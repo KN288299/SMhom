@@ -1,0 +1,1 @@
+fix: downgrade react-native-svg to 13.9.0 for old architecture compatibility

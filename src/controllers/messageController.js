@@ -1,0 +1,378 @@
+const asyncHandler = require('express-async-handler');
+const Message = require('../models/messageModel');
+const Conversation = require('../models/conversationModel');
+const mongoose = require('mongoose');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
+
+// 配置语音文件存储
+const audioStorage = multer.diskStorage({
+  destination: function(req, file, cb) {
+    const uploadDir = path.join(__dirname, '../uploads/audio');
+    // 确保目录存在
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function(req, file, cb) {
+    const timestamp = Date.now();
+    const ext = path.extname(file.originalname) || '.mp3';
+    cb(null, `voice_message_${timestamp}${ext}`);
+  }
+});
+
+// 创建上传中间件
+const uploadAudio = multer({ 
+  storage: audioStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 限制10MB
+  fileFilter: function(req, file, cb) {
+    // 只接受音频文件
+    if (file.mimetype.startsWith('audio/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('只允许上传音频文件'));
+    }
+  }
+}).single('audio');
+
+// @desc    发送消息
+// @route   POST /api/messages
+// @access  Private
+const sendMessage = asyncHandler(async (req, res) => {
+  const { 
+    conversationId, 
+    content, 
+    contentType = 'text',
+    messageType,
+    voiceUrl, 
+    voiceDuration, 
+    imageUrl,
+    videoUrl,
+    videoDuration,
+    videoWidth,
+    videoHeight,
+    aspectRatio,
+    fileUrl,
+    latitude,
+    longitude,
+    locationName,
+    address
+  } = req.body;
+  
+  // 验证会话是否存在
+  const conversation = await Conversation.findById(conversationId);
+  if (!conversation) {
+    res.status(404);
+    throw new Error('会话不存在');
+  }
+  
+  // 确定发送者角色
+  let senderRole = 'user';
+  let receiverId;
+  
+  // 根据请求中的用户角色确定发送者和接收者
+  if (req.user && req.user.role === 'customer_service') {
+    senderRole = 'customer_service';
+    receiverId = conversation.userId;
+    
+    // 增加用户的未读消息计数
+    conversation.unreadCountUser += 1;
+  } else {
+    receiverId = conversation.customerServiceId;
+    
+    // 增加客服的未读消息计数
+    conversation.unreadCountCS += 1;
+  }
+  
+  // 创建新消息基础对象
+  const messageData = {
+    conversationId,
+    senderId: req.user._id,
+    senderRole,
+    content,
+    contentType,
+    messageType: messageType || contentType, // 优先使用传入的messageType，否则使用contentType
+  };
+  
+  // 根据消息类型添加附加字段
+  if (contentType === 'voice' && voiceUrl) {
+    messageData.voiceUrl = voiceUrl;
+    messageData.voiceDuration = voiceDuration || '00:00';
+    // 同时设置通用fileUrl字段
+    messageData.fileUrl = fileUrl || voiceUrl;
+  }
+  
+  if (contentType === 'image' && imageUrl) {
+    messageData.imageUrl = imageUrl;
+    // 同时设置通用fileUrl字段
+    messageData.fileUrl = fileUrl || imageUrl;
+  }
+  
+  if (contentType === 'video') {
+    // 优先使用fileUrl，如果没有则使用videoUrl
+    const videoFileUrl = fileUrl || videoUrl;
+    
+    if (videoFileUrl) {
+      messageData.fileUrl = videoFileUrl;
+      messageData.videoUrl = videoFileUrl; // 同时设置videoUrl以保持兼容性
+      messageData.videoDuration = videoDuration || '00:00';
+      if (videoWidth) messageData.videoWidth = videoWidth;
+      if (videoHeight) messageData.videoHeight = videoHeight;
+      if (aspectRatio) messageData.aspectRatio = aspectRatio;
+      
+      console.log('保存视频消息:', {
+        fileUrl: messageData.fileUrl,
+        videoUrl: messageData.videoUrl
+      });
+    }
+  }
+  
+  // 如果是位置消息
+  if (contentType === 'location' && latitude && longitude) {
+    messageData.latitude = latitude;
+    messageData.longitude = longitude;
+    messageData.locationName = locationName || '';
+    messageData.address = address || '';
+    
+    console.log('保存位置消息:', {
+      latitude: messageData.latitude,
+      longitude: messageData.longitude,
+      locationName: messageData.locationName,
+      address: messageData.address
+    });
+  }
+  
+  // 创建新消息
+  const message = await Message.create(messageData);
+  
+  // 更新会话的最后一条消息和时间
+  conversation.lastMessage = content;
+  conversation.lastMessageTime = Date.now();
+  await conversation.save();
+  
+  res.status(201).json(message);
+});
+
+// @desc    获取会话的消息列表
+// @route   GET /api/messages/:conversationId
+// @access  Private
+const getMessages = asyncHandler(async (req, res) => {
+  const { conversationId } = req.params;
+  const { page = 1, limit = 20 } = req.query;
+  
+  // 验证会话是否存在
+  const conversation = await Conversation.findById(conversationId);
+  if (!conversation) {
+    res.status(404);
+    throw new Error('会话不存在');
+  }
+  
+  // 获取消息列表，按时间倒序排列
+  const messages = await Message.find({ conversationId })
+    .sort({ createdAt: -1 })
+    .skip((page - 1) * limit)
+    .limit(parseInt(limit));
+  
+  // 获取消息总数
+  const total = await Message.countDocuments({ conversationId });
+  
+  res.json({
+    messages: messages.reverse(), // 返回时按时间正序排列
+    page: parseInt(page),
+    pages: Math.ceil(total / limit),
+    total
+  });
+});
+
+// @desc    将消息标记为已读
+// @route   PUT /api/messages/:id/read
+// @access  Private
+const markMessageAsRead = asyncHandler(async (req, res) => {
+  const message = await Message.findById(req.params.id);
+  
+  if (!message) {
+    res.status(404);
+    throw new Error('消息不存在');
+  }
+  
+  // 只有接收者可以标记消息为已读
+  if (message.senderId.toString() === req.user._id.toString()) {
+    res.status(400);
+    throw new Error('发送者不能标记自己的消息为已读');
+  }
+  
+  message.isRead = true;
+  message.readAt = Date.now();
+  
+  const updatedMessage = await message.save();
+  
+  res.json(updatedMessage);
+});
+
+// @desc    将会话中的所有消息标记为已读
+// @route   PUT /api/messages/conversation/:conversationId/read
+// @access  Private
+const markAllAsRead = asyncHandler(async (req, res) => {
+  const { conversationId } = req.params;
+  
+  console.log('🧹 [markAllAsRead] 开始清除未读消息');
+  console.log('  会话ID:', conversationId);
+  console.log('  用户ID:', req.user._id);
+  console.log('  用户角色:', req.user.role);
+  
+  // 验证会话是否存在
+  const conversation = await Conversation.findById(conversationId);
+  if (!conversation) {
+    console.error('❌ [markAllAsRead] 会话不存在:', conversationId);
+    res.status(404);
+    throw new Error('会话不存在');
+  }
+  
+  console.log('  会话信息:', {
+    userId: conversation.userId,
+    customerServiceId: conversation.customerServiceId,
+    unreadCountUser: conversation.unreadCountUser,
+    unreadCountCS: conversation.unreadCountCS
+  });
+  
+  // 确定用户角色
+  const isCustomerService = req.user && req.user.role === 'customer_service';
+  console.log('  判断为客服:', isCustomerService);
+  
+  // 构建查询条件
+  const query = {
+    conversationId,
+    isRead: false,
+    // 只标记接收到的消息为已读
+    senderId: { $ne: req.user._id }
+  };
+  
+  console.log('  查询条件:', query);
+  
+  // 查找未读消息数量
+  const unreadCount = await Message.countDocuments(query);
+  console.log('  找到未读消息数量:', unreadCount);
+  
+  // 更新所有未读消息
+  const updateResult = await Message.updateMany(query, {
+    isRead: true,
+    readAt: Date.now()
+  });
+  
+  console.log('  更新消息结果:', updateResult);
+  
+  // 重置会话的未读消息计数
+  const beforeUpdate = {
+    unreadCountUser: conversation.unreadCountUser,
+    unreadCountCS: conversation.unreadCountCS
+  };
+  
+  if (isCustomerService) {
+    conversation.unreadCountCS = 0;
+    console.log('  清除客服未读计数: unreadCountCS -> 0');
+  } else {
+    conversation.unreadCountUser = 0;
+    console.log('  清除用户未读计数: unreadCountUser -> 0');
+  }
+  
+  await conversation.save();
+  
+  const afterUpdate = {
+    unreadCountUser: conversation.unreadCountUser,
+    unreadCountCS: conversation.unreadCountCS
+  };
+  
+  console.log('✅ [markAllAsRead] 未读计数更新完成');
+  console.log('  更新前:', beforeUpdate);
+  console.log('  更新后:', afterUpdate);
+  
+  res.json({ 
+    success: true, 
+    message: '所有消息已标记为已读',
+    updatedMessages: updateResult.modifiedCount,
+    beforeUpdate,
+    afterUpdate
+  });
+});
+
+// @desc    上传语音消息
+// @route   POST /api/messages/voice
+// @access  Private
+const uploadVoiceMessage = asyncHandler(async (req, res) => {
+  // 使用multer处理上传
+  uploadAudio(req, res, async function(err) {
+    if (err) {
+      return res.status(400).json({ message: `上传失败: ${err.message}` });
+    }
+    
+    // 如果没有文件被上传
+    if (!req.file) {
+      return res.status(400).json({ message: '未提供语音文件' });
+    }
+    
+    try {
+      const { conversationId, receiverId, duration } = req.body;
+      
+      // 验证会话是否存在
+      const conversation = await Conversation.findById(conversationId);
+      if (!conversation) {
+        return res.status(404).json({ message: '会话不存在' });
+      }
+      
+      // 确定发送者角色
+      let senderRole = 'user';
+      
+      // 根据请求中的用户角色确定发送者
+      if (req.user && req.user.role === 'customer_service') {
+        senderRole = 'customer_service';
+        // 增加用户的未读消息计数
+        conversation.unreadCountUser += 1;
+      } else {
+        // 增加客服的未读消息计数
+        conversation.unreadCountCS += 1;
+      }
+      
+      // 构建语音文件URL
+      const voiceUrl = `/uploads/audio/${req.file.filename}`;
+      
+      // 创建新消息
+      const message = await Message.create({
+        conversationId,
+        senderId: req.user._id,
+        senderRole,
+        content: '语音消息',
+        contentType: 'voice',
+        voiceUrl,
+        voiceDuration: duration || '00:00'
+      });
+      
+      // 更新会话的最后一条消息和时间
+      conversation.lastMessage = '语音消息';
+      conversation.lastMessageTime = Date.now();
+      await conversation.save();
+      
+      res.status(201).json({
+        message,
+        voiceUrl
+      });
+    } catch (error) {
+      // 如果出错，删除已上传的文件
+      if (req.file) {
+        fs.unlink(req.file.path, (err) => {
+          if (err) console.error('删除语音文件失败:', err);
+        });
+      }
+      res.status(500).json({ message: `服务器错误: ${error.message}` });
+    }
+  });
+});
+
+module.exports = {
+  sendMessage,
+  getMessages,
+  markMessageAsRead,
+  markAllAsRead,
+  uploadVoiceMessage
+}; 

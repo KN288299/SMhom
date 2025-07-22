@@ -1,0 +1,28 @@
+0000000000000000000000000000000000000000 f52711998ea2771f22e5cf6d816442022df6a0a4 ks174798 <dy174798@gmail.com> 1753077663 +0800	commit (initial): init: upload all project files (no large files)
+f52711998ea2771f22e5cf6d816442022df6a0a4 f52711998ea2771f22e5cf6d816442022df6a0a4 ks174798 <dy174798@gmail.com> 1753077665 +0800	Branch: renamed refs/heads/master to refs/heads/main
+f52711998ea2771f22e5cf6d816442022df6a0a4 a759f0d84926c4d64918e0f4276bc24d48e5bdaf ks174798 <dy174798@gmail.com> 1753079136 +0800	commit: fix: use react-native-screens 4.14.0
+a759f0d84926c4d64918e0f4276bc24d48e5bdaf b5810176092fcd8b42ee4ee7a37a1e7106b340d4 ks174798 <dy174798@gmail.com> 1753079242 +0800	commit: chore: save local changes before rebase
+b5810176092fcd8b42ee4ee7a37a1e7106b340d4 b543b3efc992a4a96fdf549f74ad544e334e260e ks174798 <dy174798@gmail.com> 1753079252 +0800	pull --rebase (finish): refs/heads/main onto 7ee155690513476b953429dc0e550d14a2ae6777
+b543b3efc992a4a96fdf549f74ad544e334e260e 5d7191a9071b7898c9934fcc94fa6270ef96e4ae ks174798 <dy174798@gmail.com> 1753079835 +0800	commit: fix: regenerate yarn.lock after registry fix
+5d7191a9071b7898c9934fcc94fa6270ef96e4ae 40a5088086e0878d9a8f14598e641c864fb703a1 ks174798 <dy174798@gmail.com> 1753080012 +0800	commit: fix: use react-native-screens 4.13.1
+40a5088086e0878d9a8f14598e641c864fb703a1 570108157deb1c00fe57ba1a902f3a1556083aa1 ks174798 <dy174798@gmail.com> 1753080086 +0800	commit: chore: save local changes before rebase
+570108157deb1c00fe57ba1a902f3a1556083aa1 898dd49e84f1bfb11607726145d32d8103d4c559 ks174798 <dy174798@gmail.com> 1753080096 +0800	pull --rebase (finish): refs/heads/main onto d45be2c61ac66e1a83bddfd4850f59ee276b6091
+898dd49e84f1bfb11607726145d32d8103d4c559 1ee580982f10cb710a2a12d460510dd302e2b8d7 ks174798 <dy174798@gmail.com> 1753085536 +0800	commit: fix: downgrade react-native-screens to 4.12.0 for Xcode 15.2 compatibility
+1ee580982f10cb710a2a12d460510dd302e2b8d7 0cfb218d6a7afad2b0453f9902201f1efe842cd8 ks174798 <dy174798@gmail.com> 1753085675 +0800	commit: chore: save all changes before rebase
+0cfb218d6a7afad2b0453f9902201f1efe842cd8 75bc37a0adb5884d475ea178816a9192931933da ks174798 <dy174798@gmail.com> 1753086471 +0800	rebase (finish): refs/heads/main onto 02a573b42c148c6c2df99c4b6e6b6c4f4efeae42
+75bc37a0adb5884d475ea178816a9192931933da c6bd2830ca22433c25b7ed227665561eeb7a34c1 ks174798 <dy174798@gmail.com> 1753086544 +0800	pull --rebase (finish): refs/heads/main onto e1c5ebe130e406a6445fda8bb99d7f646244d5d4
+c6bd2830ca22433c25b7ed227665561eeb7a34c1 bf2e240ad2ca058ba67c16a4479b8914fe598574 ks174798 <dy174798@gmail.com> 1753088235 +0800	commit: fix: update Podfile and workflow for RNScreens compatibility
+bf2e240ad2ca058ba67c16a4479b8914fe598574 84c243695a7772c72dcc25886ef70aa891abdbc7 ks174798 <dy174798@gmail.com> 1753088704 +0800	commit: fix: add network retry mechanism and CDN source for pod install
+84c243695a7772c72dcc25886ef70aa891abdbc7 e39ffb38fd0976698181c9f247450834000532c2 ks174798 <dy174798@gmail.com> 1753124716 +0800	commit: chore: use Release configuration for iOS archive and export
+e39ffb38fd0976698181c9f247450834000532c2 9ec6829e91b3a673c0a655174533a937c1852faf ks174798 <dy174798@gmail.com> 1753125069 +0800	commit: fix: set C++ standard to c++20 for RN 0.79.x compatibility
+9ec6829e91b3a673c0a655174533a937c1852faf a43346599c5970021c923d5bbe759286f534f680 ks174798 <dy174798@gmail.com> 1753125611 +0800	commit: fix: patch FuseboxTracer.cpp to use find instead of contains for C++ compatibility
+a43346599c5970021c923d5bbe759286f534f680 93f43db18998c3aa902671d19e0f6b5b1179534b ks174798 <dy174798@gmail.com> 1753126351 +0800	commit: fix: use patch file to replace contains with find in FuseboxTracer.cpp
+93f43db18998c3aa902671d19e0f6b5b1179534b 0fcf49516d686496906fa7daee2e9bddef19cb62 ks174798 <dy174798@gmail.com> 1753126591 +0800	commit: fix: correct YAML syntax for patch step in workflow
+0fcf49516d686496906fa7daee2e9bddef19cb62 380f1a044edd1fc84c68667403d1cbc48a7ee7d1 ks174798 <dy174798@gmail.com> 1753127452 +0800	commit: fix: use printf for patch to avoid YAML syntax error
+380f1a044edd1fc84c68667403d1cbc48a7ee7d1 326aa974d7a6bde67e7858ba566d1561ff304a51 ks174798 <dy174798@gmail.com> 1753127624 +0800	rebase (finish): refs/heads/main onto 3160c8a7624a1333ae7045c502aa12d7a96b3bf7
+326aa974d7a6bde67e7858ba566d1561ff304a51 18a95abcfcb9be6ea1385b5126d4b296f69ae932 ks174798 <dy174798@gmail.com> 1753128574 +0800	commit (cherry-pick): fix: remove all git conflict markers, keep only printf patch
+18a95abcfcb9be6ea1385b5126d4b296f69ae932 209602cb16818e373a818298025ebaa06a983334 ks174798 <dy174798@gmail.com> 1753130169 +0800	commit: fix: use sed for patch to avoid malformed patch error
+209602cb16818e373a818298025ebaa06a983334 9cf5535ad0be32ff96b22941259e4faffd845510 ks174798 <dy174798@gmail.com> 1753179798 +0800	cherry-pick: fix: downgrade react-native-svg to 13.9.0 for old architecture compatibility
+9cf5535ad0be32ff96b22941259e4faffd845510 3d092b3547a02fb2dafb1b004eefa43ad36fb1f6 ks174798 <dy174798@gmail.com> 1753179938 +0800	commit (cherry-pick): fix: downgrade react-native-svg to 13.9.0 for old architecture compatibility
+3d092b3547a02fb2dafb1b004eefa43ad36fb1f6 0cc047d4d03017bb0293fb496d3232581f780fc5 ks174798 <dy174798@gmail.com> 1753215012 +0800	commit (amend): fix: downgrade react-native-svg to 13.9.0 for old architecture compatibility
+0cc047d4d03017bb0293fb496d3232581f780fc5 3d092b3547a02fb2dafb1b004eefa43ad36fb1f6 ks174798 <dy174798@gmail.com> 1753215030 +0800	rebase (abort): returning to refs/heads/main

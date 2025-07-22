@@ -1,0 +1,11 @@
+{
+  "firebase": {
+    "projectId": "your-project-id",
+    "serviceAccountKeyPath": "./serviceAccountKey.json"
+  },
+  "push": {
+    "enabled": true,
+    "version": "v1",
+    "useAdminSDK": true
+  }
+}

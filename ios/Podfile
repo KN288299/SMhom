@@ -1,0 +1,72 @@
+# Resolve react_native_pods.rb with node to allow for hoisting
+require Pod::Executable.execute_command('node', ['-p',
+  'require.resolve(
+    "react-native/scripts/react_native_pods.rb",
+    {paths: [process.argv[1]]},
+  )', __dir__]).strip
+
+# 使用 CDN 源
+source 'https://cdn.cocoapods.org/'
+
+platform :ios, min_ios_version_supported
+prepare_react_native_project!
+
+# 添加这些配置来解决 Swift 模块问题
+use_modular_headers!
+use_frameworks! :linkage => :static
+
+linkage = ENV['USE_FRAMEWORKS']
+if linkage != nil
+  Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
+  use_frameworks! :linkage => linkage.to_sym
+end
+
+target 'HomeServiceChat' do
+  config = use_native_modules!
+
+  use_react_native!(
+    :path => config[:reactNativePath],
+    :hermes_enabled => false,
+    # An absolute path to your application root.
+    :app_path => "#{Pod::Config.instance.installation_root}/.."
+  )
+
+  # 移除 Firebase 相关配置，暂时注释掉
+  # pod 'FirebaseCoreInternal', :modular_headers => true, :inhibit_warnings => true
+  # pod 'FirebaseCore', :modular_headers => true, :inhibit_warnings => true
+  # pod 'FirebaseMessaging', :modular_headers => true, :inhibit_warnings => true
+  # pod 'GoogleUtilities', :modular_headers => true, :inhibit_warnings => true
+
+  post_install do |installer|
+    # https://github.com/facebook/react-native/blob/main/packages/react-native/scripts/react_native_pods.rb#L197-L202
+    react_native_post_install(
+      installer,
+      config[:reactNativePath],
+      :mac_catalyst_enabled => false,
+      # :ccache_enabled => true
+    )
+    
+    # 设置编译选项
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        # iOS 部署目标
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+        
+        # Swift 编译选项
+        config.build_settings['SWIFT_VERSION'] = '5.0'
+        config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-O'
+        
+        # C++ 标准
+        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++20'
+        
+        # 禁用 arm64 模拟器构建
+        config.build_settings["EXCLUDED_ARCHS[sdk=iphonesimulator*]"] = "arm64"
+        
+        # 其它优化
+        config.build_settings['GCC_OPTIMIZATION_LEVEL'] = '0'
+        config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
+        config.build_settings['ENABLE_BITCODE'] = 'NO'
+      end
+    end
+  end
+end

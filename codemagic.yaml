@@ -1,0 +1,34 @@
+workflows:
+  ios-workflow:
+    name: iOS Build
+    environment:
+      xcode: latest
+      cocoapods: default
+      node: latest
+      vars:
+        XCODE_PROJECT: "ios/HomeServiceChat.xcworkspace"
+        XCODE_SCHEME: "HomeServiceChat"
+        BUNDLE_ID: "com.yourcompany.homeservicechat"
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm install
+          cd ios && pod install
+      - name: Set up code signing
+        script: |
+          # 证书配置由Codemagic界面处理
+          echo "Code signing setup completed"
+      - name: Build iOS app
+        script: |
+          cd ios
+          xcodebuild -workspace HomeServiceChat.xcworkspace \
+                     -scheme HomeServiceChat \
+                     -configuration Release \
+                     -archivePath build/HomeServiceChat.xcarchive \
+                     archive
+          xcodebuild -exportArchive \
+                     -archivePath build/HomeServiceChat.xcarchive \
+                     -exportPath build/ios \
+                     -exportOptionsPlist exportOptions.plist
+    artifacts:
+      - build/ios/HomeServiceChat.ipa 

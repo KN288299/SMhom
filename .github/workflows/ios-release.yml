@@ -1,0 +1,439 @@
+name: Build iOS Release IPA (No Sign)
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_cache:
+        description: '跳过缓存(true/false)'
+        required: false
+        default: 'false'
+      skip_bundle:
+        description: '跳过预构建Bundle(true/false)'
+        required: false
+        default: 'false'
+
+env:
+  NODE_OPTIONS: "--max_old_space_size=8192"
+  CI: true
+  # 显式禁用新架构
+  RCT_NEW_ARCH_ENABLED: "0"
+  USE_HERMES: "0"
+
+jobs:
+  build:
+    runs-on: macos-13
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置版本号
+        id: version
+        run: |
+          VERSION=$(node -e "console.log(require('./package.json').version)")
+          BUILD_NUMBER=$(date +%Y%m%d%H%M)
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
+          echo "构建版本: $VERSION ($BUILD_NUMBER)"
+
+      - name: 显示 Xcode 版本
+        run: xcodebuild -version
+
+      - name: 环境检查
+        run: |
+          echo "Node版本: $(node -v)"
+          echo "NPM版本: $(npm -v)"
+          echo "Yarn版本: $(yarn -v)"
+          echo "CocoaPods版本: $(pod --version)"
+          echo "系统信息: $(sw_vers)"
+          echo "工作目录: $(pwd)"
+          ls -la
+
+      - name: 缓存 node_modules
+        id: cache-node-modules
+        if: ${{ inputs.skip_cache != 'true' }}
+        uses: actions/cache@v3
+        with:
+          path: '**/node_modules'
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: 设置 yarn registry 为 npmjs
+        run: yarn config set registry https://registry.npmjs.org/
+
+      - name: 安装依赖
+        if: ${{ steps.cache-node-modules.outputs.cache-hit != 'true' || inputs.skip_cache == 'true' }}
+        run: |
+          echo "=== 安装Node依赖 ==="
+          START_TIME=$(date +%s)
+          yarn install --network-timeout 300000
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          echo "Node依赖安装完成，耗时: ${DURATION}秒"
+
+      - name: 清除旧的Pods和构建文件
+        run: |
+          echo "=== 清理旧的构建文件和Pods ==="
+          cd ios
+          rm -rf Pods
+          rm -rf Podfile.lock
+          rm -rf ~/Library/Developer/Xcode/DerivedData
+          rm -rf build
+          pod cache clean --all
+          mkdir -p build
+          chmod -R 755 .
+
+      - name: 修复依赖包架构配置
+        run: |
+          echo "=== 修复依赖包的新架构配置 ==="
+          
+          # 1. 修复 react-native-safe-area-context
+          SAFE_AREA_DIR="node_modules/react-native-safe-area-context"
+          if [ -d "$SAFE_AREA_DIR" ]; then
+            echo "修复 react-native-safe-area-context..."
+            
+            # 1.1 备份并修改RNCSafeAreaContext.mm文件，移除所有新架构相关代码
+            MM_FILE="$SAFE_AREA_DIR/ios/RNCSafeAreaContext.mm"
+            if [ -f "$MM_FILE" ]; then
+              cp "$MM_FILE" "${MM_FILE}.bak"
+              
+              # 1.1.1 注释掉新架构相关的import
+              sed -i '' 's/#import <safeareacontext\/safeareacontext.h>/\/\/#import <safeareacontext\/safeareacontext.h>/' "$MM_FILE"
+              
+              # 1.1.2 将facebook::react::命名空间使用注释掉
+              sed -i '' 's/using namespace facebook::react;/\/\/using namespace facebook::react;/' "$MM_FILE"
+              
+              # 1.1.3 注释掉TurboModule相关方法
+              sed -i '' '/getTurboModule:/,/}/s/^/\/\//' "$MM_FILE"
+              
+              echo "已修复 RNCSafeAreaContext.mm"
+            fi
+            
+            # 1.2 创建空的头文件夹和头文件(如果需要)
+            mkdir -p "$SAFE_AREA_DIR/ios/build/generated/ios/safeareacontext"
+            touch "$SAFE_AREA_DIR/ios/build/generated/ios/safeareacontext/safeareacontext.h"
+            
+            # 1.3 修改头文件，移除新架构相关的接口
+            H_FILE="$SAFE_AREA_DIR/ios/RNCSafeAreaContext.h"
+            if [ -f "$H_FILE" ]; then
+              cp "$H_FILE" "${H_FILE}.bak"
+              # 移除TurboModule相关内容
+              sed -i '' '/RCTTurboModule/d' "$H_FILE"
+              sed -i '' '/<NativeSafeAreaContextSpec>/d' "$H_FILE"
+            fi
+            
+            # 1.4 添加.xcode.env.local文件以确保正确禁用新架构
+            echo 'ENV["RCT_NEW_ARCH_ENABLED"] = "0"' > ios/.xcode.env.local
+          fi
+          
+          # 2. 手动禁用所有第三方库的新架构支持
+          echo "=== 禁用第三方库的新架构支持 ==="
+          for PODSPEC in $(find node_modules -name "*.podspec" -type f); do
+            if grep -q "fabric_enabled" "$PODSPEC"; then
+              echo "发现使用新架构的库: $PODSPEC"
+              cp "$PODSPEC" "${PODSPEC}.bak"
+              # 替换fabric_enabled = true为false
+              sed -i '' 's/fabric_enabled\s*=\s*true/fabric_enabled = false/g' "$PODSPEC"
+              # 删除React-RCTFabric依赖
+              sed -i '' '/React-RCTFabric/d' "$PODSPEC"
+              echo "已修复: $PODSPEC"
+            fi
+          done
+          
+          # 3. 为所有新架构相关代码添加条件编译
+          echo "=== 为新架构代码添加条件编译 ==="
+          for FILE in $(grep -l "RCTViewComponentView" --include="*.h" --include="*.m" --include="*.mm" -r "node_modules"); do
+            echo "为文件添加条件编译: $FILE"
+            cp "$FILE" "${FILE}.bak"
+            sed -i '' 's/#import <React\/RCTViewComponentView.h>/#if RCT_NEW_ARCH_ENABLED\n#import <React\/RCTViewComponentView.h>\n#endif/g' "$FILE"
+          done
+
+      - name: 安装CocoaPods依赖
+        run: |
+          cd ios
+          echo "=== 开始安装CocoaPods依赖 ==="
+          START_TIME=$(date +%s)
+          
+          # 配置git以处理大仓库
+          git config --global http.lowSpeedLimit 0
+          git config --global http.lowSpeedTime 999999
+          
+          # 确保环境变量设置正确
+          export RCT_NEW_ARCH_ENABLED=0
+          export USE_HERMES=0
+          
+          # 尝试3次安装pods
+          for i in {1..3}; do
+            echo "=== 尝试 $i: 安装 pods... ==="
+            pod install --verbose && break
+            echo "=== 尝试 $i 失败，重试中... ==="
+            if [ $i -eq 3 ]; then
+              echo "❌ 安装CocoaPods失败，已达到最大重试次数"
+              exit 1
+            fi
+            sleep 10
+          done
+          
+          # 检查安装结果
+          if [ ! -d "Pods" ]; then
+            echo "❌ 错误: Pods目录不存在，安装失败"
+            exit 1
+          else
+            END_TIME=$(date +%s)
+            DURATION=$((END_TIME - START_TIME))
+            echo "✅ CocoaPods依赖安装成功，耗时: ${DURATION}秒"
+            ls -la
+          fi
+
+      - name: 预构建React Native Bundle
+        if: ${{ inputs.skip_bundle != 'true' }}
+        run: |
+          echo "=== 预构建React Native Bundle 以确保打包脚本正确 ==="
+          START_TIME=$(date +%s)
+          mkdir -p ios/bundle
+          npx react-native bundle \
+            --entry-file index.js \
+            --platform ios \
+            --dev false \
+            --bundle-output ios/bundle/main.jsbundle \
+            --assets-dest ios/bundle
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          echo "✅ Bundle构建完成，耗时: ${DURATION}秒"
+
+      - name: 修复React Native打包脚本
+        run: |
+          echo "=== 修复React Native打包脚本 ==="
+          SCRIPT_PATH="node_modules/react-native/scripts/react-native-xcode.sh"
+          if [ -f "$SCRIPT_PATH" ]; then
+            # 备份原始文件
+            cp "$SCRIPT_PATH" "${SCRIPT_PATH}.bak"
+            
+            # 修改脚本增加更多日志输出和错误处理
+            sed -i '' 's/set -e/set -ex/' "$SCRIPT_PATH"
+            
+            # 尝试修复NODE_BINARY问题
+            sed -i '' 's/export NODE_BINARY=.*/export NODE_BINARY=node/' "$SCRIPT_PATH"
+            
+            echo "✅ React Native打包脚本已修改"
+          else
+            echo "⚠️ 警告: 找不到React Native打包脚本，跳过修复"
+          fi
+          
+          # 创建.xcode.env.local文件以确保正确的Node路径
+          echo "export NODE_BINARY=$(which node)" > ios/.xcode.env.local
+          echo "创建了.xcode.env.local文件: $(cat ios/.xcode.env.local)"
+
+      - name: 应用所有必要补丁
+        id: apply-patches
+        run: |
+          echo "=== 应用所有必要补丁 ==="
+          START_TIME=$(date +%s)
+          
+          # Patch 1: FuseboxTracer.cpp for C++ compatibility
+          if [ -f "node_modules/react-native/ReactCommon/reactperflogger/fusebox/FuseboxTracer.cpp" ]; then
+            echo "1️⃣ 修补 FuseboxTracer.cpp..."
+            perl -pi -e "s/!trackIdMap\.contains\(([^)]+)\)/trackIdMap.find(\$1) == trackIdMap.end()/g" node_modules/react-native/ReactCommon/reactperflogger/fusebox/FuseboxTracer.cpp
+            perl -pi -e "s/trackIdMap\.contains\(([^)]+)\)/trackIdMap.find(\$1) != trackIdMap.end()/g" node_modules/react-native/ReactCommon/reactperflogger/fusebox/FuseboxTracer.cpp
+          else
+            echo "⚠️ 警告: 找不到 FuseboxTracer.cpp 文件，跳过修补"
+          fi
+
+          # Patch 2: react-native-screens constexpr bug
+          if [ -f "node_modules/react-native-screens/ios/RNSScreenStackHeaderConfig.mm" ]; then
+            echo "2️⃣ 修补 RNSScreenStackHeaderConfig.mm..."
+            sed -i '' 's/static constexpr auto DEFAULT_TITLE_FONT_SIZE = @17;/static NSNumber* const DEFAULT_TITLE_FONT_SIZE = @17;/g' node_modules/react-native-screens/ios/RNSScreenStackHeaderConfig.mm
+            sed -i '' 's/static constexpr auto DEFAULT_TITLE_LARGE_FONT_SIZE = @34;/static NSNumber* const DEFAULT_TITLE_LARGE_FONT_SIZE = @34;/g' node_modules/react-native-screens/ios/RNSScreenStackHeaderConfig.mm
+          else
+            echo "⚠️ 警告: 找不到 RNSScreenStackHeaderConfig.mm 文件，跳过修补"
+          fi
+          
+          # Patch 3: RNSScreenStackHeaderConfig.h nullable warning
+          if [ -f "node_modules/react-native-screens/ios/RNSScreenStackHeaderConfig.h" ]; then
+            echo "3️⃣ 修补 RNSScreenStackHeaderConfig.h 添加 _Nullable/_Nonnull 修饰符..."
+            sed -i '' 's/@property (nonatomic, weak) RNSScreenView \*screenView;/@property (nonatomic, weak) RNSScreenView * _Nullable screenView;/g' node_modules/react-native-screens/ios/RNSScreenStackHeaderConfig.h
+          else
+            echo "⚠️ 警告: 找不到 RNSScreenStackHeaderConfig.h 文件，跳过修补"
+          fi
+          
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          echo "✅ 所有补丁应用完成，耗时: ${DURATION}秒"
+
+      - name: 列出 workspace 里的 scheme
+        run: |
+          cd ios
+          echo "=== 工作空间和方案信息 ==="
+          xcodebuild -list -workspace HomeServiceChat.xcworkspace
+
+      - name: 执行清理构建
+        run: |
+          cd ios
+          echo "=== 执行清理构建 ==="
+          xcodebuild clean \
+            -workspace HomeServiceChat.xcworkspace \
+            -scheme HomeServiceChat \
+            -configuration Release
+
+      - name: 归档 Release 包（无签名）
+        id: archive
+        run: |
+          cd ios
+          echo "=== 开始归档过程 ==="
+          START_TIME=$(date +%s)
+          
+          # 设置归档路径
+          ARCHIVE_PATH="$PWD/build/HomeServiceChat.xcarchive"
+          
+          # 执行归档
+          xcodebuild -workspace HomeServiceChat.xcworkspace \
+            -scheme HomeServiceChat \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$ARCHIVE_PATH" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ENABLE_BITCODE=NO \
+            GCC_OPTIMIZATION_LEVEL=0 \
+            ONLY_ACTIVE_ARCH=NO \
+            CLANG_CXX_LANGUAGE_STANDARD="c++20" \
+            OTHER_CFLAGS="-DNS_BLOCK_ASSERTIONS=1" \
+            RCT_NEW_ARCH_ENABLED=0 \
+            archive \
+            -verbose \
+            -showBuildTimingSummary \
+            | tee build.log || { echo "❌ 构建失败"; cat build.log | tail -n 300; exit 1; }
+          
+          # 检查归档结果
+          if [ -d "$ARCHIVE_PATH" ]; then
+            END_TIME=$(date +%s)
+            DURATION=$((END_TIME - START_TIME))
+            echo "✅ 归档成功: 生成了 HomeServiceChat.xcarchive，耗时: ${DURATION}秒"
+            ls -la $ARCHIVE_PATH
+            echo "archive_duration=$DURATION" >> $GITHUB_OUTPUT
+          else
+            echo "❌ 归档失败: 找不到 HomeServiceChat.xcarchive"
+            echo "=== 构建日志摘要（末尾） ==="
+            if [ -f build.log ]; then
+              tail -n 300 build.log
+            fi
+            exit 1
+          fi
+
+      - name: 验证构建结果
+        if: success()
+        run: |
+          cd ios
+          ARCHIVE_PATH="$PWD/build/HomeServiceChat.xcarchive"
+          echo "=== 验证归档文件 ==="
+          if [ -d "$ARCHIVE_PATH" ]; then
+            echo "归档文件存在，大小:"
+            du -sh "$ARCHIVE_PATH"
+            echo "归档内容:"
+            ls -la "$ARCHIVE_PATH"
+          else
+            echo "❌ 错误: 找不到归档文件"
+            exit 1
+          fi
+
+      - name: 保存构建日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ env.APP_VERSION }}-${{ env.BUILD_NUMBER }}
+          path: |
+            ios/build.log
+            ios/Pods/Pods.xcodeproj
+            ios/HomeServiceChat.xcworkspace
+
+      - name: 导出 ipa 包
+        id: export-ipa
+        if: success()
+        run: |
+          cd ios
+          echo "=== 开始导出IPA ==="
+          START_TIME=$(date +%s)
+          
+          # 归档路径和导出路径
+          ARCHIVE_PATH="$PWD/build/HomeServiceChat.xcarchive"
+          EXPORT_PATH="$PWD/build/ipa"
+          
+          # 确认导出配置文件存在
+          if [ ! -f "exportOptions.plist" ]; then
+            echo "❌ 错误: 找不到导出配置文件 exportOptions.plist"
+            exit 1
+          fi
+          
+          # 确保导出目录存在
+          mkdir -p "$EXPORT_PATH"
+          
+          # 导出IPA
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportOptionsPlist exportOptions.plist \
+            -exportPath "$EXPORT_PATH" \
+            -verbose \
+            | tee export.log || { echo "❌ 导出失败"; cat export.log; exit 1; }
+          
+          # 检查导出结果
+          if [ -d "$EXPORT_PATH" ] && [ "$(ls -A $EXPORT_PATH)" ]; then
+            END_TIME=$(date +%s)
+            DURATION=$((END_TIME - START_TIME))
+            echo "✅ IPA导出成功，耗时: ${DURATION}秒"
+            echo "export_duration=$DURATION" >> $GITHUB_OUTPUT
+            
+            # 重命名IPA文件
+            cd "$EXPORT_PATH"
+            IPA_FILE=$(ls *.ipa 2>/dev/null || echo "")
+            if [ -n "$IPA_FILE" ]; then
+              NEW_IPA_NAME="HomeServiceChat-${{ env.APP_VERSION }}-${{ env.BUILD_NUMBER }}.ipa"
+              mv "$IPA_FILE" "$NEW_IPA_NAME"
+              echo "✅ IPA已重命名为: $NEW_IPA_NAME"
+              echo "IPA大小: $(du -h $NEW_IPA_NAME | cut -f1)"
+            else
+              echo "⚠️ 未找到IPA文件，无法重命名"
+            fi
+            
+            ls -la
+          else
+            echo "❌ 导出失败: IPA目录为空"
+            if [ -f export.log ]; then
+              echo "=== 导出日志 ==="
+              cat export.log
+            fi
+            exit 1
+          fi
+
+      - name: 收集诊断信息
+        if: failure()
+        run: |
+          echo "=== 收集诊断信息 ==="
+          echo "目录结构:"
+          ls -la
+          echo "iOS目录:"
+          ls -la ios/
+          echo "构建目录:"
+          ls -la ios/build/ || echo "构建目录不存在"
+          echo "最近错误日志:"
+          find ios -name "*.log" -type f -mtime -1 -exec ls -la {} \; -exec echo "=== {} ===" \; -exec tail -n 50 {} \;
+
+      - name: 上传 ipa 包
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HomeServiceChat-${{ env.APP_VERSION }}-${{ env.BUILD_NUMBER }}
+          path: ios/build/ipa/*.ipa
+          
+      - name: 构建摘要
+        if: always()
+        run: |
+          echo "=== 构建摘要 ==="
+          echo "构建版本: ${{ env.APP_VERSION }} (构建号: ${{ env.BUILD_NUMBER }})"
+          echo "构建状态: ${{ job.status }}"
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "归档耗时: ${{ steps.archive.outputs.archive_duration || 'N/A' }} 秒"
+            echo "导出耗时: ${{ steps.export-ipa.outputs.export_duration || 'N/A' }} 秒"
+            echo "IPA路径: ios/build/ipa/HomeServiceChat-${{ env.APP_VERSION }}-${{ env.BUILD_NUMBER }}.ipa"
+          fi
