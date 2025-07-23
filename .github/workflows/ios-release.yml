@@ -219,6 +219,33 @@ jobs:
             echo "⚠️ 警告: 找不到 RNSScreenStackHeaderConfig.h 文件，跳过修补"
           fi
           
+          # Patch 4: 修复React/UIView.h错误导入问题
+          SVG_VIEW_PATH="node_modules/react-native-svg/apple/Elements/RNSVGSvgView.h"
+          if [ -f "$SVG_VIEW_PATH" ]; then
+            echo "4️⃣ 修补 RNSVGSvgView.h 导入错误..."
+            # 创建备份
+            cp "$SVG_VIEW_PATH" "${SVG_VIEW_PATH}.bak"
+            # 替换错误的导入
+            sed -i '' 's/#import <React\/UIView.h>/#import <UIKit\/UIView.h>/g' "$SVG_VIEW_PATH"
+            echo "✅ 已修复 $SVG_VIEW_PATH"
+            
+            # 在React目录下创建UIView.h占位符
+            mkdir -p "node_modules/react-native/React"
+            echo "// 占位符: 这个文件应该从UIKit导入, 而不是从React" > "node_modules/react-native/React/UIView.h"
+            echo "#import <UIKit/UIView.h>" >> "node_modules/react-native/React/UIView.h"
+            echo "✅ 已创建React/UIView.h占位符"
+          else
+            echo "⚠️ 警告: 找不到 RNSVGSvgView.h 文件，跳过修补"
+          fi
+          
+          # 递归搜索和修复所有错误导入
+          echo "5️⃣ 全局搜索和修复React/UIView.h错误导入..."
+          find ./node_modules/react-native-svg -type f -name "*.h" -o -name "*.m" -o -name "*.mm" | xargs grep -l "React/UIView.h" 2>/dev/null | while read file; do
+            echo "修复文件: $file"
+            sed -i '' 's/#import <React\/UIView.h>/#import <UIKit\/UIView.h>/g' "$file"
+          done
+          echo "✅ 完成全局修复"
+          
           END_TIME=$(date +%s)
           DURATION=$((END_TIME - START_TIME))
           echo "✅ 所有补丁应用完成，耗时: ${DURATION}秒"
