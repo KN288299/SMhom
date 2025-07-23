@@ -212,6 +212,9 @@ function fixSVGComponentView() {
       // 读取文件内容
       let content = fs.readFileSync(filePath, 'utf8');
       
+      // 修复错误的导入路径
+      content = content.replace(/#import\s+<React\/UIView.h>/g, '#import <UIKit/UIView.h>');
+      
       // 确保导入UIKit
       if (!content.includes('#import <UIKit/UIView.h>') && !content.includes('#import <UIKit/UIKit.h>')) {
         content = `#import <UIKit/UIView.h>\n${content}`;
@@ -230,12 +233,107 @@ function fixSVGComponentView() {
   });
 }
 
+// 全局修复错误的React/UIView.h导入
+function fixIncorrectImports() {
+  console.log("修复错误的React/UIView.h导入...");
+  
+  // 查找所有可能包含错误导入的文件
+  const allSvgFiles = findAllSvgFiles();
+  
+  let fixCount = 0;
+  allSvgFiles.forEach(filePath => {
+    try {
+      // 读取文件内容
+      let content = fs.readFileSync(filePath, 'utf8');
+      
+      // 检查是否有错误的导入
+      if (content.includes('<React/UIView.h>')) {
+        // 创建备份
+        if (!fs.existsSync(`${filePath}.bak`)) {
+          fs.copyFileSync(filePath, `${filePath}.bak`);
+        }
+        
+        // 修复错误的导入路径
+        const newContent = content.replace(/#import\s+<React\/UIView.h>/g, '#import <UIKit/UIView.h>');
+        
+        // 写回文件
+        fs.writeFileSync(filePath, newContent);
+        console.log(`✅ 修复了错误的导入: ${filePath}`);
+        fixCount++;
+      }
+    } catch (error) {
+      console.error(`❌ 检查文件失败 ${filePath}:`, error);
+    }
+  });
+  
+  console.log(`共修复了 ${fixCount} 个文件中的错误导入`);
+}
+
+// 查找所有RNSVG相关文件
+function findAllSvgFiles() {
+  const results = [];
+  
+  function searchDir(dirPath) {
+    try {
+      const files = fs.readdirSync(dirPath);
+      
+      for (const file of files) {
+        const filePath = path.join(dirPath, file);
+        const stat = fs.statSync(filePath);
+        
+        if (stat.isDirectory()) {
+          searchDir(filePath);
+        } else if (
+          (file.endsWith('.h') || file.endsWith('.m') || file.endsWith('.mm')) &&
+          dirPath.includes('react-native-svg')
+        ) {
+          results.push(filePath);
+        }
+      }
+    } catch (error) {
+      console.error(`❌ 搜索目录失败 ${dirPath}:`, error);
+    }
+  }
+  
+  searchDir('node_modules/react-native-svg');
+  return results;
+}
+
+// 创建React UIView.h占位符
+function createReactUIViewPlaceholder() {
+  console.log("创建React/UIView.h占位符...");
+  
+  const dirPath = path.join('node_modules/react-native/React');
+  const filePath = path.join(dirPath, 'UIView.h');
+  
+  try {
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
+    }
+    
+    const content = `// 占位符: 这个文件应该从UIKit导入, 而不是从React
+#import <UIKit/UIView.h>
+`;
+    
+    fs.writeFileSync(filePath, content);
+    console.log(`✅ 创建了占位符文件: ${filePath}`);
+  } catch (error) {
+    console.error(`❌ 创建占位符文件失败 ${filePath}:`, error);
+  }
+}
+
 // 主函数
 async function main() {
   console.log('开始修复缺失文件问题...');
   
   // 创建缺失的目录和文件
   createMissingFiles();
+  
+  // 修复错误的React/UIView.h导入
+  fixIncorrectImports();
+  
+  // 创建React UIView.h占位符
+  createReactUIViewPlaceholder();
   
   // 修复RNSVGUse.mm文件
   fixRNSVGUseFile();
