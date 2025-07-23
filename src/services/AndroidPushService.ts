@@ -1,5 +1,4 @@
-import { Alert, Linking, Platform } from 'react-native';
-// 移除直接导入@react-native-firebase/messaging
+import { Alert, Platform } from 'react-native';
 import { BASE_URL } from '../config/api';
 import NotificationService from './NotificationService';
 
@@ -17,12 +16,15 @@ interface PushNotificationData {
   body?: string;
 }
 
+/**
+ * 简化的推送服务，不依赖于Firebase
+ * 仅提供基本接口，不实际实现推送功能
+ */
 class AndroidPushService {
   private static instance: AndroidPushService;
-  private fcmToken: string | null = null;
   private initialized = false;
   private notificationService: typeof NotificationService;
-  private messaging: any = null;
+  private deviceToken: string | null = null;
 
   static getInstance(): AndroidPushService {
     if (!AndroidPushService.instance) {
@@ -33,188 +35,30 @@ class AndroidPushService {
 
   constructor() {
     this.notificationService = NotificationService;
-    // 只在Android平台上初始化Firebase
-    if (Platform.OS === 'android') {
-      try {
-        // 动态导入，这样iOS构建时不会尝试导入这个模块
-        this.importFirebaseMessaging();
-      } catch (error) {
-        console.error('❌ [AndroidPush] 无法导入Firebase消息模块:', error);
-      }
-    }
-  }
-
-  // 动态导入Firebase模块
-  private async importFirebaseMessaging() {
-    try {
-      if (Platform.OS === 'android') {
-        const messagingModule = require('@react-native-firebase/messaging');
-        this.messaging = messagingModule.default;
-        console.log('✅ [AndroidPush] Firebase消息模块导入成功');
-      }
-    } catch (error) {
-      console.error('❌ [AndroidPush] Firebase消息模块导入失败:', error);
-    }
   }
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
     try {
-      console.log(`🚀 [AndroidPush] 开始初始化推送服务 (平台: ${Platform.OS})`);
+      console.log(`🚀 [PushService] 开始初始化推送服务 (平台: ${Platform.OS})`);
       
       await this.notificationService.initialize();
       
-      // 只在Android上执行Firebase相关操作
-      if (Platform.OS === 'android' && this.messaging) {
-        const hasPermission = await this.requestPermission();
-        if (!hasPermission) {
-          console.warn('⚠️ [AndroidPush] 未获得通知权限');
-          return;
-        }
-
-        await this.getFCMToken();
-        this.setupMessageListeners();
-        this.setupTokenRefreshListener();
-      } else {
-        console.log('⏭️ [AndroidPush] 非Android平台或Firebase未初始化，跳过推送服务初始化');
-      }
-
       this.initialized = true;
-      console.log('✅ [AndroidPush] 推送服务初始化完成');
+      console.log('✅ [PushService] 推送服务初始化完成');
     } catch (error) {
-      console.error('❌ [AndroidPush] 初始化失败:', error);
+      console.error('❌ [PushService] 初始化失败:', error);
     }
   }
 
-  private async requestPermission(): Promise<boolean> {
-    try {
-      if (!this.messaging) {
-        console.warn('⚠️ [AndroidPush] Firebase消息模块未初始化');
-        return false;
-      }
-      
-      const authStatus = await this.messaging().requestPermission();
-      
-      const enabled =
-        authStatus === this.messaging.AuthorizationStatus.AUTHORIZED ||
-        authStatus === this.messaging.AuthorizationStatus.PROVISIONAL;
-
-      if (!enabled) {
-        Alert.alert(
-          '需要通知权限',
-          '为了及时接收消息和来电通知，请允许通知权限。',
-          [
-            { text: '取消', style: 'cancel' },
-            { text: '去设置', onPress: () => Linking.openSettings() },
-          ]
-        );
-        return false;
-      }
-
-      console.log('✅ [AndroidPush] 通知权限已获取');
-      return true;
-    } catch (error) {
-      console.error('❌ [AndroidPush] 权限请求失败:', error);
-      return false;
-    }
-  }
-
-  private async getFCMToken(): Promise<string | null> {
-    try {
-      if (!this.messaging) {
-        console.warn('⚠️ [AndroidPush] Firebase消息模块未初始化');
-        return null;
-      }
-      
-      const token = await this.messaging().getToken();
-      this.fcmToken = token;
-      console.log('🔑 [AndroidPush] FCM Token获取成功:', token.substring(0, 20) + '...');
-      
-      await this.sendTokenToServer(token);
-      return token;
-    } catch (error) {
-      console.error('❌ [AndroidPush] 获取FCM Token失败:', error);
-      return null;
-    }
-  }
-
-  private async sendTokenToServer(token: string): Promise<void> {
-    try {
-      // 这里暂时跳过token上传，在登录时会调用updateFCMToken
-      console.log('📝 [AndroidPush] FCM Token准备就绪，等待登录后上传');
-    } catch (error) {
-      console.error('❌ [AndroidPush] 发送FCM Token到服务器失败:', error);
-    }
-  }
-
-  // 更新FCM Token
+  // 更新设备令牌
   async updateFCMTokenAfterLogin(authToken: string): Promise<void> {
-    if (!this.fcmToken) {
-      console.log('⚠️ [AndroidPush] FCM Token尚未获取，跳过上传');
-      return;
-    }
-
-    try {
-      const response = await fetch(`${BASE_URL}/api/users/update-fcm-token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({ fcmToken: this.fcmToken }),
-      });
-
-      if (response.ok) {
-        console.log('✅ [AndroidPush] FCM Token已发送到服务器');
-      } else {
-        console.error('❌ [AndroidPush] 发送FCM Token失败:', await response.text());
-      }
-    } catch (error) {
-      console.error('❌ [AndroidPush] 发送FCM Token到服务器失败:', error);
-    }
+    // 这个方法被保留用于API兼容性，但实际上不执行任何操作
+    console.log('📱 [PushService] 不使用Firebase，跳过更新推送令牌');
   }
 
-  private setupMessageListeners(): void {
-    if (!this.messaging) {
-      console.warn('⚠️ [AndroidPush] Firebase消息模块未初始化，无法设置消息监听器');
-      return;
-    }
-    
-    this.messaging().onMessage(async (remoteMessage: any) => {
-      console.log('📨 [AndroidPush] 前台收到消息:', remoteMessage);
-      
-      const { notification, data } = remoteMessage;
-      
-      if (notification && data) {
-        this.showForegroundNotification({
-          title: notification.title || '新消息',
-          body: notification.body || '您收到了一条新消息',
-          type: data.type || 'general',
-          conversationId: data.conversationId,
-          callId: data.callId,
-          senderName: data.senderName,
-        });
-      }
-    });
-
-    this.messaging().onNotificationOpenedApp((remoteMessage: any) => {
-      console.log('👆 [AndroidPush] 通知被点击，应用从后台打开:', remoteMessage);
-      this.handleNotificationClick(remoteMessage);
-    });
-
-    this.messaging()
-      .getInitialNotification()
-      .then((remoteMessage: any) => {
-        if (remoteMessage) {
-          console.log('🚀 [AndroidPush] 应用从关闭状态被通知打开:', remoteMessage);
-          setTimeout(() => {
-            this.handleNotificationClick(remoteMessage);
-          }, 2000);
-        }
-      });
-  }
-
+  // 显示本地通知
   private showForegroundNotification(notificationData: PushNotificationData): void {
     const { type, title, body, senderName, conversationId, callId } = notificationData;
     
@@ -250,45 +94,18 @@ class AndroidPushService {
     }
   }
 
-  private handleNotificationClick(remoteMessage: any): void {
-    const { data } = remoteMessage;
-    
-    if (!data) return;
-    
-    console.log('🔔 [AndroidPush] 处理通知点击:', data);
-    
-    switch (data.type) {
-      case 'message':
-        if (data.conversationId) {
-          console.log('💬 [AndroidPush] 导航到聊天页面:', data.conversationId);
-          this.navigateToChat(data.conversationId);
-        }
-        break;
-        
-      case 'voice_call':
-        if (data.callId && data.conversationId) {
-          console.log('📞 [AndroidPush] 处理来电通知:', data.callId);
-          this.navigateToVoiceCall(data.callId, data.conversationId);
-        }
-        break;
-        
-      default:
-        console.log('📋 [AndroidPush] 未知通知类型:', data.type);
-    }
-  }
-
   private navigateToChat(conversationId: string): void {
     try {
       if (global.navigationRef?.current) {
         global.navigationRef.current.navigate('Chat', {
           conversationId: conversationId,
         });
-        console.log('✅ [AndroidPush] 导航到聊天页面成功');
+        console.log('✅ [PushService] 导航到聊天页面成功');
       } else {
-        console.warn('⚠️ [AndroidPush] 导航引用不可用');
+        console.warn('⚠️ [PushService] 导航引用不可用');
       }
     } catch (error) {
-      console.error('❌ [AndroidPush] 导航失败:', error);
+      console.error('❌ [PushService] 导航失败:', error);
     }
   }
 
@@ -300,36 +117,24 @@ class AndroidPushService {
           conversationId: conversationId,
           isIncoming: true,
         });
-        console.log('✅ [AndroidPush] 导航到来电页面成功');
+        console.log('✅ [PushService] 导航到来电页面成功');
       } else {
-        console.warn('⚠️ [AndroidPush] 导航引用不可用');
+        console.warn('⚠️ [PushService] 导航引用不可用');
       }
     } catch (error) {
-      console.error('❌ [AndroidPush] 导航到来电页面失败:', error);
+      console.error('❌ [PushService] 导航到来电页面失败:', error);
     }
-  }
-
-  private setupTokenRefreshListener(): void {
-    if (!this.messaging) {
-      console.warn('⚠️ [AndroidPush] Firebase消息模块未初始化，无法设置Token刷新监听器');
-      return;
-    }
-    
-    this.messaging().onTokenRefresh(async (token: string) => {
-      console.log('🔄 [AndroidPush] FCM Token已刷新');
-      this.fcmToken = token;
-      await this.sendTokenToServer(token);
-    });
   }
 
   getFCMToken(): string | null {
-    return this.fcmToken;
+    // 这个方法被保留用于API兼容性，但总是返回null
+    return null;
   }
 
   showTestNotification(): void {
     this.notificationService.showInAppNotification({
       title: '测试通知',
-      message: '这是一个测试推送通知',
+      message: '这是一个本地测试通知',
       data: { test: true },
       category: 'system'
     });

@@ -1,6 +1,5 @@
 import { Platform, Alert, Linking } from 'react-native';
 import PushNotification, { Importance } from 'react-native-push-notification';
-import messaging from '@react-native-firebase/messaging';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { BASE_URL } from '../config/api';
 
@@ -20,7 +19,7 @@ export interface NotificationData {
 
 class PushNotificationService {
   private initialized = false;
-  private fcmToken: string | null = null;
+  private deviceToken: string | null = null;
 
   // 初始化推送通知服务
   async initialize(): Promise<void> {
@@ -32,12 +31,6 @@ class PushNotificationService {
       
       // 请求权限
       await this.requestPermissions();
-      
-      // 获取FCM token
-      await this.getFCMToken();
-      
-      // 设置消息监听
-      this.setupMessageListeners();
       
       this.initialized = true;
       console.log('✅ [PushNotification] 推送通知服务初始化完成');
@@ -132,25 +125,15 @@ class PushNotificationService {
   private async requestPermissions(): Promise<boolean> {
     try {
       if (Platform.OS === 'ios') {
-        // iOS权限请求
-        const authStatus = await messaging().requestPermission();
-        const enabled =
-          authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-          authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-
-        if (!enabled) {
-          Alert.alert(
-            '需要通知权限',
-            '为了及时接收消息和来电通知，请允许通知权限。',
-            [
-              { text: '取消', style: 'cancel' },
-              { text: '去设置', onPress: () => Linking.openSettings() },
-            ]
-          );
-          return false;
-        }
-
-        console.log('✅ [PushNotification] iOS通知权限已获取');
+        // iOS权限请求 - 简化版，移除Firebase依赖
+        Alert.alert(
+          '需要通知权限',
+          '为了及时接收消息和来电通知，请在弹出的系统对话框中允许通知权限。',
+          [{ text: '好的', style: 'default' }]
+        );
+        
+        // 由于没有Firebase，返回true假设权限已获取
+        console.log('⚠️ [PushNotification] iOS通知权限请求已简化(无Firebase)');
         return true;
       } else {
         // Android权限请求
@@ -173,92 +156,6 @@ class PushNotificationService {
       console.error('❌ [PushNotification] 权限请求失败:', error);
       return false;
     }
-  }
-
-  // 获取FCM Token
-  private async getFCMToken(): Promise<string | null> {
-    try {
-      const token = await messaging().getToken();
-      this.fcmToken = token;
-      console.log('🔑 [PushNotification] FCM Token:', token.substring(0, 50) + '...');
-      
-      // 发送token到服务器
-      await this.sendTokenToServer(token);
-      
-      return token;
-    } catch (error) {
-      console.error('❌ [PushNotification] 获取FCM Token失败:', error);
-      return null;
-    }
-  }
-
-  // 发送token到服务器
-  private async sendTokenToServer(token: string): Promise<void> {
-    try {
-      // 获取用户信息（如果有的话）
-      const userToken = global.userToken || '';
-      
-      if (!userToken) {
-        console.log('⚠️ [PushNotification] 用户未登录，跳过token上传');
-        return;
-      }
-
-      const response = await fetch(`${BASE_URL}/api/users/update-fcm-token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userToken}`,
-        },
-        body: JSON.stringify({ fcmToken: token }),
-      });
-
-      if (response.ok) {
-        console.log('✅ [PushNotification] FCM Token已发送到服务器');
-      } else {
-        console.error('❌ [PushNotification] 发送FCM Token失败:', await response.text());
-      }
-    } catch (error) {
-      console.error('❌ [PushNotification] 发送FCM Token到服务器失败:', error);
-    }
-  }
-
-  // 设置消息监听
-  private setupMessageListeners(): void {
-    // 前台消息监听
-    messaging().onMessage(async (remoteMessage) => {
-      console.log('📨 [PushNotification] 前台收到消息:', remoteMessage);
-      
-      // 在前台显示本地通知
-      this.showLocalNotification({
-        title: remoteMessage.notification?.title || '新消息',
-        message: remoteMessage.notification?.body || '您收到了一条新消息',
-        data: remoteMessage.data,
-        category: remoteMessage.data?.type || 'message'
-      });
-    });
-
-    // 后台消息监听
-    messaging().onNotificationOpenedApp((remoteMessage) => {
-      console.log('📨 [PushNotification] 从后台打开消息:', remoteMessage);
-      // TODO: 根据消息类型导航到相应页面
-    });
-
-    // 应用启动时的消息处理
-    messaging()
-      .getInitialNotification()
-      .then((remoteMessage) => {
-        if (remoteMessage) {
-          console.log('📨 [PushNotification] 启动时的消息:', remoteMessage);
-          // TODO: 根据消息类型导航到相应页面
-        }
-      });
-
-    // Token刷新监听
-    messaging().onTokenRefresh((token) => {
-      console.log('🔄 [PushNotification] FCM Token刷新:', token.substring(0, 50) + '...');
-      this.fcmToken = token;
-      // TODO: 将新token发送到服务器
-    });
   }
 
   // 显示本地通知
@@ -312,6 +209,12 @@ class PushNotificationService {
     });
   }
 
+  // 显示应用内通知
+  showInAppNotification(data: NotificationData): void {
+    // 简化版的应用内通知，使用本地通知
+    this.showLocalNotification(data);
+  }
+
   // 清除所有通知
   clearAllNotifications(): void {
     PushNotification.cancelAllLocalNotifications();
@@ -324,18 +227,17 @@ class PushNotificationService {
     console.log('🧹 [PushNotification] 已清除通知:', id);
   }
 
-  // 获取当前FCM Token
+  // 获取设备令牌 (空实现，原Firebase FCM功能)
   getFCMTokenSync(): string | null {
-    return this.fcmToken;
+    return null;
   }
 
   // 检查通知权限状态
   async checkPermissionStatus(): Promise<boolean> {
     try {
       if (Platform.OS === 'ios') {
-        const authStatus = await messaging().hasPermission();
-        return authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-               authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+        // iOS权限检查简化版
+        return true;
       } else {
         const permission = await check(PERMISSIONS.ANDROID.POST_NOTIFICATIONS);
         return permission === RESULTS.GRANTED;

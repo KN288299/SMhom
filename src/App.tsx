@@ -33,9 +33,9 @@ function App(): React.JSX.Element {
     console.log('🔗 [App] 全局引用已设置');
   }, []);
 
-  // 初始化Android推送服务
+  // 初始化本地通知服务（原Android推送服务）
   useEffect(() => {
-    console.log('🚀 [App] 初始化Android推送服务');
+    console.log('🚀 [App] 初始化本地通知服务');
     AndroidPushService.initialize();
   }, []);
 

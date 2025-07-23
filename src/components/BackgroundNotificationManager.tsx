@@ -3,15 +3,10 @@ import { AppState, AppStateStatus } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import notificationService from '../services/NotificationService';
-import backgroundCallService from '../services/BackgroundCallService';
 
-interface BackgroundNotificationManagerProps {
-  children: React.ReactNode;
-}
-
-const BackgroundNotificationManager: React.FC<BackgroundNotificationManagerProps> = ({ children }) => {
-  const { userInfo, isCustomerService } = useContext(AuthContext);
-  const { subscribeToMessages, subscribeToIncomingCalls, isConnected } = useSocket();
+const BackgroundNotificationManager: React.FC = () => {
+  const { userInfo } = useContext(AuthContext);
+  const { subscribeToMessages, isConnected } = useSocket();
 
   // 应用状态管理
   useEffect(() => {
@@ -42,7 +37,6 @@ const BackgroundNotificationManager: React.FC<BackgroundNotificationManagerProps
   useEffect(() => {
     if (userInfo) {
       notificationService.initialize();
-      backgroundCallService.initialize();
     }
   }, [userInfo]);
 
@@ -76,29 +70,6 @@ const BackgroundNotificationManager: React.FC<BackgroundNotificationManagerProps
 
     return unsubscribeMessages;
   }, [userInfo, isConnected, subscribeToMessages]);
-
-  // 禁用来电通知处理，避免与全局来电管理器冲突
-  // 来电处理已移至全局App层面，这里不再处理来电显示
-  useEffect(() => {
-    if (!userInfo || !isConnected) return;
-
-    const unsubscribeIncomingCalls = subscribeToIncomingCalls((callData) => {
-      console.log('📞 [BackgroundNotification] 收到来电事件，但已禁用后台处理');
-      console.log('📞 [BackgroundNotification] 来电将由全局来电管理器处理');
-      
-      // 不再调用后台来电服务，避免重复显示
-      // backgroundCallService.showIncomingCallNotification({
-      //   callId: callData.callId,
-      //   callerId: callData.callerId,
-      //   callerName: callData.callerName || '未知联系人',
-      //   callerAvatar: callData.callerAvatar,
-      //   conversationId: callData.conversationId,
-      //   callerRole: callData.callerRole || 'user'
-      // });
-    });
-
-    return unsubscribeIncomingCalls;
-  }, [userInfo, isConnected, subscribeToIncomingCalls]);
 
   // 这个组件不渲染任何UI，只是后台逻辑
   return null;
