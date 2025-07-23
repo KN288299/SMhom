@@ -221,21 +221,18 @@ jobs:
               sed -i '' 's/ENV\[\x27RCT_NEW_ARCH_ENABLED\x27\][[:space:]]*=[[:space:]]*\x271\x27/ENV[\x27RCT_NEW_ARCH_ENABLED\x27] = \x270\x27/g' Podfile || \
               echo "# 强制禁用新架构" >> Podfile
             
-            # 添加额外的配置设置到Podfile底部
-            cat >> Podfile << EOL
-            
-# 确保禁用新架构
-ENV['RCT_NEW_ARCH_ENABLED'] = '0'
-ENV['USE_FABRIC'] = '0'
-ENV['USE_HERMES'] = '0'
-
-# 禁用所有Fabric相关设置
-$RCT_NEW_ARCH_ENABLED = false
-$fabric_enabled = false
-$USE_FABRIC = false
-$USE_HERMES = false
-$RCT_FABRIC_ENABLED = false
-EOL
+            # 写入禁用Fabric的配置
+            echo "# 确保禁用新架构" >> Podfile
+            echo "ENV[\"RCT_NEW_ARCH_ENABLED\"] = \"0\"" >> Podfile
+            echo "ENV[\"USE_FABRIC\"] = \"0\"" >> Podfile
+            echo "ENV[\"USE_HERMES\"] = \"0\"" >> Podfile
+            echo "" >> Podfile
+            echo "# 禁用所有Fabric相关设置" >> Podfile
+            echo "\$RCT_NEW_ARCH_ENABLED = false" >> Podfile
+            echo "\$fabric_enabled = false" >> Podfile
+            echo "\$USE_FABRIC = false" >> Podfile
+            echo "\$USE_HERMES = false" >> Podfile
+            echo "\$RCT_FABRIC_ENABLED = false" >> Podfile
             
             echo "Podfile已修复，内容:"
             cat Podfile | tail -n 10
