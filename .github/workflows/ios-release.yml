@@ -223,64 +223,34 @@ jobs:
         run: |
           echo "=== 修复react-native-svg导入问题 ==="
           
-          # RNSVGUse.mm文件导入问题修复
+          # 修复RNSVGUse.mm文件导入问题
           SVG_USE_PATH="./node_modules/react-native-svg/apple/Elements/RNSVGUse.mm"
           if [ -f "$SVG_USE_PATH" ]; then
             echo "修复文件: $SVG_USE_PATH"
             # 创建备份
             cp "$SVG_USE_PATH" "${SVG_USE_PATH}.bak"
             
-            # 替换问题导入
-            sed -i '' 's/#import <React\/RCTConversions.h>/#import <React\/RCTBridge.h>\n#import <UIKit\/UIKit.h>/g' "$SVG_USE_PATH"
+            # 替换问题导入 - 使用更简单的方法
+            grep -v "RCTConversions.h" "$SVG_USE_PATH" > "${SVG_USE_PATH}.tmp"
+            mv "${SVG_USE_PATH}.tmp" "$SVG_USE_PATH"
+            
+            # 添加必要的导入
+            sed -i '' '1i\
+            #import <UIKit/UIKit.h>\
+            #import <React/RCTBridge.h>
+            ' "$SVG_USE_PATH"
             
             echo "✅ 修复完成: $SVG_USE_PATH"
           else
             echo "⚠️ 文件不存在: $SVG_USE_PATH"
           fi
           
-          # 为RNSVG添加React-Core的头文件搜索路径
-          if [ -f "ios/Pods/Pods.xcodeproj" ]; then
-            echo "修复RNSVG头文件搜索路径..."
-            cat > fix_rnsvg_search_paths.rb << 'EOL'
-            require 'xcodeproj'
-            
-            project_path = 'ios/Pods/Pods.xcodeproj'
-            project = Xcodeproj::Project.open(project_path)
-            
-            target = project.targets.find { |t| t.name == 'RNSVG' }
-            
-            if target
-              puts "找到目标: #{target.name}"
-              target.build_configurations.each do |config|
-                # 添加React-Core头文件搜索路径
-                header_paths = config.build_settings['HEADER_SEARCH_PATHS'] ||= '$(inherited)'
-                unless header_paths.include?('React-Core')
-                  header_paths = "#{header_paths} \"${PODS_ROOT}/Headers/Public/React-Core\" \"${PODS_ROOT}/../../node_modules/react-native/ReactCommon\""
-                  config.build_settings['HEADER_SEARCH_PATHS'] = header_paths
-                  puts "已添加React-Core头文件搜索路径"
-                end
-              end
-              
-              # 保存项目
-              project.save
-              puts "✅ 成功修复RNSVG头文件搜索路径"
-            else
-              puts "未找到RNSVG目标"
-            end
-            EOL
-            
-            # 执行Ruby脚本
-            ruby fix_rnsvg_search_paths.rb
-          else
-            echo "⚠️ Pods项目不存在，跳过修复头文件搜索路径"
-          fi
-          
-          # 创建空的替代文件 (修复路径问题)
+          # 创建空的替代文件
           echo "创建RCTConversions.h占位文件..."
           mkdir -p "./node_modules/react-native/React"
-          echo "// Empty placeholder to fix missing header" > "./node_modules/react-native/React/RCTConversions.h"
+          echo "// Empty placeholder for missing header" > "./node_modules/react-native/React/RCTConversions.h"
           
-          echo "✅ 完成修复 react-native-svg 导入问题"
+          echo "✅ 完成修复react-native-svg导入问题"
 
       - name: 修复react-native-svg架构问题
         run: |
