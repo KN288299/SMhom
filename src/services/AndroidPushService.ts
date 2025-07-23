@@ -1,5 +1,5 @@
-import { Alert, Linking } from 'react-native';
-import messaging from '@react-native-firebase/messaging';
+import { Alert, Linking, Platform } from 'react-native';
+// 移除直接导入@react-native-firebase/messaging
 import { BASE_URL } from '../config/api';
 import NotificationService from './NotificationService';
 
@@ -22,6 +22,7 @@ class AndroidPushService {
   private fcmToken: string | null = null;
   private initialized = false;
   private notificationService: typeof NotificationService;
+  private messaging: any = null;
 
   static getInstance(): AndroidPushService {
     if (!AndroidPushService.instance) {
@@ -32,24 +33,52 @@ class AndroidPushService {
 
   constructor() {
     this.notificationService = NotificationService;
+    // 只在Android平台上初始化Firebase
+    if (Platform.OS === 'android') {
+      try {
+        // 动态导入，这样iOS构建时不会尝试导入这个模块
+        this.importFirebaseMessaging();
+      } catch (error) {
+        console.error('❌ [AndroidPush] 无法导入Firebase消息模块:', error);
+      }
+    }
+  }
+
+  // 动态导入Firebase模块
+  private async importFirebaseMessaging() {
+    try {
+      if (Platform.OS === 'android') {
+        const messagingModule = require('@react-native-firebase/messaging');
+        this.messaging = messagingModule.default;
+        console.log('✅ [AndroidPush] Firebase消息模块导入成功');
+      }
+    } catch (error) {
+      console.error('❌ [AndroidPush] Firebase消息模块导入失败:', error);
+    }
   }
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
     try {
-      console.log('🚀 [AndroidPush] 开始初始化推送服务');
+      console.log(`🚀 [AndroidPush] 开始初始化推送服务 (平台: ${Platform.OS})`);
       
       await this.notificationService.initialize();
-      const hasPermission = await this.requestPermission();
-      if (!hasPermission) {
-        console.warn('⚠️ [AndroidPush] 未获得通知权限');
-        return;
-      }
+      
+      // 只在Android上执行Firebase相关操作
+      if (Platform.OS === 'android' && this.messaging) {
+        const hasPermission = await this.requestPermission();
+        if (!hasPermission) {
+          console.warn('⚠️ [AndroidPush] 未获得通知权限');
+          return;
+        }
 
-      await this.getFCMToken();
-      this.setupMessageListeners();
-      this.setupTokenRefreshListener();
+        await this.getFCMToken();
+        this.setupMessageListeners();
+        this.setupTokenRefreshListener();
+      } else {
+        console.log('⏭️ [AndroidPush] 非Android平台或Firebase未初始化，跳过推送服务初始化');
+      }
 
       this.initialized = true;
       console.log('✅ [AndroidPush] 推送服务初始化完成');
@@ -60,11 +89,16 @@ class AndroidPushService {
 
   private async requestPermission(): Promise<boolean> {
     try {
-      const authStatus = await messaging().requestPermission();
+      if (!this.messaging) {
+        console.warn('⚠️ [AndroidPush] Firebase消息模块未初始化');
+        return false;
+      }
+      
+      const authStatus = await this.messaging().requestPermission();
       
       const enabled =
-        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+        authStatus === this.messaging.AuthorizationStatus.AUTHORIZED ||
+        authStatus === this.messaging.AuthorizationStatus.PROVISIONAL;
 
       if (!enabled) {
         Alert.alert(
@@ -88,7 +122,12 @@ class AndroidPushService {
 
   private async getFCMToken(): Promise<string | null> {
     try {
-      const token = await messaging().getToken();
+      if (!this.messaging) {
+        console.warn('⚠️ [AndroidPush] Firebase消息模块未初始化');
+        return null;
+      }
+      
+      const token = await this.messaging().getToken();
       this.fcmToken = token;
       console.log('🔑 [AndroidPush] FCM Token获取成功:', token.substring(0, 20) + '...');
       
@@ -109,7 +148,7 @@ class AndroidPushService {
     }
   }
 
-  // 新增方法：登录后上传FCM Token
+  // 更新FCM Token
   async updateFCMTokenAfterLogin(authToken: string): Promise<void> {
     if (!this.fcmToken) {
       console.log('⚠️ [AndroidPush] FCM Token尚未获取，跳过上传');
@@ -137,7 +176,12 @@ class AndroidPushService {
   }
 
   private setupMessageListeners(): void {
-    messaging().onMessage(async (remoteMessage: any) => {
+    if (!this.messaging) {
+      console.warn('⚠️ [AndroidPush] Firebase消息模块未初始化，无法设置消息监听器');
+      return;
+    }
+    
+    this.messaging().onMessage(async (remoteMessage: any) => {
       console.log('📨 [AndroidPush] 前台收到消息:', remoteMessage);
       
       const { notification, data } = remoteMessage;
@@ -154,12 +198,12 @@ class AndroidPushService {
       }
     });
 
-    messaging().onNotificationOpenedApp((remoteMessage: any) => {
+    this.messaging().onNotificationOpenedApp((remoteMessage: any) => {
       console.log('👆 [AndroidPush] 通知被点击，应用从后台打开:', remoteMessage);
       this.handleNotificationClick(remoteMessage);
     });
 
-    messaging()
+    this.messaging()
       .getInitialNotification()
       .then((remoteMessage: any) => {
         if (remoteMessage) {
@@ -266,7 +310,12 @@ class AndroidPushService {
   }
 
   private setupTokenRefreshListener(): void {
-    messaging().onTokenRefresh(async (token: string) => {
+    if (!this.messaging) {
+      console.warn('⚠️ [AndroidPush] Firebase消息模块未初始化，无法设置Token刷新监听器');
+      return;
+    }
+    
+    this.messaging().onTokenRefresh(async (token: string) => {
       console.log('🔄 [AndroidPush] FCM Token已刷新');
       this.fcmToken = token;
       await this.sendTokenToServer(token);
