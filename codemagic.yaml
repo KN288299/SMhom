@@ -21,6 +21,10 @@ workflows:
           echo "运行Fabric修复脚本..."
           node fix-fabric-modules.js
           
+          # 执行缺失文件修复脚本
+          echo "运行缺失文件修复脚本..."
+          node fix-missing-fabric-files.js
+          
       - name: 创建导出选项文件
         script: |
           # 创建exportOptions.plist文件支持无证书构建
