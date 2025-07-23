@@ -219,6 +219,72 @@ jobs:
           DURATION=$((END_TIME - START_TIME))
           echo "✅ 所有补丁应用完成，耗时: ${DURATION}秒"
 
+      - name: 修复react-native-svg架构问题
+        run: |
+          echo "=== 修复react-native-svg架构问题 ==="
+          
+          # RNSVGSvgView.h文件
+          SVG_VIEW_PATH="./node_modules/react-native-svg/apple/Elements/RNSVGSvgView.h"
+          if [ -f "$SVG_VIEW_PATH" ]; then
+            echo "修复 $SVG_VIEW_PATH"
+            # 创建备份
+            cp "$SVG_VIEW_PATH" "${SVG_VIEW_PATH}.bak"
+            
+            # 使用临时文件而不是直接sed，避免YAML问题
+            cat > fix_svg_view.h << 'EOL'
+            #if RCT_NEW_ARCH_ENABLED
+                RCTViewComponentView <RNSVGContainer>
+            #else
+                UIView <RNSVGContainer>
+            #endif
+            EOL
+            
+            # 替换RCTViewComponentView为条件编译
+            sed -i '' "s/RCTViewComponentView <RNSVGContainer>/$(cat fix_svg_view.h | tr '\n' ' ' | sed 's/\//\\\//g')/g" "$SVG_VIEW_PATH"
+            
+            echo "✅ 成功修复 RNSVGSvgView.h"
+          else
+            echo "⚠️ 警告: 找不到文件 $SVG_VIEW_PATH"
+          fi
+          
+          # RNSVGNode.h文件
+          SVG_NODE_PATH="./node_modules/react-native-svg/apple/RNSVGNode.h"
+          if [ -f "$SVG_NODE_PATH" ]; then
+            echo "修复 $SVG_NODE_PATH"
+            # 创建备份
+            cp "$SVG_NODE_PATH" "${SVG_NODE_PATH}.bak"
+            
+            # 使用临时文件而不是直接sed，避免YAML问题
+            cat > fix_svg_node.h << 'EOL'
+            #if RCT_NEW_ARCH_ENABLED
+                RCTViewComponentView
+            #else
+                UIView
+            #endif
+            EOL
+            
+            # 替换RCTViewComponentView为条件编译
+            sed -i '' "s/RCTViewComponentView/$(cat fix_svg_node.h | tr '\n' ' ' | sed 's/\//\\\//g')/g" "$SVG_NODE_PATH"
+            
+            echo "✅ 成功修复 RNSVGNode.h"
+          else
+            echo "⚠️ 警告: 找不到文件 $SVG_NODE_PATH"
+          fi
+          
+          # 确保 UIView 头文件被正确导入
+          for file in "$SVG_VIEW_PATH" "$SVG_NODE_PATH"; do
+            if [ -f "$file" ]; then
+              echo "确保 $file 中导入了 UIView.h"
+              if ! grep -q "#import <UIKit/UIView.h>" "$file"; then
+                # 找到第一个导入语句并在其后添加UIView导入
+                awk '/#import/ && !added {print; print "#import <UIKit/UIView.h>"; added=1; next} {print}' "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
+                echo "  添加了 UIView.h 导入"
+              fi
+            fi
+          done
+          
+          echo "✅ 完成修复 react-native-svg"
+
       - name: 预处理安全区域上下文库以避免重复头文件
         run: |
           echo "=== 预处理安全区域上下文库以避免重复头文件 ==="
