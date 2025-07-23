@@ -83,6 +83,39 @@ jobs:
           mkdir -p build
           chmod -R 755 .
 
+      # 执行我们的自定义修复脚本
+      - name: 运行自定义综合修复脚本
+        run: |
+          echo "=== 运行自定义综合修复脚本 ==="
+          
+          # 运行专门为iOS SVG Fabric架构创建的修复脚本
+          if [ -f "fix-svg-ios-fabric.js" ]; then
+            echo "执行fix-svg-ios-fabric.js..."
+            node fix-svg-ios-fabric.js
+          else
+            echo "⚠️ 找不到fix-svg-ios-fabric.js脚本，跳过此修复步骤"
+          fi
+
+          # 也可以运行特定的iOS SVG修复脚本
+          if [ -f "fix-rnsvg-ios.js" ]; then
+            echo "执行fix-rnsvg-ios.js..."
+            node fix-rnsvg-ios.js
+          else
+            echo "⚠️ 找不到fix-rnsvg-ios.js脚本，跳过此修复步骤"
+          fi
+          
+          # 应用补丁文件
+          if [ -f "fix-rnsvg-ios.patch" ]; then
+            echo "应用fix-rnsvg-ios.patch补丁..."
+            cd node_modules/react-native-svg
+            patch -p1 < ../../fix-rnsvg-ios.patch || echo "补丁应用失败，但继续执行"
+            cd ../..
+          else
+            echo "⚠️ 找不到fix-rnsvg-ios.patch文件，跳过应用补丁"
+          fi
+          
+          echo "✅ 自定义修复脚本执行完成"
+
       - name: 修复依赖包架构配置
         run: |
           echo "=== 修复依赖包的新架构配置 ==="
