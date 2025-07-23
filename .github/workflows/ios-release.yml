@@ -234,6 +234,17 @@ jobs:
           mkdir -p "./node_modules/react/renderer/components/rnsvg"
           echo "// Empty placeholder for missing header" > "./node_modules/react/renderer/components/rnsvg/ComponentDescriptors.h"
           
+          # 创建RNSVGFabricConversions.h占位符文件
+          echo "创建RNSVGFabricConversions.h占位符..."
+          SVG_DIR="./node_modules/react-native-svg/apple"
+          # 查找可能存在的目录
+          POSSIBLE_DIRS=("$SVG_DIR" "$SVG_DIR/Utils" "$SVG_DIR/Elements" "$SVG_DIR/Fabric")
+          for dir in "${POSSIBLE_DIRS[@]}"; do
+            echo "  检查目录: $dir"
+            mkdir -p "$dir"
+            echo "// Empty placeholder for RNSVGFabricConversions.h" > "$dir/RNSVGFabricConversions.h"
+          done
+          
           # 修复RNSVGUse.mm文件导入问题
           SVG_USE_PATH="./node_modules/react-native-svg/apple/Elements/RNSVGUse.mm"
           if [ -f "$SVG_USE_PATH" ]; then
@@ -248,7 +259,7 @@ jobs:
             echo "" >> "${SVG_USE_PATH}.new"
             
             # 移除所有有问题的导入
-            cat "$SVG_USE_PATH" | grep -v "RCTConversions.h" | grep -v "RCTFabricComponentsPlugins.h" | grep -v "react/renderer" >> "${SVG_USE_PATH}.new"
+            cat "$SVG_USE_PATH" | grep -v "RCTConversions.h" | grep -v "RCTFabricComponentsPlugins.h" | grep -v "react/renderer" | grep -v "RNSVGFabricConversions.h" >> "${SVG_USE_PATH}.new"
             
             # 替换原文件
             mv "${SVG_USE_PATH}.new" "$SVG_USE_PATH"
@@ -260,14 +271,13 @@ jobs:
           
           echo "✅ 完成修复react-native-svg导入问题"
           
-      # 添加一个更详细的处理所有缺失头文件的步骤
       - name: 全局修复React Native头文件问题
         run: |
           echo "=== 全局修复React Native头文件问题 ==="
           
           # 查找所有引用Fabric相关头文件的位置
           echo "查找Fabric相关导入..."
-          FABRIC_FILES=$(find ./node_modules/react-native-svg -type f -name "*.mm" -o -name "*.m" | xargs grep -l "RCTFabric\|react/renderer" 2>/dev/null || true)
+          FABRIC_FILES=$(find ./node_modules/react-native-svg -type f -name "*.mm" -o -name "*.m" | xargs grep -l "RCTFabric\|react/renderer\|RNSVGFabricConversions" 2>/dev/null || true)
           
           # 处理每个包含Fabric导入的文件
           if [ ! -z "$FABRIC_FILES" ]; then
@@ -284,7 +294,7 @@ jobs:
               echo "#define RCT_NEW_ARCH_ENABLED 0" > "${file}.tmp"
               
               # 移除所有Fabric相关导入
-              cat "$file" | grep -v "RCTFabric" | grep -v "react/renderer" >> "${file}.tmp"
+              cat "$file" | grep -v "RCTFabric" | grep -v "react/renderer" | grep -v "RNSVGFabricConversions" >> "${file}.tmp"
               
               # 替换原文件
               mv "${file}.tmp" "$file"
@@ -298,6 +308,15 @@ jobs:
           # 创建所有可能缺失的头文件目录
           mkdir -p "./node_modules/react/renderer/components/rnsvg"
           echo "// Empty placeholder for ComponentDescriptors.h" > "./node_modules/react/renderer/components/rnsvg/ComponentDescriptors.h"
+          
+          # 在所有可能的位置创建RNSVGFabricConversions.h
+          SVG_DIR="./node_modules/react-native-svg/apple"
+          FABRIC_DIRS=("$SVG_DIR" "$SVG_DIR/Utils" "$SVG_DIR/Elements" "$SVG_DIR/Fabric")
+          for dir in "${FABRIC_DIRS[@]}"; do
+            mkdir -p "$dir"
+            echo "// Empty stub for Fabric" > "$dir/RNSVGFabricConversions.h"
+            echo "  ✓ 创建: $dir/RNSVGFabricConversions.h"
+          done
           
           echo "✅ 完成全局修复"
 
