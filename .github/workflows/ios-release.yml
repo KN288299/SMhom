@@ -83,38 +83,51 @@ jobs:
           mkdir -p build
           chmod -R 755 .
 
-      # 执行我们的自定义修复脚本
-      - name: 运行自定义综合修复脚本
+      # 有选择地执行自定义修复脚本，避免重复
+      - name: 检查是否需要执行自定义修复脚本
         run: |
-          echo "=== 运行自定义综合修复脚本 ==="
+          echo "=== 检查是否需要执行自定义修复脚本 ==="
           
-          # 运行专门为iOS SVG Fabric架构创建的修复脚本
-          if [ -f "fix-svg-ios-fabric.js" ]; then
-            echo "执行fix-svg-ios-fabric.js..."
-            node fix-svg-ios-fabric.js
+          # 检查React Native SVG版本
+          SVG_VERSION=$(node -e "try { console.log(require('./package.json').dependencies['react-native-svg'] || '未安装') } catch (e) { console.log('未安装') }")
+          echo "检测到React Native SVG版本: $SVG_VERSION"
+          
+          # 检查是否有特定的文件需要修复
+          PROBLEM_FILE="./node_modules/react-native-svg/apple/RNSVGUIKit.h"
+          if [ -f "$PROBLEM_FILE" ]; then
+            # 检查文件是否有特定问题
+            if grep -q "RCTViewComponentView" "$PROBLEM_FILE"; then
+              echo "检测到需要修复的问题 - RCTViewComponentView定义问题"
+              
+              # 1. 首先尝试应用补丁文件 (如果存在)
+              if [ -f "fix-rnsvg-ios.patch" ]; then
+                echo "应用fix-rnsvg-ios.patch补丁..."
+                cd node_modules/react-native-svg
+                patch -p1 < ../../fix-rnsvg-ios.patch || echo "补丁应用失败，尝试其他修复方式"
+                cd ../..
+              fi
+              
+              # 2. 如果有自定义修复脚本，则运行它们
+              if [ -f "fix-rnsvg-ios.js" ]; then
+                echo "执行fix-rnsvg-ios.js..."
+                node fix-rnsvg-ios.js
+              fi
+              
+              # 3. 运行综合修复脚本（如果上面步骤失败或脚本不存在）
+              if [ -f "fix-svg-ios-fabric.js" ] && ([ ! -f "fix-rnsvg-ios.js" ] || grep -q "RCTViewComponentView" "$PROBLEM_FILE"); then
+                echo "执行综合修复脚本fix-svg-ios-fabric.js..."
+                node fix-svg-ios-fabric.js
+              fi
+              
+              echo "✅ 自定义修复完成"
+            else
+              echo "没有检测到需要修复的特定问题，跳过自定义修复脚本"
+            fi
           else
-            echo "⚠️ 找不到fix-svg-ios-fabric.js脚本，跳过此修复步骤"
-          fi
-
-          # 也可以运行特定的iOS SVG修复脚本
-          if [ -f "fix-rnsvg-ios.js" ]; then
-            echo "执行fix-rnsvg-ios.js..."
-            node fix-rnsvg-ios.js
-          else
-            echo "⚠️ 找不到fix-rnsvg-ios.js脚本，跳过此修复步骤"
+            echo "找不到关键文件 $PROBLEM_FILE，可能不需要修复或结构已变更"
           fi
           
-          # 应用补丁文件
-          if [ -f "fix-rnsvg-ios.patch" ]; then
-            echo "应用fix-rnsvg-ios.patch补丁..."
-            cd node_modules/react-native-svg
-            patch -p1 < ../../fix-rnsvg-ios.patch || echo "补丁应用失败，但继续执行"
-            cd ../..
-          else
-            echo "⚠️ 找不到fix-rnsvg-ios.patch文件，跳过应用补丁"
-          fi
-          
-          echo "✅ 自定义修复脚本执行完成"
+          echo "继续使用工作流内置的修复步骤..."
 
       - name: 修复依赖包架构配置
         run: |
