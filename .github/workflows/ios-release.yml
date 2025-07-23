@@ -126,6 +126,28 @@ jobs:
           else
             echo "找不到关键文件 $PROBLEM_FILE，可能不需要修复或结构已变更"
           fi
+
+          # 检查TextPath类型不匹配问题
+          TEXTPATH_FILE="./node_modules/react-native-svg/apple/Text/RNSVGTextPath.mm"
+          if [ -f "$TEXTPATH_FILE" ]; then
+            # 检查文件是否有类型不匹配问题
+            if grep -q "enum RNSVGTextPathMethod" "$TEXTPATH_FILE" && grep -q "NSString \*method" "./node_modules/react-native-svg/apple/Text/RNSVGTextPath.h"; then
+              echo "检测到TextPath类型不匹配问题"
+              
+              # 运行TextPath修复脚本
+              if [ -f "fix-svg-textpath.js" ]; then
+                echo "执行fix-svg-textpath.js修复脚本..."
+                node fix-svg-textpath.js
+                echo "✅ TextPath类型不匹配问题修复完成"
+              else
+                echo "⚠️ 未找到fix-svg-textpath.js修复脚本，无法修复TextPath问题"
+              fi
+            else
+              echo "未检测到TextPath类型不匹配问题，跳过修复"
+            fi
+          else
+            echo "找不到TextPath文件，跳过相关修复"
+          fi
           
           echo "继续使用工作流内置的修复步骤..."
 
