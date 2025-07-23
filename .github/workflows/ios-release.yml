@@ -223,36 +223,58 @@ jobs:
         run: |
           echo "=== 修复react-native-svg架构问题 ==="
           
-          # 直接修改SVG文件，使用更简单的方式
+          # SVGView文件修复
           SVG_VIEW_PATH="./node_modules/react-native-svg/apple/Elements/RNSVGSvgView.h"
-          SVG_NODE_PATH="./node_modules/react-native-svg/apple/RNSVGNode.h"
-          
-          # 为文件添加条件编译
-          for file in "$SVG_VIEW_PATH" "$SVG_NODE_PATH"; do
-            if [ -f "$file" ]; then
-              echo "修改文件: $file"
-              # 创建备份
-              cp "$file" "${file}.bak"
-              
-              # 添加UIView.h导入
-              grep -q "#import <UIKit/UIView.h>" "$file" || sed -i '' '/#import/a\
-              #import <UIKit/UIView.h>
-              ' "$file"
-              
-              # 替换RCTViewComponentView
-              if [ "$file" = "$SVG_VIEW_PATH" ]; then
-                # SVGView文件修改
-                perl -i -pe 's/RCTViewComponentView <RNSVGContainer>/#if RCT_NEW_ARCH_ENABLED\n    RCTViewComponentView <RNSVGContainer>\n#else\n    UIView <RNSVGContainer>\n#endif/g' "$file"
-              else
-                # Node文件修改
-                perl -i -pe 's/RCTViewComponentView/#if RCT_NEW_ARCH_ENABLED\n    RCTViewComponentView\n#else\n    UIView\n#endif/g' "$file"
-              fi
-              
-              echo "修复完成: $file"
-            else
-              echo "文件不存在: $file"
+          if [ -f "$SVG_VIEW_PATH" ]; then
+            echo "修复文件: $SVG_VIEW_PATH"
+            # 创建备份
+            cp "$SVG_VIEW_PATH" "${SVG_VIEW_PATH}.bak"
+            
+            # 直接重写文件的关键部分
+            # 首先确保导入UIView.h
+            if ! grep -q "#import <UIKit/UIView.h>" "$SVG_VIEW_PATH"; then
+              sed -i '' '1s/^/#import <UIKit\/UIView.h>\n/' "$SVG_VIEW_PATH"
             fi
-          done
+            
+            # 替换RCTViewComponentView
+            grep -n "RCTViewComponentView <RNSVGContainer>" "$SVG_VIEW_PATH" > /dev/null 2>&1
+            if [ $? -eq 0 ]; then
+              echo "替换SVGView中的RCTViewComponentView"
+              # 使用临时文件避免sed -i的兼容性问题
+              cat "$SVG_VIEW_PATH" | sed 's/RCTViewComponentView <RNSVGContainer>/UIView <RNSVGContainer>/g' > "${SVG_VIEW_PATH}.tmp"
+              mv "${SVG_VIEW_PATH}.tmp" "$SVG_VIEW_PATH"
+            fi
+            
+            echo "✅ 修复完成: $SVG_VIEW_PATH"
+          else
+            echo "⚠️ 文件不存在: $SVG_VIEW_PATH"
+          fi
+          
+          # Node文件修复
+          SVG_NODE_PATH="./node_modules/react-native-svg/apple/RNSVGNode.h"
+          if [ -f "$SVG_NODE_PATH" ]; then
+            echo "修复文件: $SVG_NODE_PATH"
+            # 创建备份
+            cp "$SVG_NODE_PATH" "${SVG_NODE_PATH}.bak"
+            
+            # 确保导入UIView.h
+            if ! grep -q "#import <UIKit/UIView.h>" "$SVG_NODE_PATH"; then
+              sed -i '' '1s/^/#import <UIKit\/UIView.h>\n/' "$SVG_NODE_PATH"
+            fi
+            
+            # 替换RCTViewComponentView
+            grep -n "RCTViewComponentView" "$SVG_NODE_PATH" > /dev/null 2>&1
+            if [ $? -eq 0 ]; then
+              echo "替换Node中的RCTViewComponentView"
+              # 使用临时文件避免sed -i的兼容性问题
+              cat "$SVG_NODE_PATH" | sed 's/RCTViewComponentView/UIView/g' > "${SVG_NODE_PATH}.tmp"
+              mv "${SVG_NODE_PATH}.tmp" "$SVG_NODE_PATH"
+            fi
+            
+            echo "✅ 修复完成: $SVG_NODE_PATH"
+          else
+            echo "⚠️ 文件不存在: $SVG_NODE_PATH"
+          fi
           
           echo "✅ 完成修复 react-native-svg"
 
