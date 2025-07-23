@@ -105,6 +105,9 @@ jobs:
               
               # 1.1.3 注释掉TurboModule相关方法
               sed -i '' '/getTurboModule:/,/}/s/^/\/\//' "$MM_FILE"
+
+              # 1.1.4 直接注释掉NativeSafeAreaContextSpec协议
+              sed -i '' 's/<NativeSafeAreaContextSpec>/\/\*<NativeSafeAreaContextSpec>\*\//' "$MM_FILE"
               
               echo "已修复 RNCSafeAreaContext.mm"
             fi
@@ -124,6 +127,14 @@ jobs:
             
             # 1.4 添加.xcode.env.local文件以确保正确禁用新架构
             echo 'ENV["RCT_NEW_ARCH_ENABLED"] = "0"' > ios/.xcode.env.local
+
+            # 1.5 尝试创建一个空的NativeSafeAreaContextSpec.h文件作为备用
+            mkdir -p "$SAFE_AREA_DIR/ios/safeareacontext"
+            echo "// 空的协议声明用于修复编译问题" > "$SAFE_AREA_DIR/ios/safeareacontext/safeareacontext.h"
+            echo "#pragma once" >> "$SAFE_AREA_DIR/ios/safeareacontext/safeareacontext.h"
+            echo "#include <React/RCTBridgeModule.h>" >> "$SAFE_AREA_DIR/ios/safeareacontext/safeareacontext.h"
+            echo "@protocol NativeSafeAreaContextSpec <NSObject>" >> "$SAFE_AREA_DIR/ios/safeareacontext/safeareacontext.h"
+            echo "@end" >> "$SAFE_AREA_DIR/ios/safeareacontext/safeareacontext.h"
           fi
           
           # 2. 手动禁用所有第三方库的新架构支持
@@ -234,10 +245,74 @@ jobs:
             echo "\$USE_HERMES = false" >> Podfile
             echo "\$RCT_FABRIC_ENABLED = false" >> Podfile
             
+            # 添加安全区域相关的头文件搜索路径
+            echo "" >> Podfile
+            echo "# 添加自定义头文件搜索路径" >> Podfile
+            echo "post_install do |installer|" >> Podfile
+            echo "  installer.pods_project.targets.each do |target|" >> Podfile
+            echo "    if target.name == 'react-native-safe-area-context'" >> Podfile
+            echo "      target.build_configurations.each do |config|" >> Podfile
+            echo "        config.build_settings['HEADER_SEARCH_PATHS'] ||= ''" >> Podfile
+            echo "        config.build_settings['HEADER_SEARCH_PATHS'] << ' \$(PODS_ROOT)/../../node_modules/react-native-safe-area-context/ios'" >> Podfile
+            echo "        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= '$(inherited)'" >> Podfile
+            echo "        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << ' RCT_NEW_ARCH_ENABLED=0'" >> Podfile
+            echo "      end" >> Podfile
+            echo "    end" >> Podfile
+            echo "  end" >> Podfile
+            echo "end" >> Podfile
+            
             echo "Podfile已修复，内容:"
-            cat Podfile | tail -n 10
+            cat Podfile | tail -n 20
           else
             echo "⚠️ 警告: 找不到Podfile"
+          fi
+
+      - name: 深度修复react-native-safe-area-context
+        run: |
+          echo "=== 深度修复react-native-safe-area-context Fabric依赖问题 ==="
+          SAFE_AREA_DIR="node_modules/react-native-safe-area-context"
+          
+          if [ -d "$SAFE_AREA_DIR" ]; then
+            # 完全重写RNCSafeAreaContext.mm，移除所有Fabric代码
+            MM_FILE="$SAFE_AREA_DIR/ios/RNCSafeAreaContext.mm"
+            if [ -f "$MM_FILE" ]; then
+              cp "$MM_FILE" "${MM_FILE}.original"
+              
+              # 使用echo命令创建简化版本
+              echo '#import "RNCSafeAreaContext.h"' > "$MM_FILE"
+              echo '#import <React/RCTBridge.h>' >> "$MM_FILE"
+              echo '#import <React/RCTUIManager.h>' >> "$MM_FILE"
+              echo '' >> "$MM_FILE"
+              echo '@implementation RNCSafeAreaContext' >> "$MM_FILE"
+              echo '' >> "$MM_FILE"
+              echo 'RCT_EXPORT_MODULE()' >> "$MM_FILE"
+              echo '' >> "$MM_FILE"
+              echo '+ (BOOL)requiresMainQueueSetup' >> "$MM_FILE"
+              echo '{' >> "$MM_FILE"
+              echo '  return YES;' >> "$MM_FILE"
+              echo '}' >> "$MM_FILE"
+              echo '' >> "$MM_FILE"
+              echo '@end' >> "$MM_FILE"
+              
+              echo "✅ 已重写 RNCSafeAreaContext.mm 为简化版本"
+            fi
+            
+            # 修改RNCSafeAreaContext.h文件
+            H_FILE="$SAFE_AREA_DIR/ios/RNCSafeAreaContext.h"
+            if [ -f "$H_FILE" ]; then
+              cp "$H_FILE" "${H_FILE}.original"
+              
+              # 使用echo命令创建简化版本
+              echo '#import <React/RCTBridgeModule.h>' > "$H_FILE"
+              echo '#import <React/RCTEventEmitter.h>' >> "$H_FILE"
+              echo '' >> "$H_FILE"
+              echo '@interface RNCSafeAreaContext : RCTEventEmitter <RCTBridgeModule>' >> "$H_FILE"
+              echo '@end' >> "$H_FILE"
+              
+              echo "✅ 已重写 RNCSafeAreaContext.h 为简化版本"
+            fi
+          else
+            echo "⚠️ 找不到 react-native-safe-area-context 目录"
           fi
 
       - name: 安装CocoaPods依赖
