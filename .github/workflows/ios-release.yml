@@ -219,6 +219,19 @@ jobs:
           DURATION=$((END_TIME - START_TIME))
           echo "✅ 所有补丁应用完成，耗时: ${DURATION}秒"
 
+      - name: 预处理安全区域上下文库以避免重复头文件
+        run: |
+          echo "=== 预处理安全区域上下文库以避免重复头文件 ==="
+          
+          # 直接删除生成的目录，因为这些文件会导致冲突
+          echo "删除生成的头文件..."
+          rm -rf "./node_modules/react-native-safe-area-context/ios/build"
+          
+          # 如果需要，创建一个空的占位符目录结构，防止构建过程中的路径错误
+          mkdir -p "./node_modules/react-native-safe-area-context/ios/build/generated/ios/safeareacontext"
+          
+          echo "✅ 完成预处理"
+
       - name: 修复Podfile
         run: |
           echo "=== 修复Podfile以确保禁用新架构 ==="
@@ -372,63 +385,21 @@ jobs:
           echo "=== 修复react-native-safe-area-context重复头文件问题 ==="
           cd ios
           
-          # 创建一个脚本来修改Pods项目配置
-          cat > fix_duplicate_headers.rb << 'EOL'
-          require 'xcodeproj'
-          
-          project_path = 'Pods/Pods.xcodeproj'
-          project = Xcodeproj::Project.open(project_path)
-          
-          target = project.targets.find { |t| t.name == 'react-native-safe-area-context' }
-          
-          if target
-            puts "找到目标: #{target.name}"
+          # 从Pods项目清理重复的头文件引用
+          if [ -d "Pods" ]; then
+            echo "删除生成的头文件..."
+            rm -rf "../node_modules/react-native-safe-area-context/ios/build/generated"
             
-            # 查找并移除重复的头文件复制操作
-            build_phases = target.build_phases.select { |phase| phase.instance_of?(Xcodeproj::Project::Object::PBXHeadersBuildPhase) }
+            # 如果build目录为空，完全删除它以防止混淆
+            if [ -z "$(ls -A ../node_modules/react-native-safe-area-context/ios/build 2>/dev/null)" ]; then
+              rm -rf "../node_modules/react-native-safe-area-context/ios/build"
+            fi
             
-            if build_phases.any?
-              build_phases.each do |phase|
-                # 检查并移除生成目录中的头文件
-                files_to_remove = phase.files.select do |file|
-                  file_path = file.file_ref.real_path.to_s rescue ""
-                  file_path.include?('/build/generated/ios/safeareacontext/safeareacontext.h')
-                end
-                
-                if files_to_remove.any?
-                  puts "移除 #{files_to_remove.count} 个重复的头文件引用"
-                  files_to_remove.each do |file|
-                    phase.remove_build_file(file)
-                  end
-                end
-              end
-              
-              # 保存项目
-              project.save
-              puts "✅ 成功修改Pods项目，移除了重复的头文件"
-            else
-              puts "未找到Headers构建阶段"
-            end
+            echo "✅ 完成清理生成的头文件"
           else
-            puts "未找到react-native-safe-area-context目标"
-          end
-          EOL
-          
-          # 运行修复脚本
-          if [ -f "Pods/Pods.xcodeproj" ]; then
-            echo "运行修复脚本..."
-            ruby fix_duplicate_headers.rb
-          else
-            echo "⚠️ 警告: Pods项目不存在，请先运行pod install"
+            echo "⚠️ 警告: Pods目录不存在，请先运行pod install"
           fi
           
-          # 备用方案：如果ruby脚本失败，尝试直接修改文件
-          echo "实施备用方案，直接删除生成的头文件..."
-          rm -rf "../node_modules/react-native-safe-area-context/ios/build/generated/ios/safeareacontext"
-          mkdir -p "../node_modules/react-native-safe-area-context/ios/build/generated/ios/safeareacontext"
-          echo "// 这是一个空文件，用于防止重复头文件错误" > "../node_modules/react-native-safe-area-context/ios/build/generated/ios/safeareacontext/safeareacontext.h"
-          
-          echo "✅ 完成修复"
           cd ..
 
       - name: 深度修复react-native-safe-area-context
