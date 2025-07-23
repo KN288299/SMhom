@@ -245,21 +245,84 @@ jobs:
             echo "\$USE_HERMES = false" >> Podfile
             echo "\$RCT_FABRIC_ENABLED = false" >> Podfile
             
-            # 添加安全区域相关的头文件搜索路径
-            echo "" >> Podfile
-            echo "# 添加自定义头文件搜索路径" >> Podfile
-            echo "post_install do |installer|" >> Podfile
-            echo "  installer.pods_project.targets.each do |target|" >> Podfile
-            echo "    if target.name == 'react-native-safe-area-context'" >> Podfile
-            echo "      target.build_configurations.each do |config|" >> Podfile
-            echo "        config.build_settings['HEADER_SEARCH_PATHS'] ||= ''" >> Podfile
-            echo "        config.build_settings['HEADER_SEARCH_PATHS'] << ' \$(PODS_ROOT)/../../node_modules/react-native-safe-area-context/ios'" >> Podfile
-            echo "        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= '$(inherited)'" >> Podfile
-            echo "        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << ' RCT_NEW_ARCH_ENABLED=0'" >> Podfile
-            echo "      end" >> Podfile
-            echo "    end" >> Podfile
-            echo "  end" >> Podfile
-            echo "end" >> Podfile
+            # 检查是否已有post_install并修改，而不是添加新的
+            if grep -q "post_install" Podfile; then
+              echo "Podfile已包含post_install，将修改而不是添加新的..."
+              
+              # 在post_install块中查找代码插入位置
+              if grep -q "installer.pods_project.targets.each" Podfile; then
+                # 已经有target循环，在合适的位置添加我们的代码
+                SEARCH_PATTERN="installer.pods_project.targets.each do |target|"
+                INSERT_AFTER_LINE=$(grep -n "$SEARCH_PATTERN" Podfile | head -1 | cut -d: -f1)
+                
+                if [ ! -z "$INSERT_AFTER_LINE" ]; then
+                  # 创建临时文件
+                  cp Podfile Podfile.tmp
+                  HEAD_PART=$(head -n $INSERT_AFTER_LINE Podfile.tmp)
+                  TAIL_PART=$(tail -n +$(($INSERT_AFTER_LINE + 1)) Podfile.tmp)
+                  
+                  # 写入合并后的文件
+                  echo "$HEAD_PART" > Podfile
+                  echo "    if target.name == 'react-native-safe-area-context'" >> Podfile
+                  echo "      target.build_configurations.each do |config|" >> Podfile
+                  echo "        config.build_settings['HEADER_SEARCH_PATHS'] ||= ''" >> Podfile
+                  echo "        config.build_settings['HEADER_SEARCH_PATHS'] << ' \$(PODS_ROOT)/../../node_modules/react-native-safe-area-context/ios'" >> Podfile
+                  echo "        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= '$(inherited)'" >> Podfile
+                  echo "        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << ' RCT_NEW_ARCH_ENABLED=0'" >> Podfile
+                  echo "      end" >> Podfile
+                  echo "    end" >> Podfile
+                  echo "$TAIL_PART" >> Podfile
+                  
+                  echo "✅ 成功在现有post_install的target循环中插入react-native-safe-area-context配置"
+                else
+                  echo "⚠️ 无法找到适合插入的位置，将直接附加在文件末尾"
+                  # 如果找不到插入点，直接在文件末尾添加
+                  echo "    # 修复react-native-safe-area-context" >> Podfile
+                  echo "    installer.pods_project.targets.each do |target|" >> Podfile
+                  echo "      if target.name == 'react-native-safe-area-context'" >> Podfile
+                  echo "        target.build_configurations.each do |config|" >> Podfile
+                  echo "          config.build_settings['HEADER_SEARCH_PATHS'] ||= ''" >> Podfile
+                  echo "          config.build_settings['HEADER_SEARCH_PATHS'] << ' \$(PODS_ROOT)/../../node_modules/react-native-safe-area-context/ios'" >> Podfile
+                  echo "          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= '$(inherited)'" >> Podfile
+                  echo "          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << ' RCT_NEW_ARCH_ENABLED=0'" >> Podfile
+                  echo "        end" >> Podfile
+                  echo "      end" >> Podfile
+                  echo "    end" >> Podfile
+                fi
+              else
+                # 在post_install的结尾前添加我们的代码
+                sed -i '' '/post_install do |installer|/,/end/ {
+                  /end/ i\
+                  \ \ # 修复react-native-safe-area-context\
+                  \ \ installer.pods_project.targets.each do |target|\
+                  \ \ \ \ if target.name == '\''react-native-safe-area-context'\''\
+                  \ \ \ \ \ \ target.build_configurations.each do |config|\
+                  \ \ \ \ \ \ \ \ config.build_settings['\''HEADER_SEARCH_PATHS'\''] ||= '\'\''\
+                  \ \ \ \ \ \ \ \ config.build_settings['\''HEADER_SEARCH_PATHS'\''] << '\'' $(PODS_ROOT)/../../node_modules/react-native-safe-area-context/ios'\''\
+                  \ \ \ \ \ \ \ \ config.build_settings['\''GCC_PREPROCESSOR_DEFINITIONS'\''] ||= '\''$(inherited)'\''\
+                  \ \ \ \ \ \ \ \ config.build_settings['\''GCC_PREPROCESSOR_DEFINITIONS'\''] << '\'' RCT_NEW_ARCH_ENABLED=0'\''\
+                  \ \ \ \ \ \ end\
+                  \ \ \ \ end\
+                  \ \ end\
+                }' Podfile
+              fi
+            else
+              # 没有现有的post_install，可以安全地添加一个新的
+              echo "" >> Podfile
+              echo "# 添加自定义头文件搜索路径" >> Podfile
+              echo "post_install do |installer|" >> Podfile
+              echo "  installer.pods_project.targets.each do |target|" >> Podfile
+              echo "    if target.name == 'react-native-safe-area-context'" >> Podfile
+              echo "      target.build_configurations.each do |config|" >> Podfile
+              echo "        config.build_settings['HEADER_SEARCH_PATHS'] ||= ''" >> Podfile
+              echo "        config.build_settings['HEADER_SEARCH_PATHS'] << ' \$(PODS_ROOT)/../../node_modules/react-native-safe-area-context/ios'" >> Podfile
+              echo "        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= '$(inherited)'" >> Podfile
+              echo "        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << ' RCT_NEW_ARCH_ENABLED=0'" >> Podfile
+              echo "      end" >> Podfile
+              echo "    end" >> Podfile
+              echo "  end" >> Podfile
+              echo "end" >> Podfile
+            fi
             
             echo "Podfile已修复，内容:"
             cat Podfile | tail -n 20
