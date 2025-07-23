@@ -87,6 +87,10 @@ jobs:
         run: |
           echo "=== 修复依赖包的新架构配置 ==="
           
+          # 执行全局修复脚本
+          echo "执行全局修复脚本..."
+          node fix-fabric-modules.js
+          
           # 1. 修复 react-native-safe-area-context
           SAFE_AREA_DIR="node_modules/react-native-safe-area-context"
           if [ -d "$SAFE_AREA_DIR" ]; then
