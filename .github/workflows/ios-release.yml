@@ -223,6 +223,17 @@ jobs:
         run: |
           echo "=== 修复react-native-svg导入问题 ==="
           
+          # 创建RCTConversions.h和RCTFabricComponentsPlugins.h的空占位符
+          echo "创建React缺失的头文件占位符..."
+          mkdir -p "./node_modules/react-native/React"
+          echo "// Empty placeholder for missing header" > "./node_modules/react-native/React/RCTConversions.h"
+          echo "// Empty placeholder for missing header" > "./node_modules/react-native/React/RCTFabricComponentsPlugins.h"
+          
+          # 创建react/renderer目录和占位符文件
+          echo "创建React Fabric renderer占位符..."
+          mkdir -p "./node_modules/react/renderer/components/rnsvg"
+          echo "// Empty placeholder for missing header" > "./node_modules/react/renderer/components/rnsvg/ComponentDescriptors.h"
+          
           # 修复RNSVGUse.mm文件导入问题
           SVG_USE_PATH="./node_modules/react-native-svg/apple/Elements/RNSVGUse.mm"
           if [ -f "$SVG_USE_PATH" ]; then
@@ -230,26 +241,22 @@ jobs:
             # 创建备份
             cp "$SVG_USE_PATH" "${SVG_USE_PATH}.bak"
             
-            # 移除所有Fabric相关导入
-            grep -v "RCTConversions.h\|RCTFabricComponentsPlugins.h" "$SVG_USE_PATH" > "${SVG_USE_PATH}.tmp"
-            mv "${SVG_USE_PATH}.tmp" "$SVG_USE_PATH"
+            # 在文件顶部添加条件编译
+            echo "#define RCT_NEW_ARCH_ENABLED 0" > "${SVG_USE_PATH}.new"
+            echo "#import <UIKit/UIKit.h>" >> "${SVG_USE_PATH}.new"
+            echo "#import <React/RCTBridge.h>" >> "${SVG_USE_PATH}.new"
+            echo "" >> "${SVG_USE_PATH}.new"
             
-            # 添加必要的导入
-            sed -i '' '1i\
-            #import <UIKit/UIKit.h>\
-            #import <React/RCTBridge.h>
-            ' "$SVG_USE_PATH"
+            # 移除所有有问题的导入
+            cat "$SVG_USE_PATH" | grep -v "RCTConversions.h" | grep -v "RCTFabricComponentsPlugins.h" | grep -v "react/renderer" >> "${SVG_USE_PATH}.new"
+            
+            # 替换原文件
+            mv "${SVG_USE_PATH}.new" "$SVG_USE_PATH"
             
             echo "✅ 修复完成: $SVG_USE_PATH"
           else
             echo "⚠️ 文件不存在: $SVG_USE_PATH"
           fi
-          
-          # 创建所有需要的空头文件
-          echo "创建缺失的头文件占位符..."
-          mkdir -p "./node_modules/react-native/React"
-          echo "// Empty placeholder for missing header" > "./node_modules/react-native/React/RCTConversions.h"
-          echo "// Empty placeholder for missing header" > "./node_modules/react-native/React/RCTFabricComponentsPlugins.h"
           
           echo "✅ 完成修复react-native-svg导入问题"
           
@@ -260,34 +267,37 @@ jobs:
           
           # 查找所有引用Fabric相关头文件的位置
           echo "查找Fabric相关导入..."
-          FABRIC_IMPORTS=$(find ./node_modules/react-native-svg -type f -name "*.mm" -o -name "*.m" | xargs grep -l "RCTFabric" 2>/dev/null || true)
+          FABRIC_FILES=$(find ./node_modules/react-native-svg -type f -name "*.mm" -o -name "*.m" | xargs grep -l "RCTFabric\|react/renderer" 2>/dev/null || true)
           
           # 处理每个包含Fabric导入的文件
-          if [ ! -z "$FABRIC_IMPORTS" ]; then
-            echo "找到以下文件包含Fabric导入:"
-            echo "$FABRIC_IMPORTS"
+          if [ ! -z "$FABRIC_FILES" ]; then
+            echo "找到以下文件包含Fabric相关导入:"
+            echo "$FABRIC_FILES"
             
-            for file in $FABRIC_IMPORTS; do
+            for file in $FABRIC_FILES; do
               echo "处理: $file"
               
               # 创建备份
               cp "$file" "${file}.bak"
               
-              # 在文件顶部添加条件编译
-              sed -i '' '1i\
-              #define RCT_NEW_ARCH_ENABLED 0
-              ' "$file"
+              # 添加条件编译定义
+              echo "#define RCT_NEW_ARCH_ENABLED 0" > "${file}.tmp"
               
-              # 用条件编译包装所有Fabric相关导入
-              sed -i '' 's/#import <React\/RCTFabric.*\.h>/#if RCT_NEW_ARCH_ENABLED\
-              #import <React\/RCTFabric*\.h>\
-              #endif/g' "$file"
+              # 移除所有Fabric相关导入
+              cat "$file" | grep -v "RCTFabric" | grep -v "react/renderer" >> "${file}.tmp"
+              
+              # 替换原文件
+              mv "${file}.tmp" "$file"
               
               echo "✅ 已修复: $file"
             done
           else
             echo "没有找到其他Fabric相关导入"
           fi
+          
+          # 创建所有可能缺失的头文件目录
+          mkdir -p "./node_modules/react/renderer/components/rnsvg"
+          echo "// Empty placeholder for ComponentDescriptors.h" > "./node_modules/react/renderer/components/rnsvg/ComponentDescriptors.h"
           
           echo "✅ 完成全局修复"
 
