@@ -147,6 +147,101 @@ jobs:
             cp "$FILE" "${FILE}.bak"
             sed -i '' 's/#import <React\/RCTViewComponentView.h>/#if RCT_NEW_ARCH_ENABLED\n#import <React\/RCTViewComponentView.h>\n#endif/g' "$FILE"
           done
+          
+          # 4. 修复React Native核心代码中的问题
+          echo "=== 修复React Native核心代码中的Fabric相关问题 ==="
+          # 4.1 修复RCTUnimplementedViewComponentView
+          UNIMPL_HEADER="node_modules/react-native/React/Fabric/Mounting/ComponentViews/UnimplementedView/RCTUnimplementedViewComponentView.h"
+          UNIMPL_MM="node_modules/react-native/React/Fabric/Mounting/ComponentViews/UnimplementedView/RCTUnimplementedViewComponentView.mm"
+          
+          if [ -f "$UNIMPL_HEADER" ]; then
+            echo "修复 RCTUnimplementedViewComponentView.h..."
+            cp "$UNIMPL_HEADER" "${UNIMPL_HEADER}.bak"
+            # 在文件顶部添加条件编译
+            echo '#if RCT_NEW_ARCH_ENABLED' | cat - "$UNIMPL_HEADER" > temp && mv temp "$UNIMPL_HEADER"
+            # 在文件末尾添加条件编译结束
+            echo "#endif // RCT_NEW_ARCH_ENABLED" >> "$UNIMPL_HEADER"
+          fi
+          
+          if [ -f "$UNIMPL_MM" ]; then
+            echo "修复 RCTUnimplementedViewComponentView.mm..."
+            cp "$UNIMPL_MM" "${UNIMPL_MM}.bak"
+            # 在文件顶部添加条件编译
+            echo '#if RCT_NEW_ARCH_ENABLED' | cat - "$UNIMPL_MM" > temp && mv temp "$UNIMPL_MM"
+            # 在文件末尾添加条件编译结束
+            echo "#endif // RCT_NEW_ARCH_ENABLED" >> "$UNIMPL_MM"
+          fi
+
+      - name: 应用所有必要补丁
+        id: apply-patches
+        run: |
+          echo "=== 应用所有必要补丁 ==="
+          START_TIME=$(date +%s)
+          
+          # Patch 1: FuseboxTracer.cpp for C++ compatibility
+          if [ -f "node_modules/react-native/ReactCommon/reactperflogger/fusebox/FuseboxTracer.cpp" ]; then
+            echo "1️⃣ 修补 FuseboxTracer.cpp..."
+            perl -pi -e "s/!trackIdMap\.contains\(([^)]+)\)/trackIdMap.find(\$1) == trackIdMap.end()/g" node_modules/react-native/ReactCommon/reactperflogger/fusebox/FuseboxTracer.cpp
+            perl -pi -e "s/trackIdMap\.contains\(([^)]+)\)/trackIdMap.find(\$1) != trackIdMap.end()/g" node_modules/react-native/ReactCommon/reactperflogger/fusebox/FuseboxTracer.cpp
+          else
+            echo "⚠️ 警告: 找不到 FuseboxTracer.cpp 文件，跳过修补"
+          fi
+
+          # Patch 2: react-native-screens constexpr bug
+          if [ -f "node_modules/react-native-screens/ios/RNSScreenStackHeaderConfig.mm" ]; then
+            echo "2️⃣ 修补 RNSScreenStackHeaderConfig.mm..."
+            sed -i '' 's/static constexpr auto DEFAULT_TITLE_FONT_SIZE = @17;/static NSNumber* const DEFAULT_TITLE_FONT_SIZE = @17;/g' node_modules/react-native-screens/ios/RNSScreenStackHeaderConfig.mm
+            sed -i '' 's/static constexpr auto DEFAULT_TITLE_LARGE_FONT_SIZE = @34;/static NSNumber* const DEFAULT_TITLE_LARGE_FONT_SIZE = @34;/g' node_modules/react-native-screens/ios/RNSScreenStackHeaderConfig.mm
+          else
+            echo "⚠️ 警告: 找不到 RNSScreenStackHeaderConfig.mm 文件，跳过修补"
+          fi
+          
+          # Patch 3: RNSScreenStackHeaderConfig.h nullable warning
+          if [ -f "node_modules/react-native-screens/ios/RNSScreenStackHeaderConfig.h" ]; then
+            echo "3️⃣ 修补 RNSScreenStackHeaderConfig.h 添加 _Nullable/_Nonnull 修饰符..."
+            sed -i '' 's/@property (nonatomic, weak) RNSScreenView \*screenView;/@property (nonatomic, weak) RNSScreenView * _Nullable screenView;/g' node_modules/react-native-screens/ios/RNSScreenStackHeaderConfig.h
+          else
+            echo "⚠️ 警告: 找不到 RNSScreenStackHeaderConfig.h 文件，跳过修补"
+          fi
+          
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          echo "✅ 所有补丁应用完成，耗时: ${DURATION}秒"
+
+      - name: 修复Podfile
+        run: |
+          echo "=== 修复Podfile以确保禁用新架构 ==="
+          cd ios
+          
+          if [ -f "Podfile" ]; then
+            cp Podfile Podfile.bak
+            
+            # 确保环境变量在Podfile中正确设置
+            grep -q "ENV\['RCT_NEW_ARCH_ENABLED'\]" Podfile && \
+              sed -i '' 's/ENV\[\x27RCT_NEW_ARCH_ENABLED\x27\][[:space:]]*=[[:space:]]*\x271\x27/ENV[\x27RCT_NEW_ARCH_ENABLED\x27] = \x270\x27/g' Podfile || \
+              echo "# 强制禁用新架构" >> Podfile
+            
+            # 添加额外的配置设置到Podfile底部
+            cat >> Podfile << EOL
+            
+# 确保禁用新架构
+ENV['RCT_NEW_ARCH_ENABLED'] = '0'
+ENV['USE_FABRIC'] = '0'
+ENV['USE_HERMES'] = '0'
+
+# 禁用所有Fabric相关设置
+$RCT_NEW_ARCH_ENABLED = false
+$fabric_enabled = false
+$USE_FABRIC = false
+$USE_HERMES = false
+$RCT_FABRIC_ENABLED = false
+EOL
+            
+            echo "Podfile已修复，内容:"
+            cat Podfile | tail -n 10
+          else
+            echo "⚠️ 警告: 找不到Podfile"
+          fi
 
       - name: 安装CocoaPods依赖
         run: |
@@ -224,42 +319,6 @@ jobs:
           echo "export NODE_BINARY=$(which node)" > ios/.xcode.env.local
           echo "创建了.xcode.env.local文件: $(cat ios/.xcode.env.local)"
 
-      - name: 应用所有必要补丁
-        id: apply-patches
-        run: |
-          echo "=== 应用所有必要补丁 ==="
-          START_TIME=$(date +%s)
-          
-          # Patch 1: FuseboxTracer.cpp for C++ compatibility
-          if [ -f "node_modules/react-native/ReactCommon/reactperflogger/fusebox/FuseboxTracer.cpp" ]; then
-            echo "1️⃣ 修补 FuseboxTracer.cpp..."
-            perl -pi -e "s/!trackIdMap\.contains\(([^)]+)\)/trackIdMap.find(\$1) == trackIdMap.end()/g" node_modules/react-native/ReactCommon/reactperflogger/fusebox/FuseboxTracer.cpp
-            perl -pi -e "s/trackIdMap\.contains\(([^)]+)\)/trackIdMap.find(\$1) != trackIdMap.end()/g" node_modules/react-native/ReactCommon/reactperflogger/fusebox/FuseboxTracer.cpp
-          else
-            echo "⚠️ 警告: 找不到 FuseboxTracer.cpp 文件，跳过修补"
-          fi
-
-          # Patch 2: react-native-screens constexpr bug
-          if [ -f "node_modules/react-native-screens/ios/RNSScreenStackHeaderConfig.mm" ]; then
-            echo "2️⃣ 修补 RNSScreenStackHeaderConfig.mm..."
-            sed -i '' 's/static constexpr auto DEFAULT_TITLE_FONT_SIZE = @17;/static NSNumber* const DEFAULT_TITLE_FONT_SIZE = @17;/g' node_modules/react-native-screens/ios/RNSScreenStackHeaderConfig.mm
-            sed -i '' 's/static constexpr auto DEFAULT_TITLE_LARGE_FONT_SIZE = @34;/static NSNumber* const DEFAULT_TITLE_LARGE_FONT_SIZE = @34;/g' node_modules/react-native-screens/ios/RNSScreenStackHeaderConfig.mm
-          else
-            echo "⚠️ 警告: 找不到 RNSScreenStackHeaderConfig.mm 文件，跳过修补"
-          fi
-          
-          # Patch 3: RNSScreenStackHeaderConfig.h nullable warning
-          if [ -f "node_modules/react-native-screens/ios/RNSScreenStackHeaderConfig.h" ]; then
-            echo "3️⃣ 修补 RNSScreenStackHeaderConfig.h 添加 _Nullable/_Nonnull 修饰符..."
-            sed -i '' 's/@property (nonatomic, weak) RNSScreenView \*screenView;/@property (nonatomic, weak) RNSScreenView * _Nullable screenView;/g' node_modules/react-native-screens/ios/RNSScreenStackHeaderConfig.h
-          else
-            echo "⚠️ 警告: 找不到 RNSScreenStackHeaderConfig.h 文件，跳过修补"
-          fi
-          
-          END_TIME=$(date +%s)
-          DURATION=$((END_TIME - START_TIME))
-          echo "✅ 所有补丁应用完成，耗时: ${DURATION}秒"
-
       - name: 列出 workspace 里的 scheme
         run: |
           cd ios
@@ -285,6 +344,9 @@ jobs:
           # 设置归档路径
           ARCHIVE_PATH="$PWD/build/HomeServiceChat.xcarchive"
           
+          # 确保禁用新架构的环境变量
+          export RCT_NEW_ARCH_ENABLED=0
+          
           # 执行归档
           xcodebuild -workspace HomeServiceChat.xcworkspace \
             -scheme HomeServiceChat \
@@ -301,6 +363,10 @@ jobs:
             CLANG_CXX_LANGUAGE_STANDARD="c++20" \
             OTHER_CFLAGS="-DNS_BLOCK_ASSERTIONS=1" \
             RCT_NEW_ARCH_ENABLED=0 \
+            RCT_FABRIC_ENABLED=0 \
+            USE_FABRIC=0 \
+            FABRIC_ENABLED=NO \
+            GCC_PREPROCESSOR_DEFINITIONS="RCT_NEW_ARCH_ENABLED=0" \
             archive \
             -verbose \
             -showBuildTimingSummary \
