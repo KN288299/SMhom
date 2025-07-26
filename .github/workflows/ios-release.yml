@@ -71,6 +71,28 @@ jobs:
           DURATION=$((END_TIME - START_TIME))
           echo "Node依赖安装完成，耗时: ${DURATION}秒"
 
+      - name: 降级react-native-svg版本
+        run: |
+          echo "=== 降级react-native-svg以解决TextPath类型不匹配问题 ==="
+          CURRENT_VERSION=$(node -e "try { console.log(require('./package.json').dependencies['react-native-svg'] || '未安装') } catch (e) { console.log('未安装') }")
+          echo "当前react-native-svg版本: $CURRENT_VERSION"
+          
+          # 降级到兼容版本
+          echo "将react-native-svg降级到15.1.0版本..."
+          yarn remove react-native-svg
+          yarn add react-native-svg@15.1.0
+          
+          # 验证降级结果
+          NEW_VERSION=$(node -e "try { console.log(require('./package.json').dependencies['react-native-svg']) } catch (e) { console.log('未安装') }")
+          echo "降级后版本: $NEW_VERSION"
+          
+          # 清除node_modules中的缓存
+          echo "清理node_modules中的react-native-svg..."
+          rm -rf node_modules/react-native-svg/apple/Text/RNSVGTextPath.mm.bak
+          rm -rf node_modules/react-native-svg/apple/Text/RNSVGTextPath.h.bak
+          
+          echo "✅ react-native-svg已降级完成"
+
       - name: 清除旧的Pods和构建文件
         run: |
           echo "=== 清理旧的构建文件和Pods ==="
@@ -130,20 +152,26 @@ jobs:
           # 检查TextPath类型不匹配问题
           TEXTPATH_FILE="./node_modules/react-native-svg/apple/Text/RNSVGTextPath.mm"
           if [ -f "$TEXTPATH_FILE" ]; then
-            # 检查文件是否有类型不匹配问题
-            if grep -q "enum RNSVGTextPathMethod" "$TEXTPATH_FILE" && grep -q "NSString \*method" "./node_modules/react-native-svg/apple/Text/RNSVGTextPath.h"; then
-              echo "检测到TextPath类型不匹配问题"
-              
-              # 运行TextPath修复脚本
-              if [ -f "fix-svg-textpath.js" ]; then
-                echo "执行fix-svg-textpath.js修复脚本..."
-                node fix-svg-textpath.js
-                echo "✅ TextPath类型不匹配问题修复完成"
-              else
-                echo "⚠️ 未找到fix-svg-textpath.js修复脚本，无法修复TextPath问题"
-              fi
+            # 检查当前SVG版本，如果已降级到15.1.0则跳过
+            CURRENT_SVG_VERSION=$(node -e "try { console.log(require('./package.json').dependencies['react-native-svg']) } catch (e) { console.log('未安装') }")
+            if [[ "$CURRENT_SVG_VERSION" == *"15.1.0"* ]]; then
+              echo "SVG版本已降级到15.1.0，跳过TextPath修复"
             else
-              echo "未检测到TextPath类型不匹配问题，跳过修复"
+              # 检查文件是否有类型不匹配问题
+              if grep -q "enum RNSVGTextPathMethod" "$TEXTPATH_FILE" && grep -q "NSString \*method" "./node_modules/react-native-svg/apple/Text/RNSVGTextPath.h"; then
+                echo "检测到TextPath类型不匹配问题"
+                
+                # 运行TextPath修复脚本
+                if [ -f "fix-svg-textpath.js" ]; then
+                  echo "执行fix-svg-textpath.js修复脚本..."
+                  node fix-svg-textpath.js
+                  echo "✅ TextPath类型不匹配问题修复完成"
+                else
+                  echo "⚠️ 未找到fix-svg-textpath.js修复脚本，无法修复TextPath问题"
+                fi
+              else
+                echo "未检测到TextPath类型不匹配问题，跳过修复"
+              fi
             fi
           else
             echo "找不到TextPath文件，跳过相关修复"
