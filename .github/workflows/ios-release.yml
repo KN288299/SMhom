@@ -71,27 +71,7 @@ jobs:
           DURATION=$((END_TIME - START_TIME))
           echo "Node依赖安装完成，耗时: ${DURATION}秒"
 
-      - name: 降级react-native-svg版本
-        run: |
-          echo "=== 降级react-native-svg以解决TextPath类型不匹配问题 ==="
-          CURRENT_VERSION=$(node -e "try { console.log(require('./package.json').dependencies['react-native-svg'] || '未安装') } catch (e) { console.log('未安装') }")
-          echo "当前react-native-svg版本: $CURRENT_VERSION"
-          
-          # 降级到兼容版本
-          echo "将react-native-svg降级到15.1.0版本..."
-          yarn remove react-native-svg
-          yarn add react-native-svg@15.1.0
-          
-          # 验证降级结果
-          NEW_VERSION=$(node -e "try { console.log(require('./package.json').dependencies['react-native-svg']) } catch (e) { console.log('未安装') }")
-          echo "降级后版本: $NEW_VERSION"
-          
-          # 清除node_modules中的缓存
-          echo "清理node_modules中的react-native-svg..."
-          rm -rf node_modules/react-native-svg/apple/Text/RNSVGTextPath.mm.bak
-          rm -rf node_modules/react-native-svg/apple/Text/RNSVGTextPath.h.bak
-          
-          echo "✅ react-native-svg已降级完成"
+      # 移除SVG步骤，因为已不再使用
 
       - name: 清除旧的Pods和构建文件
         run: |
@@ -110,72 +90,18 @@ jobs:
         run: |
           echo "=== 检查是否需要执行自定义修复脚本 ==="
           
-          # 检查React Native SVG版本
+          # 确认已移除react-native-svg
           SVG_VERSION=$(node -e "try { console.log(require('./package.json').dependencies['react-native-svg'] || '未安装') } catch (e) { console.log('未安装') }")
           echo "检测到React Native SVG版本: $SVG_VERSION"
           
-          # 检查是否有特定的文件需要修复
-          PROBLEM_FILE="./node_modules/react-native-svg/apple/RNSVGUIKit.h"
-          if [ -f "$PROBLEM_FILE" ]; then
-            # 检查文件是否有特定问题
-            if grep -q "RCTViewComponentView" "$PROBLEM_FILE"; then
-              echo "检测到需要修复的问题 - RCTViewComponentView定义问题"
-              
-              # 1. 首先尝试应用补丁文件 (如果存在)
-              if [ -f "fix-rnsvg-ios.patch" ]; then
-                echo "应用fix-rnsvg-ios.patch补丁..."
-                cd node_modules/react-native-svg
-                patch -p1 < ../../fix-rnsvg-ios.patch || echo "补丁应用失败，尝试其他修复方式"
-                cd ../..
-              fi
-              
-              # 2. 如果有自定义修复脚本，则运行它们
-              if [ -f "fix-rnsvg-ios.js" ]; then
-                echo "执行fix-rnsvg-ios.js..."
-                node fix-rnsvg-ios.js
-              fi
-              
-              # 3. 运行综合修复脚本（如果上面步骤失败或脚本不存在）
-              if [ -f "fix-svg-ios-fabric.js" ] && ([ ! -f "fix-rnsvg-ios.js" ] || grep -q "RCTViewComponentView" "$PROBLEM_FILE"); then
-                echo "执行综合修复脚本fix-svg-ios-fabric.js..."
-                node fix-svg-ios-fabric.js
-              fi
-              
-              echo "✅ 自定义修复完成"
-            else
-              echo "没有检测到需要修复的特定问题，跳过自定义修复脚本"
-            fi
+          if [ "$SVG_VERSION" != "未安装" ]; then
+            echo "⚠️ 警告: 仍然检测到react-native-svg依赖，但我们已使用react-native-vector-icons替代"
           else
-            echo "找不到关键文件 $PROBLEM_FILE，可能不需要修复或结构已变更"
+            echo "✅ 已成功移除react-native-svg依赖"
           fi
-
-          # 检查TextPath类型不匹配问题
-          TEXTPATH_FILE="./node_modules/react-native-svg/apple/Text/RNSVGTextPath.mm"
-          if [ -f "$TEXTPATH_FILE" ]; then
-            # 检查当前SVG版本，如果已降级到15.1.0则跳过
-            CURRENT_SVG_VERSION=$(node -e "try { console.log(require('./package.json').dependencies['react-native-svg']) } catch (e) { console.log('未安装') }")
-            if [[ "$CURRENT_SVG_VERSION" == *"15.1.0"* ]]; then
-              echo "SVG版本已降级到15.1.0，跳过TextPath修复"
-            else
-              # 检查文件是否有类型不匹配问题
-              if grep -q "enum RNSVGTextPathMethod" "$TEXTPATH_FILE" && grep -q "NSString \*method" "./node_modules/react-native-svg/apple/Text/RNSVGTextPath.h"; then
-                echo "检测到TextPath类型不匹配问题"
-                
-                # 运行TextPath修复脚本
-                if [ -f "fix-svg-textpath.js" ]; then
-                  echo "执行fix-svg-textpath.js修复脚本..."
-                  node fix-svg-textpath.js
-                  echo "✅ TextPath类型不匹配问题修复完成"
-                else
-                  echo "⚠️ 未找到fix-svg-textpath.js修复脚本，无法修复TextPath问题"
-                fi
-              else
-                echo "未检测到TextPath类型不匹配问题，跳过修复"
-              fi
-            fi
-          else
-            echo "找不到TextPath文件，跳过相关修复"
-          fi
+          
+          # 跳过所有SVG相关检查
+          echo "已使用react-native-vector-icons替代SVG，跳过相关修复步骤"
           
           echo "继续使用工作流内置的修复步骤..."
 
@@ -475,252 +401,47 @@ jobs:
 
       - name: 修复react-native-svg重复文件问题
         run: |
-          echo "=== 修复react-native-svg重复文件问题 ==="
+          echo "=== 跳过react-native-svg相关修复 ==="
           
-          # 删除所有可能存在的RNSVGFabricConversions.h文件
-          find ./node_modules/react-native-svg -name "RNSVGFabricConversions.h" -type f -delete
-          
-          # 只在主目录创建一个RNSVGFabricConversions.h文件
-          mkdir -p "./node_modules/react-native-svg/apple"
-          echo "// Empty placeholder for RNSVGFabricConversions.h - DO NOT DUPLICATE" > "./node_modules/react-native-svg/apple/RNSVGFabricConversions.h"
-          
-          echo "✅ 已创建唯一的RNSVGFabricConversions.h文件"
+          # 检查是否已经完全移除react-native-svg
+          if [ ! -d "./node_modules/react-native-svg" ]; then
+            echo "✅ react-native-svg已完全移除，无需修复"
+          else
+            echo "⚠️ 警告: node_modules中仍存在react-native-svg目录，可能是其他依赖项引入的"
+          fi
           
       - name: 彻底修复RNSVGUse文件
         run: |
-          echo "=== 彻底修复RNSVGUse文件 ==="
+          echo "=== 跳过react-native-svg相关修复 ==="
+          echo "已使用react-native-vector-icons替代SVG，无需修复SVG文件"
           
-          SVG_USE_H_PATH="./node_modules/react-native-svg/apple/Elements/RNSVGUse.h"
-          SVG_USE_MM_PATH="./node_modules/react-native-svg/apple/Elements/RNSVGUse.mm"
-          
-          # 检查并备份文件
-          if [ -f "$SVG_USE_H_PATH" ] && [ -f "$SVG_USE_MM_PATH" ]; then
-            echo "找到RNSVGUse文件，开始修复..."
-            
-            # 备份原始文件
-            cp "$SVG_USE_H_PATH" "${SVG_USE_H_PATH}.original"
-            cp "$SVG_USE_MM_PATH" "${SVG_USE_MM_PATH}.original"
-            
-            # 检查头文件内容，了解需要的方法和属性
-            echo "检查RNSVGUse.h，查看声明的方法和属性..."
-            cat "$SVG_USE_H_PATH"
-            
-            # 创建一个简单的Objective-C空实现
-            echo "创建RNSVGUse.mm的最小实现..."
-            echo '/**' > "$SVG_USE_MM_PATH"
-            echo ' * Copyright (c) 2015-present, Horcrux.' >> "$SVG_USE_MM_PATH"
-            echo ' * All rights reserved.' >> "$SVG_USE_MM_PATH"
-            echo ' *' >> "$SVG_USE_MM_PATH"
-            echo ' * This source code is licensed under the MIT-style license found in the' >> "$SVG_USE_MM_PATH"
-            echo ' * LICENSE file in the root directory of this source tree.' >> "$SVG_USE_MM_PATH"
-            echo ' */' >> "$SVG_USE_MM_PATH"
-            echo '' >> "$SVG_USE_MM_PATH"
-            echo '#import "RNSVGUse.h"' >> "$SVG_USE_MM_PATH"
-            echo '#import "RNSVGSymbol.h"' >> "$SVG_USE_MM_PATH"
-            echo '#import <React/RCTLog.h>' >> "$SVG_USE_MM_PATH"
-            echo '' >> "$SVG_USE_MM_PATH"
-            echo '@implementation RNSVGUse' >> "$SVG_USE_MM_PATH"
-            echo '' >> "$SVG_USE_MM_PATH"
-            echo '- (void)setHref:(NSString *)href' >> "$SVG_USE_MM_PATH"
-            echo '{' >> "$SVG_USE_MM_PATH"
-            echo '    if ([href isEqualToString:_href]) {' >> "$SVG_USE_MM_PATH"
-            echo '        return;' >> "$SVG_USE_MM_PATH"
-            echo '    }' >> "$SVG_USE_MM_PATH"
-            echo '    [self invalidate];' >> "$SVG_USE_MM_PATH"
-            echo '    _href = href;' >> "$SVG_USE_MM_PATH"
-            echo '}' >> "$SVG_USE_MM_PATH"
-            echo '' >> "$SVG_USE_MM_PATH"
-            echo '- (void)setX:(RNSVGLength *)x' >> "$SVG_USE_MM_PATH"
-            echo '{' >> "$SVG_USE_MM_PATH"
-            echo '    if ([x isEqualTo:_x]) {' >> "$SVG_USE_MM_PATH"
-            echo '        return;' >> "$SVG_USE_MM_PATH"
-            echo '    }' >> "$SVG_USE_MM_PATH"
-            echo '    [self invalidate];' >> "$SVG_USE_MM_PATH"
-            echo '    _x = x;' >> "$SVG_USE_MM_PATH"
-            echo '}' >> "$SVG_USE_MM_PATH"
-            echo '' >> "$SVG_USE_MM_PATH"
-            echo '- (void)setY:(RNSVGLength *)y' >> "$SVG_USE_MM_PATH"
-            echo '{' >> "$SVG_USE_MM_PATH"
-            echo '    if ([y isEqualTo:_y]) {' >> "$SVG_USE_MM_PATH"
-            echo '        return;' >> "$SVG_USE_MM_PATH"
-            echo '    }' >> "$SVG_USE_MM_PATH"
-            echo '    [self invalidate];' >> "$SVG_USE_MM_PATH"
-            echo '    _y = y;' >> "$SVG_USE_MM_PATH"
-            echo '}' >> "$SVG_USE_MM_PATH"
-            echo '' >> "$SVG_USE_MM_PATH"
-            echo '- (void)setUsewidth:(RNSVGLength *)usewidth' >> "$SVG_USE_MM_PATH"
-            echo '{' >> "$SVG_USE_MM_PATH"
-            echo '    if ([usewidth isEqualTo:_usewidth]) {' >> "$SVG_USE_MM_PATH"
-            echo '        return;' >> "$SVG_USE_MM_PATH"
-            echo '    }' >> "$SVG_USE_MM_PATH"
-            echo '    [self invalidate];' >> "$SVG_USE_MM_PATH"
-            echo '    _usewidth = usewidth;' >> "$SVG_USE_MM_PATH"
-            echo '}' >> "$SVG_USE_MM_PATH"
-            echo '' >> "$SVG_USE_MM_PATH"
-            echo '- (void)setUseheight:(RNSVGLength *)useheight' >> "$SVG_USE_MM_PATH"
-            echo '{' >> "$SVG_USE_MM_PATH"
-            echo '    if ([useheight isEqualTo:_useheight]) {' >> "$SVG_USE_MM_PATH"
-            echo '        return;' >> "$SVG_USE_MM_PATH"
-            echo '    }' >> "$SVG_USE_MM_PATH"
-            echo '    [self invalidate];' >> "$SVG_USE_MM_PATH"
-            echo '    _useheight = useheight;' >> "$SVG_USE_MM_PATH"
-            echo '}' >> "$SVG_USE_MM_PATH"
-            echo '' >> "$SVG_USE_MM_PATH"
-            echo '@end' >> "$SVG_USE_MM_PATH"
-            
-            echo "✅ RNSVGUse.mm文件已简化为最小实现"
-            
-          else
-            echo "⚠️ RNSVGUse文件不存在"
-          fi
-
       - name: 修复react-native-svg导入问题
         run: |
-          echo "=== 修复react-native-svg导入问题 ==="
+          echo "=== 跳过react-native-svg相关修复 ==="
           
-          # 创建RCTConversions.h和RCTFabricComponentsPlugins.h的空占位符
+          # 创建React缺失头文件占位符
           echo "创建React缺失的头文件占位符..."
           mkdir -p "./node_modules/react-native/React"
           echo "// Empty placeholder for missing header" > "./node_modules/react-native/React/RCTConversions.h"
           echo "// Empty placeholder for missing header" > "./node_modules/react-native/React/RCTFabricComponentsPlugins.h"
           
-          # 创建react/renderer目录和占位符文件
-          echo "创建React Fabric renderer占位符..."
-          mkdir -p "./node_modules/react/renderer/components/rnsvg"
-          echo "// Empty placeholder for missing header" > "./node_modules/react/renderer/components/rnsvg/ComponentDescriptors.h"
-          
-          # 创建RNSVGFabricConversions.h占位符文件
-          echo "创建RNSVGFabricConversions.h占位符..."
-          SVG_DIR="./node_modules/react-native-svg/apple"
-          # 查找可能存在的目录
-          POSSIBLE_DIRS=("$SVG_DIR" "$SVG_DIR/Utils" "$SVG_DIR/Elements" "$SVG_DIR/Fabric")
-          for dir in "${POSSIBLE_DIRS[@]}"; do
-            echo "  检查目录: $dir"
-            mkdir -p "$dir"
-            echo "// Empty placeholder for RNSVGFabricConversions.h" > "$dir/RNSVGFabricConversions.h"
-          done
-          
-          # 修复RNSVGUse.mm文件导入问题
-          SVG_USE_PATH="./node_modules/react-native-svg/apple/Elements/RNSVGUse.mm"
-          if [ -f "$SVG_USE_PATH" ]; then
-            echo "修复文件: $SVG_USE_PATH"
-            # 创建备份
-            cp "$SVG_USE_PATH" "${SVG_USE_PATH}.bak"
-            
-            # 在文件顶部添加条件编译
-            echo "#define RCT_NEW_ARCH_ENABLED 0" > "${SVG_USE_PATH}.new"
-            echo "#import <UIKit/UIKit.h>" >> "${SVG_USE_PATH}.new"
-            echo "#import <React/RCTBridge.h>" >> "${SVG_USE_PATH}.new"
-            echo "" >> "${SVG_USE_PATH}.new"
-            
-            # 移除所有有问题的导入
-            cat "$SVG_USE_PATH" | grep -v "RCTConversions.h" | grep -v "RCTFabricComponentsPlugins.h" | grep -v "react/renderer" | grep -v "RNSVGFabricConversions.h" >> "${SVG_USE_PATH}.new"
-            
-            # 替换原文件
-            mv "${SVG_USE_PATH}.new" "$SVG_USE_PATH"
-            
-            echo "✅ 修复完成: $SVG_USE_PATH"
-          else
-            echo "⚠️ 文件不存在: $SVG_USE_PATH"
-          fi
-          
-          echo "✅ 完成修复react-native-svg导入问题"
+          echo "✅ 已创建React缺失头文件占位符"
           
       - name: 全局修复React Native头文件问题
         run: |
           echo "=== 全局修复React Native头文件问题 ==="
           
-          # 查找所有引用Fabric相关头文件的位置
-          echo "查找Fabric相关导入..."
-          FABRIC_FILES=$(find ./node_modules/react-native-svg -type f -name "*.mm" -o -name "*.m" | xargs grep -l "RCTFabric\|react/renderer\|RNSVGFabricConversions" 2>/dev/null || true)
+          # 只保留创建必要的头文件目录
+          mkdir -p "./node_modules/react/renderer/components"
+          echo "// Empty placeholder" > "./node_modules/react/renderer/components/ComponentDescriptors.h"
           
-          # 处理每个包含Fabric导入的文件
-          if [ ! -z "$FABRIC_FILES" ]; then
-            echo "找到以下文件包含Fabric相关导入:"
-            echo "$FABRIC_FILES"
-            
-            for file in $FABRIC_FILES; do
-              echo "处理: $file"
-              
-              # 创建备份
-              cp "$file" "${file}.bak"
-              
-              # 添加条件编译定义
-              echo "#define RCT_NEW_ARCH_ENABLED 0" > "${file}.tmp"
-              
-              # 移除所有Fabric相关导入
-              cat "$file" | grep -v "RCTFabric" | grep -v "react/renderer" | grep -v "RNSVGFabricConversions" >> "${file}.tmp"
-              
-              # 替换原文件
-              mv "${file}.tmp" "$file"
-              
-              echo "✅ 已修复: $file"
-            done
-          else
-            echo "没有找到其他Fabric相关导入"
-          fi
-          
-          # 创建所有可能缺失的头文件目录
-          mkdir -p "./node_modules/react/renderer/components/rnsvg"
-          echo "// Empty placeholder for ComponentDescriptors.h" > "./node_modules/react/renderer/components/rnsvg/ComponentDescriptors.h"
-          
-          # 在所有可能的位置创建RNSVGFabricConversions.h
-          SVG_DIR="./node_modules/react-native-svg/apple"
-          FABRIC_DIRS=("$SVG_DIR" "$SVG_DIR/Utils" "$SVG_DIR/Elements" "$SVG_DIR/Fabric")
-          for dir in "${FABRIC_DIRS[@]}"; do
-            mkdir -p "$dir"
-            echo "// Empty stub for Fabric" > "$dir/RNSVGFabricConversions.h"
-            echo "  ✓ 创建: $dir/RNSVGFabricConversions.h"
-          done
-          
-          echo "✅ 完成全局修复"
+          echo "✅ 已创建React Renderer组件占位符"
 
       - name: 修复react-native-svg组件问题
         run: |
-          echo "=== 修复react-native-svg组件问题 ==="
+          echo "=== 跳过react-native-svg组件问题修复 ==="
+          echo "已使用react-native-vector-icons替代SVG，无需修复SVG组件问题"
           
-          # SVGView文件修复
-          SVG_VIEW_PATH="./node_modules/react-native-svg/apple/Elements/RNSVGSvgView.h"
-          if [ -f "$SVG_VIEW_PATH" ]; then
-            echo "修复文件: $SVG_VIEW_PATH"
-            # 创建备份
-            cp "$SVG_VIEW_PATH" "${SVG_VIEW_PATH}.bak"
-            
-            # 确保导入UIKit
-            grep -q "#import <UIKit/UIView.h>" "$SVG_VIEW_PATH" || sed -i '' '1i\
-            #import <UIKit/UIView.h>
-            ' "$SVG_VIEW_PATH"
-            
-            # 替换RCTViewComponentView
-            sed -i '' 's/RCTViewComponentView <RNSVGContainer>/UIView <RNSVGContainer>/g' "$SVG_VIEW_PATH"
-            
-            echo "✅ 修复完成: $SVG_VIEW_PATH"
-          else
-            echo "⚠️ 文件不存在: $SVG_VIEW_PATH"
-          fi
-          
-          # Node文件修复
-          SVG_NODE_PATH="./node_modules/react-native-svg/apple/RNSVGNode.h"
-          if [ -f "$SVG_NODE_PATH" ]; then
-            echo "修复文件: $SVG_NODE_PATH"
-            # 创建备份
-            cp "$SVG_NODE_PATH" "${SVG_NODE_PATH}.bak"
-            
-            # 确保导入UIKit
-            grep -q "#import <UIKit/UIView.h>" "$SVG_NODE_PATH" || sed -i '' '1i\
-            #import <UIKit/UIView.h>
-            ' "$SVG_NODE_PATH"
-            
-            # 替换RCTViewComponentView
-            sed -i '' 's/RCTViewComponentView/UIView/g' "$SVG_NODE_PATH"
-            
-            echo "✅ 修复完成: $SVG_NODE_PATH"
-          else
-            echo "⚠️ 文件不存在: $SVG_NODE_PATH"
-          fi
-          
-          echo "✅ 完成修复 react-native-svg组件"
-
       - name: 预处理安全区域上下文库以避免重复头文件
         run: |
           echo "=== 预处理安全区域上下文库以避免重复头文件 ==="
