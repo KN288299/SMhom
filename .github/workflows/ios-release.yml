@@ -586,27 +586,39 @@ jobs:
             exit 1
           fi
           
-          # 将权限模块添加到Podfile中
-          echo "" >> Podfile
-          echo "# 手动添加react-native-permissions依赖" >> Podfile
-          echo "pod 'RNPermissions', :path => '../node_modules/react-native-permissions'" >> Podfile
-          echo "" >> Podfile
-          echo "# 添加所需的具体权限模块" >> Podfile
-          echo "permissions_path = '../node_modules/react-native-permissions/ios'" >> Podfile
-          echo "pod 'Permission-Camera', :path => \"\#{permissions_path}/Camera\"" >> Podfile
-          echo "pod 'Permission-Microphone', :path => \"\#{permissions_path}/Microphone\"" >> Podfile
-          echo "pod 'Permission-PhotoLibrary', :path => \"\#{permissions_path}/PhotoLibrary\"" >> Podfile
-          echo "pod 'Permission-LocationWhenInUse', :path => \"\#{permissions_path}/LocationWhenInUse\"" >> Podfile
+          # 修改Podfile以使用正确的路径变量
+          cp Podfile Podfile.bak
+          
+          # 添加权限库配置
+          sed -i '' '/use_react_native/a\
+          \
+          # 直接使用来自RN配置的路径\
+          permissions_path = File.join(config[:reactNativePath], "\..", "react-native-permissions")\
+          pod "RNPermissions", :path => permissions_path\
+          \
+          # 添加应用需要的权限模块\
+          pod "Permission-Camera", :path => "#{permissions_path}/ios/Camera"\
+          pod "Permission-Microphone", :path => "#{permissions_path}/ios/Microphone"\
+          pod "Permission-PhotoLibrary", :path => "#{permissions_path}/ios/PhotoLibrary"\
+          pod "Permission-LocationWhenInUse", :path => "#{permissions_path}/ios/LocationWhenInUse"
+          ' Podfile
+          
+          # 添加禁用新架构的配置
+          sed -i '' '1i\
+          # 禁用React Native新架构，修复权限问题\
+          ENV["RCT_NEW_ARCH_ENABLED"] = "0"\
+          $RNPermissionsDisableAutolinking = true
+          ' Podfile
           
           # 创建react-native.config.js文件
           cd ..
-          echo "创建react-native.config.js文件..."
           echo "module.exports = {" > react-native.config.js
           echo "  dependencies: {" >> react-native.config.js
           echo "    'react-native-permissions': {" >> react-native.config.js
           echo "      platforms: {" >> react-native.config.js
           echo "        ios: {" >> react-native.config.js
-          echo "          podspecPath: './node_modules/react-native-permissions/ios/RNPermissions.podspec'" >> react-native.config.js
+          echo "          // 动态查找podspec路径" >> react-native.config.js
+          echo "          podspecPath: undefined" >> react-native.config.js
           echo "        }," >> react-native.config.js
           echo "      }," >> react-native.config.js
           echo "    }," >> react-native.config.js
