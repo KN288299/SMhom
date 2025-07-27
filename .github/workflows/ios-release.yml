@@ -581,7 +581,8 @@ jobs:
           
           # 检查文件结构
           echo "检查React Native Permissions库文件结构..."
-          ls -la ./node_modules/react-native-permissions/ios || echo "权限库目录不存在"
+          ls -la ./node_modules/react-native-permissions || echo "权限库目录不存在"
+          find ./node_modules -name "*.podspec" | grep -i permission || echo "找不到podspec文件"
           
           # 1. 备份原始文件
           RN_PERMISSIONS_DIR="./node_modules/react-native-permissions"
@@ -663,9 +664,20 @@ jobs:
           echo '' >> "${SPEC_DIR}/RNPermissionsSpec.h"
           echo '#endif /* RNPermissionsSpec_h */' >> "${SPEC_DIR}/RNPermissionsSpec.h"
           
+          # 5. 确保podspec文件在正确位置
+          echo "处理podspec文件位置..."
+          if [ -f "${RN_PERMISSIONS_DIR}/RNPermissions.podspec" ]; then
+            echo "找到podspec文件，创建ios目录副本..."
+            mkdir -p "${RN_PERMISSIONS_DIR}/ios"
+            cp "${RN_PERMISSIONS_DIR}/RNPermissions.podspec" "${RN_PERMISSIONS_DIR}/ios/"
+            echo "podspec已复制到ios目录"
+          else
+            echo "⚠️ 警告：找不到RNPermissions.podspec文件"
+          fi
+          
           cd ios
           
-          # 5. 确保Podfile正确配置
+          # 6. 确保Podfile正确配置
           echo "更新 Podfile 配置..."
           
           # 备份原始Podfile
@@ -709,18 +721,14 @@ jobs:
           echo '    :app_path => "#{Pod::Config.instance.installation_root}/.."' >> Podfile
           echo '  )' >> Podfile
           echo '' >> Podfile
-          echo '  # 使用单一路径方式添加权限模块' >> Podfile
+          echo '  # 使用根目录podspec' >> Podfile
           echo '  pod "RNPermissions", :path => "../node_modules/react-native-permissions"' >> Podfile
-          echo '  pod "Permission-Camera", :path => "../node_modules/react-native-permissions"' >> Podfile
-          echo '  pod "Permission-Microphone", :path => "../node_modules/react-native-permissions"' >> Podfile
-          echo '  pod "Permission-PhotoLibrary", :path => "../node_modules/react-native-permissions"' >> Podfile
-          echo '  pod "Permission-LocationWhenInUse", :path => "../node_modules/react-native-permissions"' >> Podfile
-          echo '' >> Podfile
-          echo '  # 移除 Firebase 相关配置，暂时注释掉' >> Podfile
-          echo "  # pod 'FirebaseCoreInternal', :modular_headers => true, :inhibit_warnings => true" >> Podfile
-          echo "  # pod 'FirebaseCore', :modular_headers => true, :inhibit_warnings => true" >> Podfile
-          echo "  # pod 'FirebaseMessaging', :modular_headers => true, :inhibit_warnings => true" >> Podfile
-          echo "  # pod 'GoogleUtilities', :modular_headers => true, :inhibit_warnings => true" >> Podfile
+          echo '  # 子组件路径指向根目录' >> Podfile
+          echo '  permissions_path = "../node_modules/react-native-permissions"' >> Podfile
+          echo '  pod "Permission-Camera", :path => "#{permissions_path}"' >> Podfile
+          echo '  pod "Permission-Microphone", :path => "#{permissions_path}"' >> Podfile
+          echo '  pod "Permission-PhotoLibrary", :path => "#{permissions_path}"' >> Podfile
+          echo '  pod "Permission-LocationWhenInUse", :path => "#{permissions_path}"' >> Podfile
           echo '' >> Podfile
           echo '  post_install do |installer|' >> Podfile
           echo '    # https://github.com/facebook/react-native/blob/main/packages/react-native/scripts/react_native_pods.rb#L197-L202' >> Podfile
