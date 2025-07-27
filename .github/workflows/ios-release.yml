@@ -586,44 +586,115 @@ jobs:
             exit 1
           fi
           
-          # 修改Podfile以使用正确的路径变量
-          cp Podfile Podfile.bak
+          # 备份原始Podfile
+          cp Podfile Podfile.original
           
-          # 添加权限库配置
-          sed -i '' '/use_react_native/a\
-          \
-          # 直接使用来自RN配置的路径\
-          permissions_path = File.join(config[:reactNativePath], "\..", "react-native-permissions")\
-          pod "RNPermissions", :path => permissions_path\
-          \
-          # 添加应用需要的权限模块\
-          pod "Permission-Camera", :path => "#{permissions_path}/ios/Camera"\
-          pod "Permission-Microphone", :path => "#{permissions_path}/ios/Microphone"\
-          pod "Permission-PhotoLibrary", :path => "#{permissions_path}/ios/PhotoLibrary"\
-          pod "Permission-LocationWhenInUse", :path => "#{permissions_path}/ios/LocationWhenInUse"
-          ' Podfile
+          # 直接创建新的Podfile，使用简单的cat命令
+          cat > Podfile << 'EOF'
+# 禁用React Native新架构，修复权限问题
+ENV['RCT_NEW_ARCH_ENABLED'] = '0'
+$RNPermissionsDisableAutolinking = true
+
+# Resolve react_native_pods.rb with node to allow for hoisting
+require Pod::Executable.execute_command('node', ['-p',
+  'require.resolve(
+    "react-native/scripts/react_native_pods.rb",
+    {paths: [process.argv[1]]},
+  )', __dir__]).strip
+
+# 使用 CDN 源
+source 'https://cdn.cocoapods.org/'
+
+platform :ios, min_ios_version_supported
+prepare_react_native_project!
+
+# 添加这些配置来解决 Swift 模块问题
+use_modular_headers!
+use_frameworks! :linkage => :static
+
+linkage = ENV['USE_FRAMEWORKS']
+if linkage != nil
+  Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
+  use_frameworks! :linkage => linkage.to_sym
+end
+
+target 'HomeServiceChat' do
+  config = use_native_modules!
+
+  use_react_native!(
+    :path => config[:reactNativePath],
+    :hermes_enabled => false,
+    # An absolute path to your application root.
+    :app_path => "#{Pod::Config.instance.installation_root}/.."
+  )
+  
+  # 手动添加RNPermissions和需要的权限模块
+  pod 'RNPermissions', :path => '../node_modules/react-native-permissions'
+  
+  # 添加应用需要的权限模块
+  permissions_ios_path = '../node_modules/react-native-permissions/ios'
+  pod 'Permission-Camera', :path => "#{permissions_ios_path}/Camera"
+  pod 'Permission-Microphone', :path => "#{permissions_ios_path}/Microphone" 
+  pod 'Permission-PhotoLibrary', :path => "#{permissions_ios_path}/PhotoLibrary"
+  pod 'Permission-LocationWhenInUse', :path => "#{permissions_ios_path}/LocationWhenInUse"
+
+  # 移除 Firebase 相关配置，暂时注释掉
+  # pod 'FirebaseCoreInternal', :modular_headers => true, :inhibit_warnings => true
+  # pod 'FirebaseCore', :modular_headers => true, :inhibit_warnings => true
+  # pod 'FirebaseMessaging', :modular_headers => true, :inhibit_warnings => true
+  # pod 'GoogleUtilities', :modular_headers => true, :inhibit_warnings => true
+
+  post_install do |installer|
+    # https://github.com/facebook/react-native/blob/main/packages/react-native/scripts/react_native_pods.rb#L197-L202
+    react_native_post_install(
+      installer,
+      config[:reactNativePath],
+      :mac_catalyst_enabled => false
+    )
+    
+    # 设置编译选项
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        # iOS 部署目标
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+        
+        # Swift 编译选项
+        config.build_settings['SWIFT_VERSION'] = '5.0'
+        config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-O'
+        
+        # C++ 标准
+        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++20'
+        
+        # 禁用 arm64 模拟器构建
+        config.build_settings["EXCLUDED_ARCHS[sdk=iphonesimulator*]"] = "arm64"
+        
+        # 其它优化
+        config.build_settings['GCC_OPTIMIZATION_LEVEL'] = '0'
+        config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
+        config.build_settings['ENABLE_BITCODE'] = 'NO'
+      end
+    end
+  end
+end
+EOF
           
-          # 添加禁用新架构的配置
-          sed -i '' '1i\
-          # 禁用React Native新架构，修复权限问题\
-          ENV["RCT_NEW_ARCH_ENABLED"] = "0"\
-          $RNPermissionsDisableAutolinking = true
-          ' Podfile
+          echo "✅ 创建了新的Podfile"
           
           # 创建react-native.config.js文件
           cd ..
-          echo "module.exports = {" > react-native.config.js
-          echo "  dependencies: {" >> react-native.config.js
-          echo "    'react-native-permissions': {" >> react-native.config.js
-          echo "      platforms: {" >> react-native.config.js
-          echo "        ios: {" >> react-native.config.js
-          echo "          // 动态查找podspec路径" >> react-native.config.js
-          echo "          podspecPath: undefined" >> react-native.config.js
-          echo "        }," >> react-native.config.js
-          echo "      }," >> react-native.config.js
-          echo "    }," >> react-native.config.js
-          echo "  }," >> react-native.config.js
-          echo "};" >> react-native.config.js
+          cat > react-native.config.js << 'EOF'
+module.exports = {
+  dependencies: {
+    'react-native-permissions': {
+      platforms: {
+        ios: {
+          podspecPath: './node_modules/react-native-permissions'
+        },
+      },
+    },
+  },
+};
+EOF
           
           echo "✅ React Native Permissions配置完成"
 
