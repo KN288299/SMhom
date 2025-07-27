@@ -685,7 +685,7 @@ jobs:
           echo "    'react-native-permissions': {" >> react-native.config.js
           echo "      platforms: {" >> react-native.config.js
           echo "        ios: {" >> react-native.config.js
-          echo "          podspecPath: './node_modules/react-native-permissions'" >> react-native.config.js
+          echo "          podspecPath: './node_modules/react-native-permissions/RNPermissions.podspec'" >> react-native.config.js
           echo "        }," >> react-native.config.js
           echo "      }," >> react-native.config.js
           echo "    }," >> react-native.config.js
