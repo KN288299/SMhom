@@ -90,12 +90,12 @@ jobs:
           pod cache clean --all
           mkdir -p build
           chmod -R 755 .
-      
+
       # 其他修复步骤保持不变...
 
       - name: 配置React Native Permissions（简化版）
         run: |-
-          echo "=== 配置React Native Permissions - 简化配置 ==="
+          echo "=== 配置React Native Permissions - 解决podspec路径问题 ==="
           
           # 检查react-native-permissions版本
           PERMISSIONS_VERSION=$(node -e "console.log(require('./package.json').dependencies['react-native-permissions'] || 'undefined')")
@@ -103,9 +103,31 @@ jobs:
           
           # 确保我们使用的是3.x版本
           if [[ "$PERMISSIONS_VERSION" == *"3."* ]]; then
-            echo "✅ 使用3.x版本的React Native Permissions，无需复杂修复"
+            echo "✅ 使用3.x版本的React Native Permissions，但仍需处理podspec路径问题"
           else
             echo "⚠️ 警告：非3.x版本的React Native Permissions可能需要额外修复"
+          fi
+          
+          # 调试文件结构
+          echo "调试react-native-permissions目录结构:"
+          ls -la ./node_modules/react-native-permissions/ || echo "目录不存在"
+          echo "检查podspec文件位置:"
+          find ./node_modules -name "RNPermissions.podspec" || echo "找不到podspec文件"
+          
+          # 关键修复：确保podspec文件在iOS子目录中
+          RN_PERMISSIONS_DIR="./node_modules/react-native-permissions"
+          if [ -f "${RN_PERMISSIONS_DIR}/RNPermissions.podspec" ]; then
+            echo "找到podspec文件，创建ios子目录副本..."
+            mkdir -p "${RN_PERMISSIONS_DIR}/ios"
+            cp "${RN_PERMISSIONS_DIR}/RNPermissions.podspec" "${RN_PERMISSIONS_DIR}/ios/"
+            echo "✅ podspec已复制到ios目录: ${RN_PERMISSIONS_DIR}/ios/RNPermissions.podspec"
+            
+            # 验证复制成功
+            ls -la "${RN_PERMISSIONS_DIR}/ios/" || echo "复制后ios目录不存在"
+          else
+            echo "❌ 严重错误：找不到RNPermissions.podspec文件"
+            find ./node_modules -name "*.podspec" | head -10
+            exit 1
           fi
           
           # 为了安全起见，确保Podfile配置正确
@@ -123,7 +145,57 @@ jobs:
             echo "✅ Podfile已正确配置新架构设置"
           fi
           
+          # 修复方案：尝试添加手动权限pod配置
+          if ! grep -q "RNPermissions.*:path" Podfile; then
+            echo "添加手动权限pod配置..."
+            echo "" >> Podfile
+            echo "# 手动添加权限库配置" >> Podfile
+            echo "  pod 'RNPermissions', :path => '../node_modules/react-native-permissions'" >> Podfile
+            echo "  pod 'Permission-Camera', :path => '../node_modules/react-native-permissions'" >> Podfile
+            echo "  pod 'Permission-Microphone', :path => '../node_modules/react-native-permissions'" >> Podfile
+            echo "  pod 'Permission-PhotoLibrary', :path => '../node_modules/react-native-permissions'" >> Podfile
+            echo "  pod 'Permission-LocationWhenInUse', :path => '../node_modules/react-native-permissions'" >> Podfile
+          fi
+          
+          echo "修改后的Podfile末尾内容:"
+          tail -20 Podfile
+          
           echo "✅ React Native Permissions配置完成"
+
+      # 添加一个调试步骤来检查CocoaPods环境
+      - name: 调试CocoaPods环境
+        run: |
+          echo "=== 调试CocoaPods环境 ==="
+          
+          # 检查Pod环境
+          pod --version
+          pod env
+          
+          # 检查react-native-permissions的podspec
+          cd node_modules/react-native-permissions
+          echo "react-native-permissions目录内容:"
+          ls -la
+          
+          if [ -f "RNPermissions.podspec" ]; then
+            echo "根目录podspec内容预览:"
+            head -20 RNPermissions.podspec
+            
+            # 确保iOS目录存在
+            mkdir -p ios
+            cp RNPermissions.podspec ios/
+            echo "✅ 已复制podspec到ios目录"
+            ls -la ios/
+          else
+            echo "❌ 警告：根目录中找不到podspec文件"
+          fi
+          
+          # 返回到workspace根目录
+          cd ../..
+          
+          # 检查Podfile是否引用了这个路径
+          cd ios
+          echo "Podfile中的权限相关配置:"
+          grep -A 10 "RNPermissions" Podfile || echo "未找到RNPermissions配置"
 
       - name: 安装CocoaPods依赖
         run: |
