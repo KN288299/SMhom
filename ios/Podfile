@@ -8,6 +8,10 @@ require Pod::Executable.execute_command('node', ['-p',
 # 使用 CDN 源
 source 'https://cdn.cocoapods.org/'
 
+# 禁用React Native新架构，修复权限问题
+ENV['RCT_NEW_ARCH_ENABLED'] = '0'
+$RNPermissionsDisableAutolinking = true
+
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
@@ -30,6 +34,16 @@ target 'HomeServiceChat' do
     # An absolute path to your application root.
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
+  
+  # 手动添加权限模块配置
+  pod 'RNPermissions', :path => '../node_modules/react-native-permissions'
+  
+  # 添加应用需要的权限模块
+  permissions_path = '../node_modules/react-native-permissions/ios'
+  pod 'Permission-Camera', :path => "#{permissions_path}/Camera"
+  pod 'Permission-Microphone', :path => "#{permissions_path}/Microphone" 
+  pod 'Permission-PhotoLibrary', :path => "#{permissions_path}/PhotoLibrary"
+  pod 'Permission-LocationWhenInUse', :path => "#{permissions_path}/LocationWhenInUse"
 
   # 移除 Firebase 相关配置，暂时注释掉
   # pod 'FirebaseCoreInternal', :modular_headers => true, :inhibit_warnings => true
