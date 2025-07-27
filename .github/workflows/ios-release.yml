@@ -18,6 +18,8 @@ env:
   # 显式禁用新架构
   RCT_NEW_ARCH_ENABLED: "0"
   USE_HERMES: "0"
+  # 禁用RNPermissions自动链接
+  RN_PERMISSIONS_DISABLE_AUTOLINKING: "1"
 
 jobs:
   build:
@@ -473,6 +475,11 @@ jobs:
             echo "ENV[\"RCT_NEW_ARCH_ENABLED\"] = \"0\"" >> Podfile
             echo "ENV[\"USE_FABRIC\"] = \"0\"" >> Podfile
             echo "ENV[\"USE_HERMES\"] = \"0\"" >> Podfile
+            
+            # 禁用RNPermissions自动链接
+            echo "# 禁用RNPermissions自动链接" >> Podfile
+            echo "\$RNPermissionsDisableAutolinking = true" >> Podfile
+            
             echo "" >> Podfile
             echo "# 禁用所有Fabric相关设置" >> Podfile
             echo "\$RCT_NEW_ARCH_ENABLED = false" >> Podfile
@@ -567,6 +574,46 @@ jobs:
           else
             echo "⚠️ 警告: 找不到Podfile"
           fi
+          
+      - name: 配置React Native Permissions
+        run: |
+          echo "=== 配置React Native Permissions ==="
+          cd ios
+          
+          # 检查Podfile是否存在
+          if [ ! -f "Podfile" ]; then
+            echo "❌ 找不到Podfile"
+            exit 1
+          fi
+          
+          # 将权限模块添加到Podfile中
+          echo "" >> Podfile
+          echo "# 手动添加react-native-permissions依赖" >> Podfile
+          echo "pod 'RNPermissions', :path => '../node_modules/react-native-permissions'" >> Podfile
+          echo "" >> Podfile
+          echo "# 添加所需的具体权限模块" >> Podfile
+          echo "permissions_path = '../node_modules/react-native-permissions/ios'" >> Podfile
+          echo "pod 'Permission-Camera', :path => \"\#{permissions_path}/Camera\"" >> Podfile
+          echo "pod 'Permission-Microphone', :path => \"\#{permissions_path}/Microphone\"" >> Podfile
+          echo "pod 'Permission-PhotoLibrary', :path => \"\#{permissions_path}/PhotoLibrary\"" >> Podfile
+          echo "pod 'Permission-LocationWhenInUse', :path => \"\#{permissions_path}/LocationWhenInUse\"" >> Podfile
+          
+          # 创建react-native.config.js文件
+          cd ..
+          echo "创建react-native.config.js文件..."
+          echo "module.exports = {" > react-native.config.js
+          echo "  dependencies: {" >> react-native.config.js
+          echo "    'react-native-permissions': {" >> react-native.config.js
+          echo "      platforms: {" >> react-native.config.js
+          echo "        ios: {" >> react-native.config.js
+          echo "          podspecPath: './node_modules/react-native-permissions/ios/RNPermissions.podspec'" >> react-native.config.js
+          echo "        }," >> react-native.config.js
+          echo "      }," >> react-native.config.js
+          echo "    }," >> react-native.config.js
+          echo "  }," >> react-native.config.js
+          echo "};" >> react-native.config.js
+          
+          echo "✅ React Native Permissions配置完成"
 
       - name: 安装CocoaPods依赖
         run: |
@@ -581,6 +628,7 @@ jobs:
           # 确保环境变量设置正确
           export RCT_NEW_ARCH_ENABLED=0
           export USE_HERMES=0
+          export RN_PERMISSIONS_DISABLE_AUTOLINKING=1
           
           # 尝试3次安装pods
           for i in {1..3}; do
@@ -741,6 +789,7 @@ jobs:
           
           # 确保禁用新架构的环境变量
           export RCT_NEW_ARCH_ENABLED=0
+          export RN_PERMISSIONS_DISABLE_AUTOLINKING=1
           
           # 执行归档
           xcodebuild -workspace HomeServiceChat.xcworkspace \
@@ -761,6 +810,7 @@ jobs:
             RCT_FABRIC_ENABLED=0 \
             USE_FABRIC=0 \
             FABRIC_ENABLED=NO \
+            RN_PERMISSIONS_DISABLE_AUTOLINKING=1 \
             GCC_PREPROCESSOR_DEFINITIONS="RCT_NEW_ARCH_ENABLED=0" \
             archive \
             -verbose \
