@@ -578,6 +578,13 @@ jobs:
       - name: 配置React Native Permissions
         run: |
           echo "=== 配置React Native Permissions ==="
+          
+          # 调试：检查文件结构
+          echo "检查目录和文件结构..."
+          ls -la .
+          ls -la ./node_modules/react-native-permissions || echo "权限库目录不存在"
+          find . -name "RNPermissions.podspec" || echo "找不到podspec文件"
+          
           cd ios
           
           # 检查Podfile是否存在
@@ -586,9 +593,15 @@ jobs:
             exit 1
           fi
           
+          # 显示原始Podfile内容
+          echo "=== 原始Podfile内容 ==="
+          cat Podfile
+          echo "======================="
+          
           # 备份原始Podfile
           cp Podfile Podfile.original
           
+          # 关键改变: 不使用react-native.config.js，直接修改Podfile引入权限库
           # 使用echo命令逐行写入Podfile，避免YAML解析问题
           echo '# 禁用React Native新架构，修复权限问题' > Podfile
           echo "ENV['RCT_NEW_ARCH_ENABLED'] = '0'" >> Podfile
@@ -627,15 +640,12 @@ jobs:
           echo '    :app_path => "#{Pod::Config.instance.installation_root}/.."' >> Podfile
           echo '  )' >> Podfile
           echo '' >> Podfile
-          echo '  # 手动添加RNPermissions和需要的权限模块' >> Podfile
-          echo "  pod 'RNPermissions', :path => '../node_modules/react-native-permissions'" >> Podfile
-          echo '' >> Podfile
-          echo '  # 添加应用需要的权限模块' >> Podfile
-          echo "  permissions_ios_path = '../node_modules/react-native-permissions/ios'" >> Podfile
-          echo '  pod '"'"'Permission-Camera'"'"', :path => "#{permissions_ios_path}/Camera"' >> Podfile
-          echo '  pod '"'"'Permission-Microphone'"'"', :path => "#{permissions_ios_path}/Microphone"' >> Podfile
-          echo '  pod '"'"'Permission-PhotoLibrary'"'"', :path => "#{permissions_ios_path}/PhotoLibrary"' >> Podfile
-          echo '  pod '"'"'Permission-LocationWhenInUse'"'"', :path => "#{permissions_ios_path}/LocationWhenInUse"' >> Podfile
+          echo '  # 不使用podspecPath，直接指定子规格' >> Podfile
+          echo '  # Permission子模块' >> Podfile
+          echo '  pod "Permission-Camera", :path => "../node_modules/react-native-permissions"' >> Podfile
+          echo '  pod "Permission-Microphone", :path => "../node_modules/react-native-permissions"' >> Podfile
+          echo '  pod "Permission-PhotoLibrary", :path => "../node_modules/react-native-permissions"' >> Podfile
+          echo '  pod "Permission-LocationWhenInUse", :path => "../node_modules/react-native-permissions"' >> Podfile
           echo '' >> Podfile
           echo '  # 移除 Firebase 相关配置，暂时注释掉' >> Podfile
           echo "  # pod 'FirebaseCoreInternal', :modular_headers => true, :inhibit_warnings => true" >> Podfile
@@ -676,21 +686,31 @@ jobs:
           echo '  end' >> Podfile
           echo 'end' >> Podfile
           
-          echo "✅ 创建了新的Podfile"
+          echo "=== 新Podfile内容 ==="
+          cat Podfile
+          echo "======================"
           
-          # 创建react-native.config.js文件
+          # 修改react-native-permissions中的文件，避免使用RNPermissionsSpec
           cd ..
-          echo "module.exports = {" > react-native.config.js
-          echo "  dependencies: {" >> react-native.config.js
-          echo "    'react-native-permissions': {" >> react-native.config.js
-          echo "      platforms: {" >> react-native.config.js
-          echo "        ios: {" >> react-native.config.js
-          echo "          podspecPath: './node_modules/react-native-permissions/RNPermissions.podspec'" >> react-native.config.js
-          echo "        }," >> react-native.config.js
-          echo "      }," >> react-native.config.js
-          echo "    }," >> react-native.config.js
-          echo "  }," >> react-native.config.js
-          echo "};" >> react-native.config.js
+          RN_PERMISSIONS_DIR="node_modules/react-native-permissions/ios"
+          
+          if [ -d "$RN_PERMISSIONS_DIR" ]; then
+            echo "修复RNPermissions.h文件中的引用..."
+            
+            # 备份原始文件
+            cp "$RN_PERMISSIONS_DIR/RNPermissions.h" "$RN_PERMISSIONS_DIR/RNPermissions.h.bak" || echo "无法创建备份"
+            
+            # 替换RNPermissionsSpec引用
+            sed -i.tmp 's/#import <RNPermissionsSpec\/RNPermissionsSpec.h>/\/\/ 已注释: #import <RNPermissionsSpec\/RNPermissionsSpec.h>/' "$RN_PERMISSIONS_DIR/RNPermissions.h" || echo "无法修改RNPermissions.h"
+            
+            # 创建RNPermissionsSpec目录和空头文件
+            mkdir -p "$RN_PERMISSIONS_DIR/RNPermissionsSpec"
+            echo "// 空白占位符" > "$RN_PERMISSIONS_DIR/RNPermissionsSpec/RNPermissionsSpec.h" || echo "无法创建占位头文件"
+            
+            echo "✅ 已修复React Native Permissions头文件引用"
+          else
+            echo "⚠️ 找不到React Native Permissions ios目录"
+          fi
           
           echo "✅ React Native Permissions配置完成"
 
