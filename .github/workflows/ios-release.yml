@@ -576,32 +576,101 @@ jobs:
           fi
           
       - name: 配置React Native Permissions
-        run: |
-          echo "=== 配置React Native Permissions ==="
+        run: |-
+          echo "=== 配置React Native Permissions - 方案3：直接修复头文件 ==="
           
-          # 调试：检查文件结构
-          echo "检查目录和文件结构..."
-          ls -la .
-          ls -la ./node_modules/react-native-permissions || echo "权限库目录不存在"
-          find . -name "RNPermissions.podspec" || echo "找不到podspec文件"
+          # 检查文件结构
+          echo "检查React Native Permissions库文件结构..."
+          ls -la ./node_modules/react-native-permissions/ios || echo "权限库目录不存在"
+          
+          # 1. 备份原始文件
+          RN_PERMISSIONS_DIR="./node_modules/react-native-permissions"
+          PERMISSIONS_HEADER="${RN_PERMISSIONS_DIR}/ios/RNPermissions.h"
+          PERMISSIONS_IMPL="${RN_PERMISSIONS_DIR}/ios/RNPermissions.mm"
+          
+          if [ -f "$PERMISSIONS_HEADER" ]; then
+            echo "备份原始头文件..."
+            cp "$PERMISSIONS_HEADER" "${PERMISSIONS_HEADER}.original"
+            
+            # 2. 重写头文件，移除所有Fabric相关引用
+            echo "重写 RNPermissions.h 文件..."
+            echo '#import <React/RCTBridge.h>' > "$PERMISSIONS_HEADER"
+            echo '' >> "$PERMISSIONS_HEADER"
+            echo 'typedef enum {' >> "$PERMISSIONS_HEADER"
+            echo '  RNPermissionStatusNotAvailable = 0,' >> "$PERMISSIONS_HEADER"
+            echo '  RNPermissionStatusNotDetermined = 1,' >> "$PERMISSIONS_HEADER"
+            echo '  RNPermissionStatusRestricted = 2,' >> "$PERMISSIONS_HEADER"
+            echo '  RNPermissionStatusDenied = 3,' >> "$PERMISSIONS_HEADER"
+            echo '  RNPermissionStatusAuthorized = 4,' >> "$PERMISSIONS_HEADER"
+            echo '  RNPermissionStatusLimited = 5,' >> "$PERMISSIONS_HEADER"
+            echo '} RNPermissionStatus;' >> "$PERMISSIONS_HEADER"
+            echo '' >> "$PERMISSIONS_HEADER"
+            echo '@protocol RNPermissionHandler <NSObject>' >> "$PERMISSIONS_HEADER"
+            echo '' >> "$PERMISSIONS_HEADER"
+            echo '@required' >> "$PERMISSIONS_HEADER"
+            echo '' >> "$PERMISSIONS_HEADER"
+            echo '+ (NSArray<NSString *> * _Nonnull)usageDescriptionKeys;' >> "$PERMISSIONS_HEADER"
+            echo '' >> "$PERMISSIONS_HEADER"
+            echo '+ (NSString * _Nonnull)handlerUniqueId;' >> "$PERMISSIONS_HEADER"
+            echo '' >> "$PERMISSIONS_HEADER"
+            echo '- (RNPermissionStatus)currentStatus;' >> "$PERMISSIONS_HEADER"
+            echo '' >> "$PERMISSIONS_HEADER"
+            echo '- (void)requestWithResolver:(void (^ _Nonnull)(RNPermissionStatus status))resolve' >> "$PERMISSIONS_HEADER"
+            echo '                   rejecter:(void (^ _Nonnull)(NSError * _Nonnull error))reject;' >> "$PERMISSIONS_HEADER"
+            echo '' >> "$PERMISSIONS_HEADER"
+            echo '@end' >> "$PERMISSIONS_HEADER"
+            echo '' >> "$PERMISSIONS_HEADER"
+            echo '@interface RNPermissions : NSObject<RCTBridgeModule>' >> "$PERMISSIONS_HEADER"
+            echo '' >> "$PERMISSIONS_HEADER"
+            echo '+ (void)flagAsRequested:(NSString * _Nonnull)handlerId;' >> "$PERMISSIONS_HEADER"
+            echo '' >> "$PERMISSIONS_HEADER"
+            echo '+ (bool)isFlaggedAsRequested:(NSString * _Nonnull)handlerId;' >> "$PERMISSIONS_HEADER"
+            echo '' >> "$PERMISSIONS_HEADER"
+            echo '@end' >> "$PERMISSIONS_HEADER"
+          else
+            echo "⚠️ 警告：找不到 RNPermissions.h 文件"
+          fi
+          
+          # 3. 修复实现文件中的 Fabric 架构代码
+          if [ -f "$PERMISSIONS_IMPL" ]; then
+            echo "备份原始实现文件..."
+            cp "$PERMISSIONS_IMPL" "${PERMISSIONS_IMPL}.original"
+            
+            # 添加强制禁用新架构的定义在文件顶部
+            echo "修改 RNPermissions.mm 文件..."
+            sed -i'' -e '1s/^/#define RCT_NEW_ARCH_ENABLED 0\n\n/' "$PERMISSIONS_IMPL"
+            
+            # 注释掉Fabric相关代码部分
+            sed -i'' -e 's/\#if RCT_NEW_ARCH_ENABLED/\#if 0 \/\/ RCT_NEW_ARCH_ENABLED/g' "$PERMISSIONS_IMPL"
+          else
+            echo "⚠️ 警告：找不到 RNPermissions.mm 文件"
+          fi
+          
+          # 4. 创建缺失的目录和头文件
+          SPEC_DIR="${RN_PERMISSIONS_DIR}/ios/RNPermissionsSpec"
+          mkdir -p "$SPEC_DIR"
+          
+          echo "创建空白占位头文件..."
+          echo '// 占位头文件，解决编译问题' > "${SPEC_DIR}/RNPermissionsSpec.h"
+          echo '#ifndef RNPermissionsSpec_h' >> "${SPEC_DIR}/RNPermissionsSpec.h"
+          echo '#define RNPermissionsSpec_h' >> "${SPEC_DIR}/RNPermissionsSpec.h"
+          echo '' >> "${SPEC_DIR}/RNPermissionsSpec.h"
+          echo '#include <React/RCTBridgeModule.h>' >> "${SPEC_DIR}/RNPermissionsSpec.h"
+          echo '' >> "${SPEC_DIR}/RNPermissionsSpec.h"
+          echo '@protocol NativeSomePermissionsSpec <NSObject>' >> "${SPEC_DIR}/RNPermissionsSpec.h"
+          echo '// 空协议实现' >> "${SPEC_DIR}/RNPermissionsSpec.h"
+          echo '@end' >> "${SPEC_DIR}/RNPermissionsSpec.h"
+          echo '' >> "${SPEC_DIR}/RNPermissionsSpec.h"
+          echo '#endif /* RNPermissionsSpec_h */' >> "${SPEC_DIR}/RNPermissionsSpec.h"
           
           cd ios
           
-          # 检查Podfile是否存在
-          if [ ! -f "Podfile" ]; then
-            echo "❌ 找不到Podfile"
-            exit 1
-          fi
-          
-          # 显示原始Podfile内容
-          echo "=== 原始Podfile内容 ==="
-          cat Podfile
-          echo "======================="
+          # 5. 确保Podfile正确配置
+          echo "更新 Podfile 配置..."
           
           # 备份原始Podfile
           cp Podfile Podfile.original
           
-          # 关键改变: 不使用react-native.config.js，直接修改Podfile引入权限库
           # 使用echo命令逐行写入Podfile，避免YAML解析问题
           echo '# 禁用React Native新架构，修复权限问题' > Podfile
           echo "ENV['RCT_NEW_ARCH_ENABLED'] = '0'" >> Podfile
@@ -640,8 +709,8 @@ jobs:
           echo '    :app_path => "#{Pod::Config.instance.installation_root}/.."' >> Podfile
           echo '  )' >> Podfile
           echo '' >> Podfile
-          echo '  # 不使用podspecPath，直接指定子规格' >> Podfile
-          echo '  # Permission子模块' >> Podfile
+          echo '  # 使用单一路径方式添加权限模块' >> Podfile
+          echo '  pod "RNPermissions", :path => "../node_modules/react-native-permissions"' >> Podfile
           echo '  pod "Permission-Camera", :path => "../node_modules/react-native-permissions"' >> Podfile
           echo '  pod "Permission-Microphone", :path => "../node_modules/react-native-permissions"' >> Podfile
           echo '  pod "Permission-PhotoLibrary", :path => "../node_modules/react-native-permissions"' >> Podfile
@@ -661,8 +730,18 @@ jobs:
           echo '      :mac_catalyst_enabled => false' >> Podfile
           echo '    )' >> Podfile
           echo '    ' >> Podfile
-          echo '    # 设置编译选项' >> Podfile
+          echo '    # 添加自定义头文件搜索路径' >> Podfile
           echo '    installer.pods_project.targets.each do |target|' >> Podfile
+          echo '      if target.name == "RNPermissions"' >> Podfile
+          echo '        target.build_configurations.each do |config|' >> Podfile
+          echo '          # 添加React Native Permissions头文件搜索路径' >> Podfile
+          echo "          config.build_settings['HEADER_SEARCH_PATHS'] ||= '$(inherited)'" >> Podfile
+          echo "          config.build_settings['HEADER_SEARCH_PATHS'] << ' ${PODS_ROOT}/../../node_modules/react-native-permissions/ios'" >> Podfile
+          echo "          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= '$(inherited)'" >> Podfile
+          echo "          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << ' RCT_NEW_ARCH_ENABLED=0'" >> Podfile
+          echo '        end' >> Podfile
+          echo '      end' >> Podfile
+          echo '      ' >> Podfile
           echo '      target.build_configurations.each do |config|' >> Podfile
           echo '        # iOS 部署目标' >> Podfile
           echo "        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'" >> Podfile
@@ -685,32 +764,6 @@ jobs:
           echo '    end' >> Podfile
           echo '  end' >> Podfile
           echo 'end' >> Podfile
-          
-          echo "=== 新Podfile内容 ==="
-          cat Podfile
-          echo "======================"
-          
-          # 修改react-native-permissions中的文件，避免使用RNPermissionsSpec
-          cd ..
-          RN_PERMISSIONS_DIR="node_modules/react-native-permissions/ios"
-          
-          if [ -d "$RN_PERMISSIONS_DIR" ]; then
-            echo "修复RNPermissions.h文件中的引用..."
-            
-            # 备份原始文件
-            cp "$RN_PERMISSIONS_DIR/RNPermissions.h" "$RN_PERMISSIONS_DIR/RNPermissions.h.bak" || echo "无法创建备份"
-            
-            # 替换RNPermissionsSpec引用
-            sed -i.tmp 's/#import <RNPermissionsSpec\/RNPermissionsSpec.h>/\/\/ 已注释: #import <RNPermissionsSpec\/RNPermissionsSpec.h>/' "$RN_PERMISSIONS_DIR/RNPermissions.h" || echo "无法修改RNPermissions.h"
-            
-            # 创建RNPermissionsSpec目录和空头文件
-            mkdir -p "$RN_PERMISSIONS_DIR/RNPermissionsSpec"
-            echo "// 空白占位符" > "$RN_PERMISSIONS_DIR/RNPermissionsSpec/RNPermissionsSpec.h" || echo "无法创建占位头文件"
-            
-            echo "✅ 已修复React Native Permissions头文件引用"
-          else
-            echo "⚠️ 找不到React Native Permissions ios目录"
-          fi
           
           echo "✅ React Native Permissions配置完成"
 
