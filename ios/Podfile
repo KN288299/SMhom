@@ -34,16 +34,16 @@ target 'HomeServiceChat' do
     # An absolute path to your application root.
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
-  
-  # 手动添加权限模块配置
-  pod 'RNPermissions', :path => '../node_modules/react-native-permissions'
+
+  # 直接使用来自RN配置的路径，而不是硬编码相对路径
+  permissions_path = File.join(config[:reactNativePath], '..', 'react-native-permissions')
+  pod 'RNPermissions', :path => permissions_path
   
   # 添加应用需要的权限模块
-  permissions_path = '../node_modules/react-native-permissions/ios'
-  pod 'Permission-Camera', :path => "#{permissions_path}/Camera"
-  pod 'Permission-Microphone', :path => "#{permissions_path}/Microphone" 
-  pod 'Permission-PhotoLibrary', :path => "#{permissions_path}/PhotoLibrary"
-  pod 'Permission-LocationWhenInUse', :path => "#{permissions_path}/LocationWhenInUse"
+  pod 'Permission-Camera', :path => "#{permissions_path}/ios/Camera"
+  pod 'Permission-Microphone', :path => "#{permissions_path}/ios/Microphone" 
+  pod 'Permission-PhotoLibrary', :path => "#{permissions_path}/ios/PhotoLibrary"
+  pod 'Permission-LocationWhenInUse', :path => "#{permissions_path}/ios/LocationWhenInUse"
 
   # 移除 Firebase 相关配置，暂时注释掉
   # pod 'FirebaseCoreInternal', :modular_headers => true, :inhibit_warnings => true
