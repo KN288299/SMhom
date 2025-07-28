@@ -24,7 +24,7 @@ if (fs.existsSync(permissionsHeaderPath)) {
     // 写回文件
     fs.writeFileSync(permissionsHeaderPath, headerContent);
   } else {
-    console.log('未找到需要修复的导入语句，文件内容可能已更新');
+    console.log('未找到需要修改的导入语句，文件内容可能已更新');
   }
   
   console.log('RNPermissions.h修复完成');
@@ -86,44 +86,46 @@ if (fs.existsSync(mmFilePath)) {
   console.log('未找到RNPermissions.mm文件');
 }
 
-// 修改Podfile
-const podfilePath = path.join(__dirname, 'ios/Podfile');
-if (fs.existsSync(podfilePath)) {
-  console.log('修改Podfile以添加RNPermissions的特殊配置...');
-  let podfileContent = fs.readFileSync(podfilePath, 'utf8');
-  
-  // 检查是否已经包含RNPermissions配置
-  if (!podfileContent.includes('RNPermissions特殊配置')) {
-    const permissionsConfig = `
-  # RNPermissions特殊配置
-  permissions_path = '../node_modules/react-native-permissions/ios'
-  pod 'Permission-Camera', :path => "\#{permissions_path}/Camera"
-  pod 'Permission-Microphone', :path => "\#{permissions_path}/Microphone"
-  pod 'Permission-PhotoLibrary', :path => "\#{permissions_path}/PhotoLibrary"
-  pod 'Permission-Notifications', :path => "\#{permissions_path}/Notifications"
-  pod 'Permission-LocationWhenInUse', :path => "\#{permissions_path}/LocationWhenInUse"
-`;
+// 修改Podfile - 移除这部分，避免添加不存在的子模块
+// 我们在之前已经手动修改了Podfile，这里不再自动修改
 
-    // 找到插入点
-    const targetLine = "target 'HomeServiceChat' do";
-    if (podfileContent.includes(targetLine)) {
-      podfileContent = podfileContent.replace(
-        targetLine,
-        `${targetLine}\n${permissionsConfig}`
-      );
+// 检查react-native-permissions的版本和目录结构
+try {
+  const packagePath = path.join(__dirname, 'node_modules/react-native-permissions/package.json');
+  if (fs.existsSync(packagePath)) {
+    const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+    console.log(`当前使用的react-native-permissions版本: ${packageJson.version}`);
+    
+    // 检查是否有权限子模块
+    const iosPath = path.join(__dirname, 'node_modules/react-native-permissions/ios');
+    if (fs.existsSync(iosPath)) {
+      const entries = fs.readdirSync(iosPath, { withFileTypes: true });
+      const directories = entries
+        .filter(entry => entry.isDirectory())
+        .map(entry => entry.name);
       
-      fs.writeFileSync(podfilePath, podfileContent);
-      console.log('已添加RNPermissions特殊配置到Podfile');
-    } else {
-      console.log('无法在Podfile中找到插入点');
+      console.log('发现的目录:');
+      directories.forEach(dir => console.log(`- ${dir}`));
+      
+      // 检查是否有权限子模块的podspec文件
+      const podspecs = [];
+      directories.forEach(dir => {
+        const podspecPath = path.join(iosPath, dir, `${dir}.podspec`);
+        if (fs.existsSync(podspecPath)) {
+          podspecs.push(dir);
+        }
+      });
+      
+      if (podspecs.length > 0) {
+        console.log('发现的权限podspec:');
+        podspecs.forEach(pod => console.log(`- ${pod}`));
+      } else {
+        console.log('未发现任何权限podspec文件');
+      }
     }
-  } else {
-    console.log('Podfile已包含RNPermissions配置，无需修改');
   }
-} else {
-  console.log('未找到Podfile');
+} catch (err) {
+  console.error('检查react-native-permissions版本时出错:', err);
 }
 
-console.log('\n修复完成！请更新工作流中添加如下步骤:');
-console.log('1. 在构建iOS前运行: node fix-rn-permissions.js');
-console.log('2. 执行pod install后重新编译'); 
+console.log('\n修复完成！请确认iOS构建中不再引用特定的权限子模块。'); 

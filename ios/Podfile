@@ -65,13 +65,13 @@ end
 target 'HomeServiceChat' do
   config = use_native_modules!
 
-  # 配置react-native-permissions
-  permissions_path = '../node_modules/react-native-permissions/ios'
-  pod 'Permission-Camera', :path => "#{permissions_path}/Camera"
-  pod 'Permission-Microphone', :path => "#{permissions_path}/Microphone"
-  pod 'Permission-PhotoLibrary', :path => "#{permissions_path}/PhotoLibrary"
-  pod 'Permission-Notifications', :path => "#{permissions_path}/Notifications"
-  pod 'Permission-LocationWhenInUse', :path => "#{permissions_path}/LocationWhenInUse"
+  # 移除具体权限模块配置，只使用自动配置
+  # permissions_path = '../node_modules/react-native-permissions/ios'
+  # pod 'Permission-Camera', :path => "#{permissions_path}/Camera"
+  # pod 'Permission-Microphone', :path => "#{permissions_path}/Microphone"
+  # pod 'Permission-PhotoLibrary', :path => "#{permissions_path}/PhotoLibrary"
+  # pod 'Permission-Notifications', :path => "#{permissions_path}/Notifications"
+  # pod 'Permission-LocationWhenInUse', :path => "#{permissions_path}/LocationWhenInUse"
 
   use_react_native!(
     :path => config[:reactNativePath],
