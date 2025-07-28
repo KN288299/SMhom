@@ -104,14 +104,39 @@ if (!viewComponentFound) {
 #import <React/RCTViewComponentView.h>
 
 #if !RCT_NEW_ARCH_ENABLED
-@implementation RCTViewComponentView
+@implementation RCTViewComponentView {
+  NSString *_nativeId;
+  UIView *_contentView;
+}
 
 - (instancetype)initWithFrame:(CGRect)frame
 {
   if (self = [super initWithFrame:frame]) {
-    self.nativeId = nil;
+    _nativeId = nil;
+    _contentView = nil;
   }
   return self;
+}
+
+- (void)updateProps:(id)props oldProps:(id)oldProps
+{
+  // 空实现
+}
+
+- (void)prepareForRecycle
+{
+  // 空实现
+}
+
+- (void)setContentView:(UIView *)contentView
+{
+  if (_contentView != contentView) {
+    [_contentView removeFromSuperview];
+    _contentView = contentView;
+    if (_contentView) {
+      [self addSubview:_contentView];
+    }
+  }
 }
 
 @end

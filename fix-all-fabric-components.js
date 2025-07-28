@@ -56,7 +56,10 @@ if (!fs.existsSync(viewCompImplPath)) {
 #import <React/RCTViewComponentView.h>
 
 #if !RCT_NEW_ARCH_ENABLED
-@implementation RCTViewComponentView
+@implementation RCTViewComponentView {
+  NSString *_nativeId;
+  UIView *_contentView;
+}
 
 - (instancetype)initWithFrame:(CGRect)frame
 {
