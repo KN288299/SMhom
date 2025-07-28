@@ -36,8 +36,6 @@ end
 
 # 修复重复头文件的函数
 def fix_duplicate_headers(installer)
-    # 禁用React-RCTFabric目标
-    disable_react_fabric_target(installer)
   puts "正在修复重复头文件..."
   installer.pods_project.targets.each do |target|
     if target.name == 'RNPermissions'
@@ -56,50 +54,6 @@ def fix_duplicate_headers(installer)
               files[1..-1].each do |file|
                 file.remove_from_project
               end
-
-# 辅助函数：禁用React-RCTFabric目标
-def disable_react_fabric_target(installer)
-  puts "禁用React-RCTFabric目标..."
-  
-  installer.pods_project.targets.each do |target|
-    if target.name == 'React-RCTFabric'
-      puts "找到React-RCTFabric目标，禁用新架构相关代码"
-      
-      # 处理重复的头文件问题
-      target.headers_build_phase.files.each do |build_file|
-        # 检查是否存在重复的RCTViewComponentView.h文件
-        if build_file.display_name == 'RCTViewComponentView.h'
-          file_path = build_file.file_ref.real_path.to_s
-          puts "找到头文件: #{file_path}"
-          
-          # 如果是来自ComponentViews/View/目录的文件，删除它以解决冲突
-          if file_path.include?('ComponentViews/View')
-            build_file.remove_from_build_phase
-            puts "已移除冲突的RCTViewComponentView.h文件: #{file_path}"
-          end
-        end
-      end
-      
-      target.build_configurations.each do |config|
-        # 添加预处理器定义以禁用新架构
-        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
-        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'RCT_NEW_ARCH_ENABLED=0'
-        
-        # 修改其他编译设置
-        config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
-        config.build_settings['GCC_OPTIMIZATION_LEVEL'] = '0'
-      end
-      
-      # 为所有源文件添加条件编译
-      target.source_build_phase.files.each do |file|
-        next unless file.file_ref.path.end_with?('.mm', '.m', '.cpp')
-        file.settings ||= {}
-        file.settings['COMPILER_FLAGS'] ||= ''
-        file.settings['COMPILER_FLAGS'] += ' -DRCT_NEW_ARCH_ENABLED=0'
-      end
-    end
-  end
-end
             end
           end
         end
