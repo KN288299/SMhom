@@ -82,7 +82,7 @@ if (!viewComponentFound) {
 @interface RCTViewComponentView : UIView
 
 @property (nonatomic, copy, nullable) NSString *nativeId;
-@property (nonatomic, strong) UIView *contentView;
+@property (nonatomic, strong, nullable) UIView *contentView;
 
 - (void)updateProps:(id _Nonnull)props oldProps:(id _Nonnull)oldProps;
 - (void)prepareForRecycle;
