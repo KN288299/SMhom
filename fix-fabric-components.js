@@ -74,10 +74,18 @@ if (!viewComponentFound) {
 #import <React/RCTDefines.h>
 #import <UIKit/UIKit.h>
 
+#ifndef RCT_NEW_ARCH_ENABLED
+#define RCT_NEW_ARCH_ENABLED 0
+#endif
+
 #if !RCT_NEW_ARCH_ENABLED
 @interface RCTViewComponentView : UIView
 
 @property (nonatomic, copy, nullable) NSString *nativeId;
+@property (nonatomic, strong) UIView *contentView;
+
+- (void)updateProps:(id)props oldProps:(id)oldProps;
+- (void)prepareForRecycle;
 
 @end
 #endif
@@ -103,6 +111,10 @@ if (!viewComponentFound) {
 #import <React/RCTDefines.h>
 #import <React/RCTViewComponentView.h>
 
+#ifndef RCT_NEW_ARCH_ENABLED
+#define RCT_NEW_ARCH_ENABLED 0
+#endif
+
 #if !RCT_NEW_ARCH_ENABLED
 @implementation RCTViewComponentView {
   NSString *_nativeId;
@@ -126,6 +138,18 @@ if (!viewComponentFound) {
 - (void)prepareForRecycle
 {
   // 空实现
+}
+
+- (NSString *)nativeId {
+  return _nativeId;
+}
+
+- (void)setNativeId:(NSString *)nativeId {
+  _nativeId = [nativeId copy];
+}
+
+- (UIView *)contentView {
+  return _contentView;
 }
 
 - (void)setContentView:(UIView *)contentView
