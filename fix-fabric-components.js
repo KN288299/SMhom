@@ -47,6 +47,7 @@ ${content}
 
 @interface RCTViewComponentView : UIView
 @property (nonatomic, strong) UIView *contentView;
+@property (nonatomic, copy) NSString *nativeId;
 - (void)updateProps:(void *)props oldProps:(void *)oldProps;
 @end
 #endif // !RCT_NEW_ARCH_ENABLED
@@ -88,6 +89,7 @@ if (!viewComponentFound) {
 
 @interface RCTViewComponentView : UIView
 @property (nonatomic, strong) UIView *contentView;
+@property (nonatomic, copy) NSString *nativeId;
 - (void)updateProps:(void *)props oldProps:(void *)oldProps;
 @end
 #endif // RCT_NEW_ARCH_ENABLED
@@ -112,6 +114,7 @@ if (!viewComponentFound) {
 - (instancetype)initWithFrame:(CGRect)frame {
   if (self = [super initWithFrame:frame]) {
     _contentView = nil;
+    _nativeId = nil;
   }
   return self;
 }
@@ -184,6 +187,64 @@ ${content}
 
 // 3. 修复所有可能引用RCTViewComponentView的文件
 const fabricComponentsDir = path.join(reactNativePath, 'React/Fabric/Mounting/ComponentViews');
+
+// 3.1 直接修复RCTViewFinder.mm文件
+const viewFinderPath = path.join(reactNativePath, 'React/Fabric/Utils/RCTViewFinder.mm');
+if (fs.existsSync(viewFinderPath)) {
+  console.log(`处理RCTViewFinder.mm文件: ${viewFinderPath}`);
+  
+  // 创建备份
+  const backupPath = `${viewFinderPath}.original`;
+  if (!fs.existsSync(backupPath)) {
+    fs.copyFileSync(viewFinderPath, backupPath);
+    console.log(`创建了备份: ${backupPath}`);
+  }
+  
+  // 读取文件内容
+  let content = fs.readFileSync(viewFinderPath, 'utf8');
+  
+  // 检查是否已有条件编译
+  if (!content.includes('#if RCT_NEW_ARCH_ENABLED')) {
+    // 添加条件编译
+    content = `
+#if RCT_NEW_ARCH_ENABLED
+
+${content}
+
+#endif // RCT_NEW_ARCH_ENABLED
+
+#if !RCT_NEW_ARCH_ENABLED
+// 旧架构兼容的简化实现
+#import <UIKit/UIKit.h>
+#import <React/RCTDefines.h>
+
+UIView *RCTFindComponentViewWithName(UIView *root, NSString *nativeId) {
+  // 简化实现
+  if ([root.accessibilityIdentifier isEqualToString:nativeId] ||
+      [root.accessibilityLabel isEqualToString:nativeId]) {
+    return root;
+  }
+  
+  for (UIView *subview in root.subviews) {
+    UIView *result = RCTFindComponentViewWithName(subview, nativeId);
+    if (result != nil) {
+      return result;
+    }
+  }
+  
+  return nil;
+}
+#endif // !RCT_NEW_ARCH_ENABLED
+`;
+    
+    fs.writeFileSync(viewFinderPath, content);
+    console.log(`已添加条件编译到: ${viewFinderPath}`);
+  } else {
+    console.log(`文件已包含条件编译: ${viewFinderPath}`);
+  }
+} else {
+  console.log(`RCTViewFinder.mm文件不存在: ${viewFinderPath}`);
+}
 
 function processDirectory(dir) {
   if (!fs.existsSync(dir)) return;
