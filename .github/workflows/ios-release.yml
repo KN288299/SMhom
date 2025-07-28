@@ -478,6 +478,11 @@ jobs:
           echo "=== 修复React Native引用路径问题 ==="
           node fix-import-paths.js
           
+      - name: 修复React Core重复头文件问题
+        run: |
+          echo "=== 修复React Core重复头文件问题 ==="
+          node fix-duplicate-headers.js
+          
       - name: 修复Podfile
         run: |
           echo "=== 修复Podfile以确保禁用新架构 ==="
