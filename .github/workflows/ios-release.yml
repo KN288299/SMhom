@@ -1070,7 +1070,127 @@ jobs:
           echo '}' >> "$FINDER_FILE"
           echo '#endif' >> "$FINDER_FILE"
           
-          echo "已创建所有必要的React Native文件"
+          # 修复RCTTextComponentView
+          echo "=== 修复RCTTextComponentView ==="
+          TEXT_COMP_DIR="node_modules/react-native/React/Fabric/Mounting/ComponentViews/Text"
+          mkdir -p "$TEXT_COMP_DIR"
+          
+          # 修改或创建RCTTextComponentView.h
+          TEXT_HEADER="$TEXT_COMP_DIR/RCTTextComponentView.h"
+          echo '#import <React/RCTDefines.h>' > "$TEXT_HEADER"
+          echo '#import <React/RCTViewComponentView.h>' >> "$TEXT_HEADER"
+          echo '#import <UIKit/UIKit.h>' >> "$TEXT_HEADER"
+          echo '' >> "$TEXT_HEADER"
+          echo '#ifndef RCT_NEW_ARCH_ENABLED' >> "$TEXT_HEADER"
+          echo '#define RCT_NEW_ARCH_ENABLED 0' >> "$TEXT_HEADER"
+          echo '#endif' >> "$TEXT_HEADER"
+          echo '' >> "$TEXT_HEADER"
+          echo '#if RCT_NEW_ARCH_ENABLED' >> "$TEXT_HEADER"
+          echo '// 原始新架构实现' >> "$TEXT_HEADER"
+          echo '@interface RCTTextComponentView : RCTViewComponentView' >> "$TEXT_HEADER"
+          echo '// 原有方法' >> "$TEXT_HEADER"
+          echo '@end' >> "$TEXT_HEADER"
+          echo '#else' >> "$TEXT_HEADER"
+          echo '// 旧架构兼容实现' >> "$TEXT_HEADER"
+          echo '@interface RCTTextComponentView : UIView' >> "$TEXT_HEADER"
+          echo '@property (nonatomic, copy, nullable) NSString *text;' >> "$TEXT_HEADER"
+          echo '@end' >> "$TEXT_HEADER"
+          echo '#endif' >> "$TEXT_HEADER"
+          
+          # 修改或创建RCTTextComponentView.mm
+          TEXT_IMPL="$TEXT_COMP_DIR/RCTTextComponentView.mm"
+          echo '#import "RCTTextComponentView.h"' > "$TEXT_IMPL"
+          echo '#import <React/RCTDefines.h>' >> "$TEXT_IMPL"
+          echo '' >> "$TEXT_IMPL"
+          echo '#ifndef RCT_NEW_ARCH_ENABLED' >> "$TEXT_IMPL"
+          echo '#define RCT_NEW_ARCH_ENABLED 0' >> "$TEXT_IMPL"
+          echo '#endif' >> "$TEXT_IMPL"
+          echo '' >> "$TEXT_IMPL"
+          echo '#if RCT_NEW_ARCH_ENABLED' >> "$TEXT_IMPL"
+          echo '// 原始新架构实现' >> "$TEXT_IMPL"
+          echo '@implementation RCTTextComponentView' >> "$TEXT_IMPL"
+          echo '' >> "$TEXT_IMPL"
+          echo '- (instancetype)initWithFrame:(CGRect)frame {' >> "$TEXT_IMPL"
+          echo '  if (self = [super initWithFrame:frame]) {' >> "$TEXT_IMPL"
+          echo '    // 初始化代码' >> "$TEXT_IMPL"
+          echo '  }' >> "$TEXT_IMPL"
+          echo '  return self;' >> "$TEXT_IMPL"
+          echo '}' >> "$TEXT_IMPL"
+          echo '' >> "$TEXT_IMPL"
+          echo '- (void)updateProps:(id)props oldProps:(id)oldProps {' >> "$TEXT_IMPL"
+          echo '  [super updateProps:props oldProps:oldProps];' >> "$TEXT_IMPL"
+          echo '  // 更新逻辑' >> "$TEXT_IMPL"
+          echo '}' >> "$TEXT_IMPL"
+          echo '' >> "$TEXT_IMPL"
+          echo '@end' >> "$TEXT_IMPL"
+          echo '' >> "$TEXT_IMPL"
+          echo '#else' >> "$TEXT_IMPL"
+          echo '// 旧架构兼容实现' >> "$TEXT_IMPL"
+          echo '@implementation RCTTextComponentView {' >> "$TEXT_IMPL"
+          echo '  UILabel *_label;' >> "$TEXT_IMPL"
+          echo '  NSString *_text;' >> "$TEXT_IMPL"
+          echo '}' >> "$TEXT_IMPL"
+          echo '' >> "$TEXT_IMPL"
+          echo '- (instancetype)initWithFrame:(CGRect)frame {' >> "$TEXT_IMPL"
+          echo '  if (self = [super initWithFrame:frame]) {' >> "$TEXT_IMPL"
+          echo '    _label = [[UILabel alloc] initWithFrame:self.bounds];' >> "$TEXT_IMPL"
+          echo '    _label.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;' >> "$TEXT_IMPL"
+          echo '    [self addSubview:_label];' >> "$TEXT_IMPL"
+          echo '  }' >> "$TEXT_IMPL"
+          echo '  return self;' >> "$TEXT_IMPL"
+          echo '}' >> "$TEXT_IMPL"
+          echo '' >> "$TEXT_IMPL"
+          echo '- (NSString *)text {' >> "$TEXT_IMPL"
+          echo '  return _text;' >> "$TEXT_IMPL"
+          echo '}' >> "$TEXT_IMPL"
+          echo '' >> "$TEXT_IMPL"
+          echo '- (void)setText:(NSString *)text {' >> "$TEXT_IMPL"
+          echo '  _text = [text copy];' >> "$TEXT_IMPL"
+          echo '  _label.text = _text;' >> "$TEXT_IMPL"
+          echo '}' >> "$TEXT_IMPL"
+          echo '' >> "$TEXT_IMPL"
+          echo '@end' >> "$TEXT_IMPL"
+          echo '#endif' >> "$TEXT_IMPL"
+          
+          # 修复其他常见组件的头文件，确保它们可以找到RCTViewComponentView
+          echo "=== 复制RCTViewComponentView.h到更多位置 ==="
+          mkdir -p "node_modules/react-native/React/Fabric/Mounting/ComponentViews/View"
+          cp "$VIEW_HEADER" "node_modules/react-native/React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.h"
+          
+          # 搜索并修复其他组件
+          echo "=== 查找和修复其他依赖RCTViewComponentView的组件 ==="
+          find "node_modules/react-native/React/Fabric/Mounting/ComponentViews" -name "*.h" -o -name "*.mm" | while read file; do
+            if grep -q "RCTViewComponentView" "$file"; then
+              echo "修复文件: $file"
+              # 备份原始文件
+              cp "$file" "${file}.bak"
+              # 添加必要的导入
+              if [[ "$file" == *.h ]]; then
+                # 对于头文件，在文件顶部添加导入
+                sed -i '' '1i\
+                #import <React/RCTDefines.h>\
+                #import <React/RCTViewComponentView.h>\
+                ' "$file"
+                # 使用条件编译包装类定义
+                sed -i '' 's/@interface \(.*\) : RCTViewComponentView/#if RCT_NEW_ARCH_ENABLED\
+                @interface \1 : RCTViewComponentView/g' "$file"
+                # 在文件末尾添加#endif
+                echo "#endif" >> "$file"
+              elif [[ "$file" == *.mm ]]; then
+                # 对于实现文件，在文件顶部添加定义
+                sed -i '' '1i\
+                #import <React/RCTDefines.h>\
+                \
+                #ifndef RCT_NEW_ARCH_ENABLED\
+                #define RCT_NEW_ARCH_ENABLED 0\
+                #endif\
+                \
+                ' "$file"
+              fi
+            fi
+          done
+          
+          echo "已修复所有组件文件"
 
       - name: 列出 workspace 里的 scheme
         run: |
