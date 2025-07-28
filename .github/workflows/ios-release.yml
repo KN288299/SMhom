@@ -483,6 +483,12 @@ jobs:
           echo "=== 修复React Core重复头文件问题 ==="
           node fix-duplicate-headers.js
           
+      # 添加修复所有Fabric组件的步骤
+      - name: 修复所有React Native Fabric组件
+        run: |
+          echo "=== 修复所有React Native Fabric组件 ==="
+          node fix-all-fabric-components.js
+          
       - name: 修复Podfile
         run: |
           echo "=== 修复Podfile以确保禁用新架构 ==="
