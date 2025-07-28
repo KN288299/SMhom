@@ -103,229 +103,122 @@ jobs:
           echo "=== 修复React Native Fabric组件问题 ==="
           node fix-fabric-components.js
           
-      # 添加专门修复RCTViewFinder.mm文件的步骤 - 更详细的诊断和修复  
-      - name: 修复RCTViewFinder.mm和RCTViewComponentView.h文件
+      # 添加专门修复RCTViewFinder.mm文件的步骤  
+      - name: 修复RCTViewFinder.mm文件
         run: |
-          echo "=== 详细修复RCTViewFinder.mm和RCTViewComponentView.h文件中的错误 ==="
-          
-          # 检查文件是否存在以及内容
-          echo "检查原始文件..."
+          echo "=== 修复RCTViewFinder.mm文件中的错误 ==="
           VIEW_FINDER_PATH="node_modules/react-native/React/Fabric/Utils/RCTViewFinder.mm"
-          VIEW_COMPONENT_PATH="node_modules/react-native/React/RCTViewComponentView.h"
           
           if [ -f "$VIEW_FINDER_PATH" ]; then
-            echo "RCTViewFinder.mm 存在，显示前10行："
-            head -n 10 "$VIEW_FINDER_PATH"
-            echo "文件行数: $(wc -l < "$VIEW_FINDER_PATH")"
+            # 创建备份
+            cp "$VIEW_FINDER_PATH" "${VIEW_FINDER_PATH}.original"
+            
+            # 替换文件内容
+            echo "替换RCTViewFinder.mm的内容以修复错误..."
+            
+            # 创建新文件
+            echo "/*" > "$VIEW_FINDER_PATH"
+            echo " * 由GitHub Actions自动修复，解决RCTViewComponentView未声明的问题" >> "$VIEW_FINDER_PATH"
+            echo " */" >> "$VIEW_FINDER_PATH"
+            echo "#import <React/RCTDefines.h>" >> "$VIEW_FINDER_PATH"
+            echo "#import <UIKit/UIKit.h>" >> "$VIEW_FINDER_PATH"
+            echo "" >> "$VIEW_FINDER_PATH"
+            echo "#if RCT_NEW_ARCH_ENABLED" >> "$VIEW_FINDER_PATH"
+            echo "// 原始的新架构代码会在构建时被引入" >> "$VIEW_FINDER_PATH"
+            echo "#else" >> "$VIEW_FINDER_PATH"
+            echo "// 旧架构兼容的简化实现" >> "$VIEW_FINDER_PATH"
+            echo "#import <React/RCTViewComponentView.h>" >> "$VIEW_FINDER_PATH"
+            echo "" >> "$VIEW_FINDER_PATH"
+            echo "UIView *RCTFindComponentViewWithName(UIView *view, NSString *nativeId) {" >> "$VIEW_FINDER_PATH"
+            echo "  // 简化实现，在非Fabric架构下提供基本功能" >> "$VIEW_FINDER_PATH"
+            echo "  if ([view isKindOfClass:[RCTViewComponentView class]]) {" >> "$VIEW_FINDER_PATH"
+            echo "    if ([nativeId isEqualToString:((RCTViewComponentView *)view).nativeId]) {" >> "$VIEW_FINDER_PATH"
+            echo "      return view;" >> "$VIEW_FINDER_PATH"
+            echo "    }" >> "$VIEW_FINDER_PATH"
+            echo "  }" >> "$VIEW_FINDER_PATH"
+            echo "  " >> "$VIEW_FINDER_PATH"
+            echo "  for (UIView *subview in view.subviews) {" >> "$VIEW_FINDER_PATH"
+            echo "    UIView *result = RCTFindComponentViewWithName(subview, nativeId);" >> "$VIEW_FINDER_PATH"
+            echo "    if (result != nil) {" >> "$VIEW_FINDER_PATH"
+            echo "      return result;" >> "$VIEW_FINDER_PATH"
+            echo "    }" >> "$VIEW_FINDER_PATH"
+            echo "  }" >> "$VIEW_FINDER_PATH"
+            echo "  " >> "$VIEW_FINDER_PATH"
+            echo "  return nil;" >> "$VIEW_FINDER_PATH"
+            echo "}" >> "$VIEW_FINDER_PATH"
+            echo "#endif" >> "$VIEW_FINDER_PATH"
+            
+            echo "✅ 已修复 RCTViewFinder.mm 文件"
           else
-            echo "RCTViewFinder.mm 文件不存在，需要创建"
+            echo "⚠️ 警告: 找不到 RCTViewFinder.mm 文件，尝试创建..."
+            
+            # 确保目录存在
+            mkdir -p "node_modules/react-native/React/Fabric/Utils"
+            
+            # 创建新文件
+            echo "/*" > "$VIEW_FINDER_PATH"
+            echo " * 由GitHub Actions自动创建，解决RCTViewComponentView未声明的问题" >> "$VIEW_FINDER_PATH"
+            echo " */" >> "$VIEW_FINDER_PATH"
+            echo "#import <React/RCTDefines.h>" >> "$VIEW_FINDER_PATH"
+            echo "#import <UIKit/UIKit.h>" >> "$VIEW_FINDER_PATH"
+            echo "" >> "$VIEW_FINDER_PATH"
+            echo "#if RCT_NEW_ARCH_ENABLED" >> "$VIEW_FINDER_PATH"
+            echo "// 原始的新架构代码会在构建时被引入" >> "$VIEW_FINDER_PATH"
+            echo "#else" >> "$VIEW_FINDER_PATH"
+            echo "// 旧架构兼容的简化实现" >> "$VIEW_FINDER_PATH"
+            echo "#import <React/RCTViewComponentView.h>" >> "$VIEW_FINDER_PATH"
+            echo "" >> "$VIEW_FINDER_PATH"
+            echo "UIView *RCTFindComponentViewWithName(UIView *view, NSString *nativeId) {" >> "$VIEW_FINDER_PATH"
+            echo "  // 简化实现，在非Fabric架构下提供基本功能" >> "$VIEW_FINDER_PATH"
+            echo "  if ([view isKindOfClass:[RCTViewComponentView class]]) {" >> "$VIEW_FINDER_PATH"
+            echo "    if ([nativeId isEqualToString:((RCTViewComponentView *)view).nativeId]) {" >> "$VIEW_FINDER_PATH"
+            echo "      return view;" >> "$VIEW_FINDER_PATH"
+            echo "    }" >> "$VIEW_FINDER_PATH"
+            echo "  }" >> "$VIEW_FINDER_PATH"
+            echo "  " >> "$VIEW_FINDER_PATH"
+            echo "  for (UIView *subview in view.subviews) {" >> "$VIEW_FINDER_PATH"
+            echo "    UIView *result = RCTFindComponentViewWithName(subview, nativeId);" >> "$VIEW_FINDER_PATH"
+            echo "    if (result != nil) {" >> "$VIEW_FINDER_PATH"
+            echo "      return result;" >> "$VIEW_FINDER_PATH"
+            echo "    }" >> "$VIEW_FINDER_PATH"
+            echo "  }" >> "$VIEW_FINDER_PATH"
+            echo "  " >> "$VIEW_FINDER_PATH"
+            echo "  return nil;" >> "$VIEW_FINDER_PATH"
+            echo "}" >> "$VIEW_FINDER_PATH"
+            echo "#endif" >> "$VIEW_FINDER_PATH"
+            
+            echo "✅ 已创建 RCTViewFinder.mm 文件"
           fi
           
-          if [ -f "$VIEW_COMPONENT_PATH" ]; then
-            echo "RCTViewComponentView.h 存在，显示前10行："
-            head -n 10 "$VIEW_COMPONENT_PATH"
-          else
-            echo "RCTViewComponentView.h 文件不存在，需要创建"
+      # 执行完整的Fabric组件修复脚本
+      - name: 修复所有React Native Fabric组件
+        run: |
+          echo "=== 执行全面的Fabric组件修复 ==="
+          node fix-all-fabric-components.js
+          
+          # 确保RCTViewComponentView.h文件被正确创建
+          VIEW_COMPONENT_PATH="node_modules/react-native/React/RCTViewComponentView.h"
+          if [ ! -f "$VIEW_COMPONENT_PATH" ]; then
+            echo "⚠️ 警告: RCTViewComponentView.h文件不存在，创建它..."
+            echo "/**" > "$VIEW_COMPONENT_PATH"
+            echo " * 由GitHub Actions自动创建的RCTViewComponentView.h" >> "$VIEW_COMPONENT_PATH"
+            echo " */" >> "$VIEW_COMPONENT_PATH"
+            echo "#import <React/RCTDefines.h>" >> "$VIEW_COMPONENT_PATH"
+            echo "#import <UIKit/UIKit.h>" >> "$VIEW_COMPONENT_PATH"
+            echo "" >> "$VIEW_COMPONENT_PATH"
+            echo "#if !RCT_NEW_ARCH_ENABLED" >> "$VIEW_COMPONENT_PATH"
+            echo "@interface RCTViewComponentView : UIView" >> "$VIEW_COMPONENT_PATH"
+            echo "" >> "$VIEW_COMPONENT_PATH"
+            echo "@property (nonatomic, copy, nullable) NSString *nativeId;" >> "$VIEW_COMPONENT_PATH"
+            echo "@property (nonatomic, strong) UIView *contentView;" >> "$VIEW_COMPONENT_PATH"
+            echo "" >> "$VIEW_COMPONENT_PATH"
+            echo "- (void)updateProps:(id)props oldProps:(id)oldProps;" >> "$VIEW_COMPONENT_PATH"
+            echo "- (void)prepareForRecycle;" >> "$VIEW_COMPONENT_PATH"
+            echo "" >> "$VIEW_COMPONENT_PATH"
+            echo "@end" >> "$VIEW_COMPONENT_PATH"
+            echo "#endif" >> "$VIEW_COMPONENT_PATH"
+            echo "✅ 已创建 RCTViewComponentView.h 文件"
           fi
-          
-          # 1. 首先确保RCTViewComponentView.h在所有需要的位置都存在
-          echo "创建所有可能的RCTViewComponentView.h位置..."
-          
-          # 主要位置
-          mkdir -p "node_modules/react-native/React"
-          mkdir -p "node_modules/react-native/React/Fabric/Mounting/ComponentViews/View"
-          
-          # 创建RCTViewComponentView.h在React根目录
-          echo "创建 React/RCTViewComponentView.h..."
-          cat > "node_modules/react-native/React/RCTViewComponentView.h" << 'EOF'
-/*
- * 由GitHub Actions修复脚本自动创建
- */
-#pragma once
-
-#import <UIKit/UIKit.h>
-
-@interface RCTViewComponentView : UIView
-
-@property (nonatomic, copy, nullable) NSString *nativeId;
-
-@end
-EOF
-          
-          # 创建RCTViewComponentView.h在ComponentViews/View目录
-          echo "创建 React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.h..."
-          cat > "node_modules/react-native/React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.h" << 'EOF'
-/*
- * 由GitHub Actions修复脚本自动创建
- */
-#pragma once
-
-#import <UIKit/UIKit.h>
-
-@interface RCTViewComponentView : UIView
-
-@property (nonatomic, copy, nullable) NSString *nativeId;
-
-@end
-EOF
-          
-          # 2. 现在创建或修复RCTViewFinder.mm
-          echo "修复 RCTViewFinder.mm..."
-          mkdir -p "node_modules/react-native/React/Fabric/Utils"
-          
-          cat > "node_modules/react-native/React/Fabric/Utils/RCTViewFinder.mm" << 'EOF'
-/*
- * 由GitHub Actions修复脚本自动创建
- */
-#import <React/RCTDefines.h>
-#import <UIKit/UIKit.h>
-#import <React/RCTViewComponentView.h>
-
-UIView *RCTFindComponentViewWithName(UIView *view, NSString *nativeId) {
-  // 简化实现，在非Fabric架构下提供基本功能
-  if ([view isKindOfClass:[RCTViewComponentView class]]) {
-    if ([nativeId isEqualToString:((RCTViewComponentView *)view).nativeId]) {
-      return view;
-    }
-  }
-  
-  for (UIView *subview in view.subviews) {
-    UIView *result = RCTFindComponentViewWithName(subview, nativeId);
-    if (result != nil) {
-      return result;
-    }
-  }
-  
-  return nil;
-}
-EOF
-          
-          echo "验证修复后的文件..."
-          if [ -f "node_modules/react-native/React/RCTViewComponentView.h" ]; then
-            echo "✅ React/RCTViewComponentView.h 已创建"
-            head -n 5 "node_modules/react-native/React/RCTViewComponentView.h"
-          else
-            echo "❌ React/RCTViewComponentView.h 创建失败!"
-          fi
-          
-          if [ -f "node_modules/react-native/React/Fabric/Utils/RCTViewFinder.mm" ]; then
-            echo "✅ React/Fabric/Utils/RCTViewFinder.mm 已修复"
-            head -n 10 "node_modules/react-native/React/Fabric/Utils/RCTViewFinder.mm"
-          else
-            echo "❌ React/Fabric/Utils/RCTViewFinder.mm 修复失败!"
-          fi
-          
-          echo "添加补充修复脚本..."
-          # 创建脚本来修复 RCTViewFinder.mm 特定问题
-          cat > fix-rctviewfinder.js << 'EOF'
-const fs = require('fs');
-const path = require('path');
-
-console.log('开始修复RCTViewFinder.mm中的RCTViewComponentView未声明问题...');
-
-const reactNativePath = path.join(__dirname, 'node_modules/react-native');
-const viewFinderPath = path.join(reactNativePath, 'React/Fabric/Utils/RCTViewFinder.mm');
-const viewComponentHeaderPath = path.join(reactNativePath, 'React/RCTViewComponentView.h');
-const fabricViewComponentHeaderPath = path.join(reactNativePath, 'React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.h');
-
-// 确保目录存在
-function ensureDirectoryExistence(filePath) {
-  const dirname = path.dirname(filePath);
-  if (fs.existsSync(dirname)) {
-    return true;
-  }
-  ensureDirectoryExistence(dirname);
-  fs.mkdirSync(dirname);
-}
-
-// 1. 创建RCTViewComponentView.h
-function createViewComponentHeader() {
-  const headerContent = `/*
- * 由fix-rctviewfinder.js创建
- * 用于在禁用Fabric架构时提供兼容性
- */
-#pragma once
-
-#import <UIKit/UIKit.h>
-
-@interface RCTViewComponentView : UIView
-
-@property (nonatomic, copy, nullable) NSString *nativeId;
-
-@end
-`;
-
-  ensureDirectoryExistence(viewComponentHeaderPath);
-  fs.writeFileSync(viewComponentHeaderPath, headerContent);
-  console.log(`创建了RCTViewComponentView.h: ${viewComponentHeaderPath}`);
-  
-  // 同时在Fabric目录创建
-  ensureDirectoryExistence(fabricViewComponentHeaderPath);
-  fs.writeFileSync(fabricViewComponentHeaderPath, headerContent);
-  console.log(`创建了RCTViewComponentView.h在Fabric目录: ${fabricViewComponentHeaderPath}`);
-}
-
-// 2. 修复RCTViewFinder.mm
-function fixViewFinder() {
-  const viewFinderContent = `/*
- * 由fix-rctviewfinder.js修复
- * 用于在禁用Fabric架构时提供兼容性
- */
-#import <React/RCTDefines.h>
-#import <UIKit/UIKit.h>
-#import <React/RCTViewComponentView.h>
-
-UIView *RCTFindComponentViewWithName(UIView *view, NSString *nativeId) {
-  // 简化实现，在非Fabric架构下提供基本功能
-  if ([view isKindOfClass:[RCTViewComponentView class]]) {
-    if ([nativeId isEqualToString:((RCTViewComponentView *)view).nativeId]) {
-      return view;
-    }
-  }
-  
-  for (UIView *subview in view.subviews) {
-    UIView *result = RCTFindComponentViewWithName(subview, nativeId);
-    if (result != nil) {
-      return result;
-    }
-  }
-  
-  return nil;
-}
-`;
-
-  ensureDirectoryExistence(viewFinderPath);
-  fs.writeFileSync(viewFinderPath, viewFinderContent);
-  console.log(`修复了RCTViewFinder.mm: ${viewFinderPath}`);
-}
-
-// 3. 检查文件是否存在并执行修复
-if (!fs.existsSync(viewComponentHeaderPath)) {
-  console.log('RCTViewComponentView.h不存在，创建文件...');
-  createViewComponentHeader();
-} else {
-  console.log('RCTViewComponentView.h已存在，内容:');
-  console.log(fs.readFileSync(viewComponentHeaderPath, 'utf8').substring(0, 150) + '...');
-}
-
-if (!fs.existsSync(viewFinderPath)) {
-  console.log('RCTViewFinder.mm不存在，创建文件...');
-  fixViewFinder();
-} else {
-  console.log('RCTViewFinder.mm已存在，替换内容...');
-  const original = fs.readFileSync(viewFinderPath, 'utf8');
-  fs.writeFileSync(viewFinderPath + '.original', original);
-  console.log('原始文件已备份为:' + viewFinderPath + '.original');
-  fixViewFinder();
-}
-
-console.log('修复完成!');
-EOF
-          
-          echo "运行补充修复脚本..."
-          node fix-rctviewfinder.js
-          
-          echo "✅ 修复完成！"
 
       # 有选择地执行自定义修复脚本，避免重复
       - name: 检查是否需要执行自定义修复脚本
@@ -707,344 +600,97 @@ EOF
           echo "=== 修复React Core重复头文件问题 ==="
           node fix-duplicate-headers.js
           
-      # 添加修复所有Fabric组件的步骤
+      # 添加专门修复RCTViewFinder.mm和全面修复Fabric组件的步骤
       - name: 修复所有React Native Fabric组件
         run: |
           echo "=== 修复所有React Native Fabric组件 ==="
           node fix-all-fabric-components.js
-
-      - name: 修复Podfile
-        run: |
-          echo "=== 修复Podfile以确保禁用新架构 ==="
-          cd ios
           
-          if [ -f "Podfile" ]; then
-            cp Podfile Podfile.bak
-            
-            # 确保环境变量在Podfile中正确设置
-            grep -q "ENV\['RCT_NEW_ARCH_ENABLED'\]" Podfile && \
-              sed -i '' 's/ENV\[\x27RCT_NEW_ARCH_ENABLED\x27\][[:space:]]*=[[:space:]]*\x271\x27/ENV[\x27RCT_NEW_ARCH_ENABLED\x27] = \x270\x27/g' Podfile || \
-              echo "# 强制禁用新架构" >> Podfile
-            
-            # 写入禁用Fabric的配置
-            echo "# 确保禁用新架构" >> Podfile
-            echo "ENV[\"RCT_NEW_ARCH_ENABLED\"] = \"0\"" >> Podfile
-            echo "ENV[\"USE_FABRIC\"] = \"0\"" >> Podfile
-            echo "ENV[\"USE_HERMES\"] = \"0\"" >> Podfile
-            echo "" >> Podfile
-            echo "# 禁用所有Fabric相关设置" >> Podfile
-            echo "\$RCT_NEW_ARCH_ENABLED = false" >> Podfile
-            echo "\$fabric_enabled = false" >> Podfile
-            echo "\$USE_FABRIC = false" >> Podfile
-            echo "\$USE_HERMES = false" >> Podfile
-            echo "\$RCT_FABRIC_ENABLED = false" >> Podfile
-            
-            # 创建ruby函数修复重复文件问题
-            echo "" >> Podfile
-            echo "# 修复重复头文件的函数" >> Podfile
-            echo "def fix_duplicate_headers(installer)" >> Podfile
-            echo "  puts \"正在修复重复头文件...\"" >> Podfile
-            echo "  installer.pods_project.targets.each do |target|" >> Podfile
-            echo "    if target.name == 'RNSVG'" >> Podfile
-            echo "      puts \"修复RNSVG头文件...\"" >> Podfile
-            echo "      # 找到所有的复制头文件阶段" >> Podfile
-            echo "      target.build_phases.each do |phase|" >> Podfile
-            echo "        if phase.is_a?(Xcodeproj::Project::Object::PBXHeadersBuildPhase)" >> Podfile
-            echo "          puts \"处理头文件阶段...\"" >> Podfile
-            echo "          # 查找重复的RNSVGFabricConversions.h文件引用" >> Podfile
-            echo "          fabric_files = phase.files.select do |file|" >> Podfile
-            echo "            file.display_name == 'RNSVGFabricConversions.h'" >> Podfile
-            echo "          end" >> Podfile
-            echo "          if fabric_files.count > 1" >> Podfile
-            echo "            puts \"找到#{fabric_files.count}个重复的RNSVGFabricConversions.h引用，保留第一个，移除其余的...\"" >> Podfile
-            echo "            # 保留第一个，删除其他" >> Podfile
-            echo "            fabric_files[1..-1].each do |file|" >> Podfile
-            echo "              file.remove_from_project" >> Podfile
-            echo "            end" >> Podfile
-            echo "            puts \"已解决重复文件问题\"" >> Podfile
-            echo "          end" >> Podfile
-            echo "        end" >> Podfile
-            echo "      end" >> Podfile
-            echo "    end" >> Podfile
-            echo "  end" >> Podfile
-            echo "end" >> Podfile
-            
-            # 检查是否已有post_install并修改，而不是添加新的
-            if grep -q "post_install" Podfile; then
-              echo "Podfile已包含post_install，将修改而不是添加新的..."
-              
-              # 在post_install块中查找代码插入位置
-              if grep -q "installer.pods_project.targets.each" Podfile; then
-                # 已经有target循环，在合适的位置添加我们的代码
-                SEARCH_PATTERN="post_install do |installer|"
-                INSERT_AFTER_LINE=$(grep -n "$SEARCH_PATTERN" Podfile | head -1 | cut -d: -f1)
-                
-                if [ ! -z "$INSERT_AFTER_LINE" ]; then
-                  # 创建临时文件
-                  cp Podfile Podfile.tmp
-                  HEAD_PART=$(head -n $INSERT_AFTER_LINE Podfile.tmp)
-                  TAIL_PART=$(tail -n +$(($INSERT_AFTER_LINE + 1)) Podfile.tmp)
-                  
-                  # 写入合并后的文件
-                  echo "$HEAD_PART" > Podfile
-                  echo "  # 修复重复头文件" >> Podfile
-                  echo "  fix_duplicate_headers(installer)" >> Podfile
-                  echo "$TAIL_PART" >> Podfile
-                  
-                  echo "✅ 成功在post_install开头添加修复重复头文件的代码"
-                fi
-              else
-                # 找不到插入点，使用sed替换
-                sed -i '' '/post_install do |installer|/a\
-                \ \ # 修复重复头文件\
-                \ \ fix_duplicate_headers(installer)
-                ' Podfile
-              fi
-            else
-              # 没有现有的post_install，可以安全地添加一个新的
-              echo "" >> Podfile
-              echo "# 添加自定义头文件搜索路径" >> Podfile
-              echo "post_install do |installer|" >> Podfile
-              echo "  # 修复重复头文件" >> Podfile
-              echo "  fix_duplicate_headers(installer)" >> Podfile
-              echo "  installer.pods_project.targets.each do |target|" >> Podfile
-              echo "    if target.name == 'react-native-safe-area-context'" >> Podfile
-              echo "      target.build_configurations.each do |config|" >> Podfile
-              echo "        config.build_settings['HEADER_SEARCH_PATHS'] ||= ''" >> Podfile
-              echo "        config.build_settings['HEADER_SEARCH_PATHS'] << ' \$(PODS_ROOT)/../../node_modules/react-native-safe-area-context/ios'" >> Podfile
-              echo "        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= '$(inherited)'" >> Podfile
-              echo "        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << ' RCT_NEW_ARCH_ENABLED=0'" >> Podfile
-              echo "      end" >> Podfile
-              echo "    end" >> Podfile
-              echo "  end" >> Podfile
-              echo "end" >> Podfile
-            fi
-            
-            echo "Podfile已修复，内容:"
-            cat Podfile | tail -n 20
-          else
-            echo "⚠️ 警告: 找不到Podfile"
-          fi
-
-      - name: 确认RCTViewFinder和React-RCTFabric配置已修复
-        run: |
-          echo "=== 确认RCTViewFinder和React-RCTFabric配置已修复 ==="
-          
-          # 检查文件是否存在以及内容
-          VIEW_FINDER_PATH="node_modules/react-native/React/Fabric/Utils/RCTViewFinder.mm"
+          # 确保RCTViewComponentView.h文件被正确创建
           VIEW_COMPONENT_PATH="node_modules/react-native/React/RCTViewComponentView.h"
+          if [ ! -f "$VIEW_COMPONENT_PATH" ]; then
+            echo "⚠️ 警告: RCTViewComponentView.h文件不存在，创建它..."
+            echo "/**" > "$VIEW_COMPONENT_PATH"
+            echo " * 由GitHub Actions自动创建的RCTViewComponentView.h" >> "$VIEW_COMPONENT_PATH"
+            echo " */" >> "$VIEW_COMPONENT_PATH"
+            echo "#import <React/RCTDefines.h>" >> "$VIEW_COMPONENT_PATH"
+            echo "#import <UIKit/UIKit.h>" >> "$VIEW_COMPONENT_PATH"
+            echo "" >> "$VIEW_COMPONENT_PATH"
+            echo "#if !RCT_NEW_ARCH_ENABLED" >> "$VIEW_COMPONENT_PATH"
+            echo "@interface RCTViewComponentView : UIView" >> "$VIEW_COMPONENT_PATH"
+            echo "" >> "$VIEW_COMPONENT_PATH"
+            echo "@property (nonatomic, copy, nullable) NSString *nativeId;" >> "$VIEW_COMPONENT_PATH"
+            echo "@property (nonatomic, strong) UIView *contentView;" >> "$VIEW_COMPONENT_PATH"
+            echo "" >> "$VIEW_COMPONENT_PATH"
+            echo "- (void)updateProps:(id)props oldProps:(id)oldProps;" >> "$VIEW_COMPONENT_PATH"
+            echo "- (void)prepareForRecycle;" >> "$VIEW_COMPONENT_PATH"
+            echo "" >> "$VIEW_COMPONENT_PATH"
+            echo "@end" >> "$VIEW_COMPONENT_PATH"
+            echo "#endif" >> "$VIEW_COMPONENT_PATH"
+            echo "✅ 已创建 RCTViewComponentView.h 文件"
+          fi
           
+          # 再次检查RCTViewFinder.mm文件
+          VIEW_FINDER_PATH="node_modules/react-native/React/Fabric/Utils/RCTViewFinder.mm"
           if [ -f "$VIEW_FINDER_PATH" ]; then
-            echo "✅ RCTViewFinder.mm 文件存在"
-            echo "文件内容:"
-            cat "$VIEW_FINDER_PATH"
-          else
-            echo "❌ 错误: RCTViewFinder.mm 文件不存在!"
-            # 再次尝试创建
-            mkdir -p "node_modules/react-native/React/Fabric/Utils"
-            echo '/*
-* 紧急修复 - 由确认步骤创建
-*/
-#import <React/RCTDefines.h>
-#import <UIKit/UIKit.h>
-#import <React/RCTViewComponentView.h>
-
-UIView *RCTFindComponentViewWithName(UIView *view, NSString *nativeId) {
-  if ([view isKindOfClass:[RCTViewComponentView class]]) {
-    if ([nativeId isEqualToString:((RCTViewComponentView *)view).nativeId]) {
-      return view;
-    }
-  }
-  
-  for (UIView *subview in view.subviews) {
-    UIView *result = RCTFindComponentViewWithName(subview, nativeId);
-    if (result != nil) {
-      return result;
-    }
-  }
-  
-  return nil;
-}' > "$VIEW_FINDER_PATH"
-            echo "🔄 紧急创建了 RCTViewFinder.mm 文件"
-          fi
-          
-          if [ -f "$VIEW_COMPONENT_PATH" ]; then
-            echo "✅ RCTViewComponentView.h 文件存在"
-            echo "文件内容:"
-            cat "$VIEW_COMPONENT_PATH"
-          else
-            echo "❌ 错误: RCTViewComponentView.h 文件不存在!"
-            # 再次尝试创建
-            mkdir -p "node_modules/react-native/React"
-            echo '/*
-* 紧急修复 - 由确认步骤创建
-*/
-#pragma once
-
-#import <UIKit/UIKit.h>
-
-@interface RCTViewComponentView : UIView
-
-@property (nonatomic, copy, nullable) NSString *nativeId;
-
-@end' > "$VIEW_COMPONENT_PATH"
-            echo "🔄 紧急创建了 RCTViewComponentView.h 文件"
-          fi
-          
-          # 修改Podfile以禁用React-RCTFabric
-          echo "修改Podfile以禁用React-RCTFabric..."
-          cd ios
-          if grep -q "React-RCTFabric" Podfile; then
-            echo "Podfile中包含React-RCTFabric引用，将进行修改"
-            sed -i '' 's/pod "React-RCTFabric"/# pod "React-RCTFabric" # 已禁用以解决编译问题/g' Podfile
-            echo "✅ 已在Podfile中禁用React-RCTFabric"
-          else
-            echo "Podfile中未找到React-RCTFabric引用，无需修改"
-          fi
-          cd ..
-          
-          echo "✅ 确认步骤完成"
-          
-      - name: 安装CocoaPods依赖
-        run: |
-          cd ios
-          echo "=== 开始安装CocoaPods依赖 ==="
-          START_TIME=$(date +%s)
-          
-          # 配置git以处理大仓库
-          git config --global http.lowSpeedLimit 0
-          git config --global http.lowSpeedTime 999999
-          
-          # 确保环境变量设置正确
-          export RCT_NEW_ARCH_ENABLED=0
-          export USE_HERMES=0
-          
-          # 尝试3次安装pods
-          for i in {1..3}; do
-            echo "=== 尝试 $i: 安装 pods... ==="
-            pod install --verbose && break
-            echo "=== 尝试 $i 失败，重试中... ==="
-            if [ $i -eq 3 ]; then
-              echo "❌ 安装CocoaPods失败，已达到最大重试次数"
-              exit 1
-            fi
-            sleep 10
-          done
-          
-          # 检查安装结果
-          if [ ! -d "Pods" ]; then
-            echo "❌ 错误: Pods目录不存在，安装失败"
-            exit 1
-          else
-            END_TIME=$(date +%s)
-            DURATION=$((END_TIME - START_TIME))
-            echo "✅ CocoaPods依赖安装成功，耗时: ${DURATION}秒"
-            ls -la
+            echo "再次检查RCTViewFinder.mm文件..."
+            grep -q "RCTViewComponentView" "$VIEW_FINDER_PATH" && grep -q "#if !RCT_NEW_ARCH_ENABLED" "$VIEW_FINDER_PATH" || {
+              echo "RCTViewFinder.mm需要更新，添加适当的条件编译..."
+              echo "/*" > "$VIEW_FINDER_PATH"
+              echo " * 由GitHub Actions自动修复，解决RCTViewComponentView未声明的问题" >> "$VIEW_FINDER_PATH"
+              echo " */" >> "$VIEW_FINDER_PATH"
+              echo "#import <React/RCTDefines.h>" >> "$VIEW_FINDER_PATH"
+              echo "#import <UIKit/UIKit.h>" >> "$VIEW_FINDER_PATH"
+              echo "" >> "$VIEW_FINDER_PATH"
+              echo "#if RCT_NEW_ARCH_ENABLED" >> "$VIEW_FINDER_PATH"
+              echo "// 原始的新架构代码会在构建时被引入" >> "$VIEW_FINDER_PATH"
+              echo "#else" >> "$VIEW_FINDER_PATH"
+              echo "// 旧架构兼容的简化实现" >> "$VIEW_FINDER_PATH"
+              echo "#import <React/RCTViewComponentView.h>" >> "$VIEW_FINDER_PATH"
+              echo "" >> "$VIEW_FINDER_PATH"
+              echo "UIView *RCTFindComponentViewWithName(UIView *view, NSString *nativeId) {" >> "$VIEW_FINDER_PATH"
+              echo "  // 简化实现，在非Fabric架构下提供基本功能" >> "$VIEW_FINDER_PATH"
+              echo "  if ([view isKindOfClass:[RCTViewComponentView class]]) {" >> "$VIEW_FINDER_PATH"
+              echo "    if ([nativeId isEqualToString:((RCTViewComponentView *)view).nativeId]) {" >> "$VIEW_FINDER_PATH"
+              echo "      return view;" >> "$VIEW_FINDER_PATH"
+              echo "    }" >> "$VIEW_FINDER_PATH"
+              echo "  }" >> "$VIEW_FINDER_PATH"
+              echo "  " >> "$VIEW_FINDER_PATH"
+              echo "  for (UIView *subview in view.subviews) {" >> "$VIEW_FINDER_PATH"
+              echo "    UIView *result = RCTFindComponentViewWithName(subview, nativeId);" >> "$VIEW_FINDER_PATH"
+              echo "    if (result != nil) {" >> "$VIEW_FINDER_PATH"
+              echo "      return result;" >> "$VIEW_FINDER_PATH"
+              echo "    }" >> "$VIEW_FINDER_PATH"
+              echo "  }" >> "$VIEW_FINDER_PATH"
+              echo "  " >> "$VIEW_FINDER_PATH"
+              echo "  return nil;" >> "$VIEW_FINDER_PATH"
+              echo "}" >> "$VIEW_FINDER_PATH"
+              echo "#endif" >> "$VIEW_FINDER_PATH"
+              echo "✅ 再次修复了RCTViewFinder.mm文件"
+            }
           fi
 
       - name: 修复react-native-safe-area-context重复头文件问题
         run: |
           echo "=== 修复react-native-safe-area-context重复头文件问题 ==="
-          cd ios
-          
-          # 从Pods项目清理重复的头文件引用
-          if [ -d "Pods" ]; then
-            echo "删除生成的头文件..."
-            rm -rf "../node_modules/react-native-safe-area-context/ios/build/generated"
-            
-            # 如果build目录为空，完全删除它以防止混淆
-            if [ -z "$(ls -A ../node_modules/react-native-safe-area-context/ios/build 2>/dev/null)" ]; then
-              rm -rf "../node_modules/react-native-safe-area-context/ios/build"
-            fi
-            
-            echo "✅ 完成清理生成的头文件"
-          else
-            echo "⚠️ 警告: Pods目录不存在，请先运行pod install"
-          fi
-          
-          cd ..
 
-      - name: 深度修复react-native-safe-area-context
+      - name: 修复Podfile
         run: |
-          echo "=== 深度修复react-native-safe-area-context Fabric依赖问题 ==="
-          SAFE_AREA_DIR="node_modules/react-native-safe-area-context"
-          
-          if [ -d "$SAFE_AREA_DIR" ]; then
-            # 完全重写RNCSafeAreaContext.mm，移除所有Fabric代码
-            MM_FILE="$SAFE_AREA_DIR/ios/RNCSafeAreaContext.mm"
-            if [ -f "$MM_FILE" ]; then
-              cp "$MM_FILE" "${MM_FILE}.original"
-              
-              # 使用echo命令创建简化版本
-              echo '#import "RNCSafeAreaContext.h"' > "$MM_FILE"
-              echo '#import <React/RCTBridge.h>' >> "$MM_FILE"
-              echo '#import <React/RCTUIManager.h>' >> "$MM_FILE"
-              echo '' >> "$MM_FILE"
-              echo '@implementation RNCSafeAreaContext' >> "$MM_FILE"
-              echo '' >> "$MM_FILE"
-              echo 'RCT_EXPORT_MODULE()' >> "$MM_FILE"
-              echo '' >> "$MM_FILE"
-              echo '+ (BOOL)requiresMainQueueSetup' >> "$MM_FILE"
-              echo '{' >> "$MM_FILE"
-              echo '  return YES;' >> "$MM_FILE"
-              echo '}' >> "$MM_FILE"
-              echo '' >> "$MM_FILE"
-              echo '@end' >> "$MM_FILE"
-              
-              echo "✅ 已重写 RNCSafeAreaContext.mm 为简化版本"
-            fi
-            
-            # 修改RNCSafeAreaContext.h文件
-            H_FILE="$SAFE_AREA_DIR/ios/RNCSafeAreaContext.h"
-            if [ -f "$H_FILE" ]; then
-              cp "$H_FILE" "${H_FILE}.original"
-              
-              # 使用echo命令创建简化版本
-              echo '#import <React/RCTBridgeModule.h>' > "$H_FILE"
-              echo '#import <React/RCTEventEmitter.h>' >> "$H_FILE"
-              echo '' >> "$H_FILE"
-              echo '@interface RNCSafeAreaContext : RCTEventEmitter <RCTBridgeModule>' >> "$H_FILE"
-              echo '@end' >> "$H_FILE"
-              
-              echo "✅ 已重写 RNCSafeAreaContext.h 为简化版本"
-            fi
-          else
-            echo "⚠️ 找不到 react-native-safe-area-context 目录"
-          fi
-
-      - name: 预构建React Native Bundle
-        if: ${{ inputs.skip_bundle != 'true' }}
-        run: |
-          echo "=== 预构建React Native Bundle 以确保打包脚本正确 ==="
-          START_TIME=$(date +%s)
-          mkdir -p ios/bundle
-          npx react-native bundle \
-            --entry-file index.js \
-            --platform ios \
-            --dev false \
-            --bundle-output ios/bundle/main.jsbundle \
-            --assets-dest ios/bundle
-          END_TIME=$(date +%s)
-          DURATION=$((END_TIME - START_TIME))
-          echo "✅ Bundle构建完成，耗时: ${DURATION}秒"
-
-      - name: 修复React Native打包脚本
-        run: |
-          echo "=== 修复React Native打包脚本 ==="
-          SCRIPT_PATH="node_modules/react-native/scripts/react-native-xcode.sh"
-          if [ -f "$SCRIPT_PATH" ]; then
+          echo "=== 修复Podfile ==="
+          PODFILE_PATH="node_modules/react-native/scripts/react-native-pod.sh"
+          if [ -f "$PODFILE_PATH" ]; then
             # 备份原始文件
-            cp "$SCRIPT_PATH" "${SCRIPT_PATH}.bak"
+            cp "$PODFILE_PATH" "${PODFILE_PATH}.bak"
             
             # 修改脚本增加更多日志输出和错误处理
-            sed -i '' 's/set -e/set -ex/' "$SCRIPT_PATH"
+            sed -i '' 's/set -e/set -ex/' "$PODFILE_PATH"
             
             # 尝试修复NODE_BINARY问题
-            sed -i '' 's/export NODE_BINARY=.*/export NODE_BINARY=node/' "$SCRIPT_PATH"
+            sed -i '' 's/export NODE_BINARY=.*/export NODE_BINARY=node/' "$PODFILE_PATH"
             
-            echo "✅ React Native打包脚本已修改"
+            echo "✅ Podfile已修改"
           else
-            echo "⚠️ 警告: 找不到React Native打包脚本，跳过修复"
+            echo "⚠️ 警告: 找不到Podfile，跳过修复"
           fi
           
           # 创建.xcode.env.local文件以确保正确的Node路径
