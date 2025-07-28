@@ -290,6 +290,336 @@ ${content}
 // 处理所有Fabric组件目录
 processDirectory(fabricComponentsDir);
 
+// 3.2 修复RCTSwitchComponentView文件
+const switchComponentDir = path.join(reactNativePath, 'React/Fabric/Mounting/ComponentViews/Switch');
+const switchHeaderPath = path.join(switchComponentDir, 'RCTSwitchComponentView.h');
+const switchImplPath = path.join(switchComponentDir, 'RCTSwitchComponentView.mm');
+
+// 确保Switch目录存在
+if (fs.existsSync(switchComponentDir)) {
+  console.log('处理Switch组件文件...');
+  
+  // 创建或修改Switch组件的头文件
+  if (fs.existsSync(switchHeaderPath)) {
+    // 创建备份
+    const backupPath = `${switchHeaderPath}.original`;
+    if (!fs.existsSync(backupPath)) {
+      fs.copyFileSync(switchHeaderPath, backupPath);
+      console.log(`创建了备份: ${backupPath}`);
+    }
+    
+    // 读取文件内容
+    let content = fs.readFileSync(switchHeaderPath, 'utf8');
+    
+    // 检查是否已有条件编译
+    if (!content.includes('#if RCT_NEW_ARCH_ENABLED')) {
+      // 添加条件编译
+      content = `
+#if RCT_NEW_ARCH_ENABLED
+
+${content}
+
+#endif // RCT_NEW_ARCH_ENABLED
+
+#if !RCT_NEW_ARCH_ENABLED
+// 旧架构兼容的简化实现
+#import <UIKit/UIKit.h>
+#import <React/RCTViewComponentView.h>
+
+// 定义协议，避免编译错误
+@protocol RCTSwitchViewProtocol
+@required
+- (void)setValue:(BOOL)value;
+@end
+
+// 定义组件视图
+@interface RCTSwitchComponentView : RCTViewComponentView <RCTSwitchViewProtocol>
+@end
+#endif // !RCT_NEW_ARCH_ENABLED
+`;
+      fs.writeFileSync(switchHeaderPath, content);
+      console.log(`已修改文件，添加条件编译: ${switchHeaderPath}`);
+    } else {
+      console.log(`文件已包含条件编译，无需修改: ${switchHeaderPath}`);
+    }
+  } else {
+    console.log(`创建Switch组件的头文件: ${switchHeaderPath}`);
+    // 创建目录（如果需要）
+    if (!fs.existsSync(switchComponentDir)) {
+      fs.mkdirSync(switchComponentDir, { recursive: true });
+    }
+    
+    // 创建头文件
+    const headerContent = `
+#if RCT_NEW_ARCH_ENABLED
+// 新架构实现在构建时会被引入
+#else
+// 旧架构兼容的简化实现
+#import <UIKit/UIKit.h>
+#import <React/RCTViewComponentView.h>
+
+// 定义协议，避免编译错误
+@protocol RCTSwitchViewProtocol
+@required
+- (void)setValue:(BOOL)value;
+@end
+
+// 定义组件视图
+@interface RCTSwitchComponentView : RCTViewComponentView <RCTSwitchViewProtocol>
+@end
+#endif // RCT_NEW_ARCH_ENABLED
+`;
+    fs.writeFileSync(switchHeaderPath, headerContent);
+    console.log(`创建了Switch组件头文件: ${switchHeaderPath}`);
+  }
+  
+  // 创建或修改Switch组件的实现文件
+  if (fs.existsSync(switchImplPath)) {
+    // 创建备份
+    const backupPath = `${switchImplPath}.original`;
+    if (!fs.existsSync(backupPath)) {
+      fs.copyFileSync(switchImplPath, backupPath);
+      console.log(`创建了备份: ${backupPath}`);
+    }
+    
+    // 读取文件内容
+    let content = fs.readFileSync(switchImplPath, 'utf8');
+    
+    // 检查是否已有条件编译
+    if (!content.includes('#if RCT_NEW_ARCH_ENABLED')) {
+      // 添加条件编译
+      content = `
+#if RCT_NEW_ARCH_ENABLED
+
+${content}
+
+#endif // RCT_NEW_ARCH_ENABLED
+
+#if !RCT_NEW_ARCH_ENABLED
+// 旧架构兼容的简化实现
+#import "RCTSwitchComponentView.h"
+
+@implementation RCTSwitchComponentView {
+  UISwitch *_switchView;
+}
+
+- (instancetype)initWithFrame:(CGRect)frame {
+  if (self = [super initWithFrame:frame]) {
+    _switchView = [[UISwitch alloc] initWithFrame:self.bounds];
+    [_switchView addTarget:self
+                   action:@selector(onChange:)
+         forControlEvents:UIControlEventValueChanged];
+    self.contentView = _switchView;
+  }
+  return self;
+}
+
+- (void)setValue:(BOOL)value {
+  _switchView.on = value;
+}
+
+- (void)onChange:(UISwitch *)sender {
+  // 简化版本，只提供基本功能
+  if ([self.superview respondsToSelector:@selector(onSwitchValueChange:)]) {
+    [self.superview performSelector:@selector(onSwitchValueChange:) withObject:@(sender.on)];
+  }
+}
+
+- (void)prepareForRecycle {
+  [super prepareForRecycle];
+  _switchView.on = NO;
+}
+
++ (Class)ComponentViewClass {
+  return RCTSwitchComponentView.class;
+}
+
+@end
+#endif // !RCT_NEW_ARCH_ENABLED
+`;
+      fs.writeFileSync(switchImplPath, content);
+      console.log(`已修改文件，添加条件编译: ${switchImplPath}`);
+    } else {
+      console.log(`文件已包含条件编译，无需修改: ${switchImplPath}`);
+    }
+  } else {
+    console.log(`创建Switch组件的实现文件: ${switchImplPath}`);
+    // 创建实现文件
+    const implContent = `
+#if RCT_NEW_ARCH_ENABLED
+// 新架构实现在构建时会被引入
+#else
+// 旧架构兼容的简化实现
+#import "RCTSwitchComponentView.h"
+
+@implementation RCTSwitchComponentView {
+  UISwitch *_switchView;
+}
+
+- (instancetype)initWithFrame:(CGRect)frame {
+  if (self = [super initWithFrame:frame]) {
+    _switchView = [[UISwitch alloc] initWithFrame:self.bounds];
+    [_switchView addTarget:self
+                   action:@selector(onChange:)
+         forControlEvents:UIControlEventValueChanged];
+    self.contentView = _switchView;
+  }
+  return self;
+}
+
+- (void)setValue:(BOOL)value {
+  _switchView.on = value;
+}
+
+- (void)onChange:(UISwitch *)sender {
+  // 简化版本，只提供基本功能
+  if ([self.superview respondsToSelector:@selector(onSwitchValueChange:)]) {
+    [self.superview performSelector:@selector(onSwitchValueChange:) withObject:@(sender.on)];
+  }
+}
+
+- (void)prepareForRecycle {
+  [super prepareForRecycle];
+  _switchView.on = NO;
+}
+
++ (Class)ComponentViewClass {
+  return RCTSwitchComponentView.class;
+}
+
+@end
+#endif // !RCT_NEW_ARCH_ENABLED
+`;
+    fs.writeFileSync(switchImplPath, implContent);
+    console.log(`创建了Switch组件实现文件: ${switchImplPath}`);
+  }
+} else {
+  console.log(`Switch组件目录不存在: ${switchComponentDir}`);
+}
+
+// 3.3 自动处理常见的Fabric组件
+const commonFabricComponents = [
+  'ActivityIndicator',
+  'Image',
+  'ScrollView',
+  'Modal',
+  'TextInput',
+  'Text',
+  'View',
+  'RefreshControl',
+  'Slider',
+  'Switch'
+];
+
+// 自动处理多个组件
+commonFabricComponents.forEach(componentName => {
+  // 确定该组件的路径
+  const componentDir = path.join(reactNativePath, `React/Fabric/Mounting/ComponentViews/${componentName}`);
+  const headerPath = path.join(componentDir, `RCT${componentName}ComponentView.h`);
+  const implPath = path.join(componentDir, `RCT${componentName}ComponentView.mm`);
+  
+  // 检查组件目录是否存在
+  if (fs.existsSync(componentDir)) {
+    console.log(`处理${componentName}组件文件...`);
+    
+    // 处理头文件
+    if (fs.existsSync(headerPath)) {
+      // 创建备份
+      const backupPath = `${headerPath}.original`;
+      if (!fs.existsSync(backupPath)) {
+        fs.copyFileSync(headerPath, backupPath);
+        console.log(`创建了备份: ${backupPath}`);
+      }
+      
+      // 读取文件内容
+      let content = fs.readFileSync(headerPath, 'utf8');
+      
+      // 检查是否已有条件编译
+      if (!content.includes('#if RCT_NEW_ARCH_ENABLED')) {
+        // 添加条件编译
+        content = `
+#if RCT_NEW_ARCH_ENABLED
+
+${content}
+
+#endif // RCT_NEW_ARCH_ENABLED
+
+#if !RCT_NEW_ARCH_ENABLED
+// 旧架构兼容的简化实现
+#import <UIKit/UIKit.h>
+#import <React/RCTViewComponentView.h>
+
+@interface RCT${componentName}ComponentView : RCTViewComponentView
+@end
+#endif // !RCT_NEW_ARCH_ENABLED
+`;
+        fs.writeFileSync(headerPath, content);
+        console.log(`已修改文件，添加条件编译: ${headerPath}`);
+      } else {
+        console.log(`文件已包含条件编译，无需修改: ${headerPath}`);
+      }
+    }
+    
+    // 处理实现文件
+    if (fs.existsSync(implPath)) {
+      // 创建备份
+      const backupPath = `${implPath}.original`;
+      if (!fs.existsSync(backupPath)) {
+        fs.copyFileSync(implPath, backupPath);
+        console.log(`创建了备份: ${backupPath}`);
+      }
+      
+      // 读取文件内容
+      let content = fs.readFileSync(implPath, 'utf8');
+      
+      // 检查是否已有条件编译
+      if (!content.includes('#if RCT_NEW_ARCH_ENABLED')) {
+        // 添加条件编译
+        content = `
+#if RCT_NEW_ARCH_ENABLED
+
+${content}
+
+#endif // RCT_NEW_ARCH_ENABLED
+
+#if !RCT_NEW_ARCH_ENABLED
+// 旧架构兼容的简化实现
+#import "RCT${componentName}ComponentView.h"
+
+@implementation RCT${componentName}ComponentView
+
+- (instancetype)initWithFrame:(CGRect)frame {
+  if (self = [super initWithFrame:frame]) {
+    // 初始化为空，仅用于编译通过
+  }
+  return self;
+}
+
+- (void)updateProps:(void *)props oldProps:(void *)oldProps {
+  // 空实现
+  [super updateProps:props oldProps:oldProps];
+}
+
+- (void)prepareForRecycle {
+  [super prepareForRecycle];
+}
+
++ (Class)ComponentViewClass {
+  return RCT${componentName}ComponentView.class;
+}
+
+@end
+#endif // !RCT_NEW_ARCH_ENABLED
+`;
+        fs.writeFileSync(implPath, content);
+        console.log(`已修改文件，添加条件编译: ${implPath}`);
+      } else {
+        console.log(`文件已包含条件编译，无需修改: ${implPath}`);
+      }
+    }
+  }
+});
+
 // 4. 修改Podfile以禁用React-RCTFabric和修复文件冲突
 const podfilePath = path.join(__dirname, 'ios/Podfile');
 if (fs.existsSync(podfilePath)) {
