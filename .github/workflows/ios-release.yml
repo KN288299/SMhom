@@ -96,6 +96,12 @@ jobs:
         run: |
           echo "=== 修复@react-native-async-storage/async-storage问题 ==="
           node fix-async-storage.js
+          
+      # 添加修复Fabric组件的步骤
+      - name: 修复React Native Fabric组件
+        run: |
+          echo "=== 修复React Native Fabric组件问题 ==="
+          node fix-fabric-components.js
 
       # 有选择地执行自定义修复脚本，避免重复
       - name: 检查是否需要执行自定义修复脚本
