@@ -193,11 +193,11 @@ jobs:
           echo '@property (nonatomic, copy, nullable) NSString *nativeId;' >> "$VIEW_HEADER_TEMP"
           echo '@property (nonatomic, strong) UIView *contentView;' >> "$VIEW_HEADER_TEMP"
           echo '' >> "$VIEW_HEADER_TEMP"
-          echo '- (void)updateProps:(id)props oldProps:(id)oldProps;' >> "$VIEW_HEADER_TEMP"
+          echo '- (void)updateProps:(id _Nonnull)props oldProps:(id _Nonnull)oldProps;' >> "$VIEW_HEADER_TEMP"
           echo '- (void)prepareForRecycle;' >> "$VIEW_HEADER_TEMP"
           echo '' >> "$VIEW_HEADER_TEMP"
           echo '@end' >> "$VIEW_HEADER_TEMP"
-          echo '#endif' >> "$VIEW_HEADER_TEMP"
+          echo '#endif // !RCT_NEW_ARCH_ENABLED' >> "$VIEW_HEADER_TEMP"
           
           # 复制到目标位置
           mkdir -p "$(dirname "$VIEW_HEADER_TARGET")"
@@ -937,11 +937,11 @@ jobs:
           echo '@property (nonatomic, copy, nullable) NSString *nativeId;' >> "$VIEW_HEADER"
           echo '@property (nonatomic, strong) UIView *contentView;' >> "$VIEW_HEADER"
           echo '' >> "$VIEW_HEADER"
-          echo '- (void)updateProps:(id)props oldProps:(id)oldProps;' >> "$VIEW_HEADER"
+          echo '- (void)updateProps:(id _Nonnull)props oldProps:(id _Nonnull)oldProps;' >> "$VIEW_HEADER"
           echo '- (void)prepareForRecycle;' >> "$VIEW_HEADER"
           echo '' >> "$VIEW_HEADER"
           echo '@end' >> "$VIEW_HEADER"
-          echo '#endif' >> "$VIEW_HEADER"
+          echo '#endif // !RCT_NEW_ARCH_ENABLED' >> "$VIEW_HEADER"
           
           # 确保RCTViewComponentView.mm文件存在
           VIEW_IMPL="node_modules/react-native/React/RCTViewComponentView.mm"

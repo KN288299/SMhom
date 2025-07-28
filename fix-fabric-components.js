@@ -84,11 +84,11 @@ if (!viewComponentFound) {
 @property (nonatomic, copy, nullable) NSString *nativeId;
 @property (nonatomic, strong) UIView *contentView;
 
-- (void)updateProps:(id)props oldProps:(id)oldProps;
+- (void)updateProps:(id _Nonnull)props oldProps:(id _Nonnull)oldProps;
 - (void)prepareForRecycle;
 
 @end
-#endif
+#endif // !RCT_NEW_ARCH_ENABLED
 `;
 
     // 创建目录
