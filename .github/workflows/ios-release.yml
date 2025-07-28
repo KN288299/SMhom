@@ -90,6 +90,12 @@ jobs:
         run: |
           echo "=== 修复react-native-permissions问题 ==="
           node fix-rn-permissions.js
+          
+      # 添加修复async-storage的步骤
+      - name: 修复async-storage
+        run: |
+          echo "=== 修复@react-native-async-storage/async-storage问题 ==="
+          node fix-async-storage.js
 
       # 有选择地执行自定义修复脚本，避免重复
       - name: 检查是否需要执行自定义修复脚本
