@@ -473,6 +473,11 @@ jobs:
           
           echo "✅ 完成预处理"
 
+      - name: 修复react-native-svg引用路径问题
+        run: |
+          echo "=== 修复React Native引用路径问题 ==="
+          node fix-import-paths.js
+          
       - name: 修复Podfile
         run: |
           echo "=== 修复Podfile以确保禁用新架构 ==="
