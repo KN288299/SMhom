@@ -324,6 +324,7 @@ ${content}
 #if !RCT_NEW_ARCH_ENABLED
 // 旧架构兼容的简化实现
 #import <UIKit/UIKit.h>
+#import <React/RCTDefines.h>
 #import <React/RCTViewComponentView.h>
 
 // 定义协议，避免编译错误
@@ -356,6 +357,7 @@ ${content}
 #else
 // 旧架构兼容的简化实现
 #import <UIKit/UIKit.h>
+#import <React/RCTDefines.h>
 #import <React/RCTViewComponentView.h>
 
 // 定义协议，避免编译错误
@@ -518,71 +520,103 @@ commonFabricComponents.forEach(componentName => {
   const headerPath = path.join(componentDir, `RCT${componentName}ComponentView.h`);
   const implPath = path.join(componentDir, `RCT${componentName}ComponentView.mm`);
   
-  // 检查组件目录是否存在
-  if (fs.existsSync(componentDir)) {
-    console.log(`处理${componentName}组件文件...`);
+  // 确保组件目录存在
+  if (!fs.existsSync(componentDir)) {
+    fs.mkdirSync(componentDir, { recursive: true });
+    console.log(`创建了组件目录: ${componentDir}`);
+  }
+  
+  console.log(`处理${componentName}组件文件...`);
+  
+  // 创建或修改头文件
+  let headerContent;
+  if (fs.existsSync(headerPath)) {
+    // 创建备份
+    const backupPath = `${headerPath}.original`;
+    if (!fs.existsSync(backupPath)) {
+      fs.copyFileSync(headerPath, backupPath);
+      console.log(`创建了备份: ${backupPath}`);
+    }
     
-    // 处理头文件
-    if (fs.existsSync(headerPath)) {
-      // 创建备份
-      const backupPath = `${headerPath}.original`;
-      if (!fs.existsSync(backupPath)) {
-        fs.copyFileSync(headerPath, backupPath);
-        console.log(`创建了备份: ${backupPath}`);
-      }
-      
-      // 读取文件内容
-      let content = fs.readFileSync(headerPath, 'utf8');
-      
-      // 检查是否已有条件编译
-      if (!content.includes('#if RCT_NEW_ARCH_ENABLED')) {
-        // 添加条件编译
-        content = `
+    // 读取已有的头文件内容
+    const originalContent = fs.readFileSync(headerPath, 'utf8');
+    
+    // 检查是否已有条件编译
+    if (!originalContent.includes('#if RCT_NEW_ARCH_ENABLED')) {
+      // 添加条件编译
+      headerContent = `/*
+ * 由fix-fabric-components.js修改，添加条件编译
+ * 原始文件已备份为${path.basename(headerPath)}.original
+ */
+#import <React/RCTDefines.h>
+
 #if RCT_NEW_ARCH_ENABLED
-
-${content}
-
-#endif // RCT_NEW_ARCH_ENABLED
-
-#if !RCT_NEW_ARCH_ENABLED
+// 原始新架构实现
+${originalContent}
+#else // !RCT_NEW_ARCH_ENABLED
 // 旧架构兼容的简化实现
 #import <UIKit/UIKit.h>
 #import <React/RCTViewComponentView.h>
 
 @interface RCT${componentName}ComponentView : RCTViewComponentView
 @end
-#endif // !RCT_NEW_ARCH_ENABLED
+#endif // RCT_NEW_ARCH_ENABLED
 `;
-        fs.writeFileSync(headerPath, content);
-        console.log(`已修改文件，添加条件编译: ${headerPath}`);
-      } else {
-        console.log(`文件已包含条件编译，无需修改: ${headerPath}`);
-      }
+    } else {
+      console.log(`文件已包含条件编译，无需修改: ${headerPath}`);
+      headerContent = originalContent;
+    }
+  } else {
+    // 创建新的头文件
+    headerContent = `/*
+ * 由fix-fabric-components.js创建的占位符文件
+ * 用于解决Fabric相关编译错误
+ */
+#import <React/RCTDefines.h>
+
+#if RCT_NEW_ARCH_ENABLED
+// 新架构实现应在构建时被正确包含
+#else // !RCT_NEW_ARCH_ENABLED
+// 旧架构兼容的简化实现
+#import <UIKit/UIKit.h>
+#import <React/RCTViewComponentView.h>
+
+@interface RCT${componentName}ComponentView : RCTViewComponentView
+@end
+#endif // RCT_NEW_ARCH_ENABLED
+`;
+  }
+  
+  // 写入头文件
+  fs.writeFileSync(headerPath, headerContent);
+  console.log(`${fs.existsSync(headerPath) ? '更新' : '创建'}了组件头文件: ${headerPath}`);
+  
+  // 创建或修改实现文件
+  let implContent;
+  if (fs.existsSync(implPath)) {
+    // 创建备份
+    const backupPath = `${implPath}.original`;
+    if (!fs.existsSync(backupPath)) {
+      fs.copyFileSync(implPath, backupPath);
+      console.log(`创建了备份: ${backupPath}`);
     }
     
-    // 处理实现文件
-    if (fs.existsSync(implPath)) {
-      // 创建备份
-      const backupPath = `${implPath}.original`;
-      if (!fs.existsSync(backupPath)) {
-        fs.copyFileSync(implPath, backupPath);
-        console.log(`创建了备份: ${backupPath}`);
-      }
-      
-      // 读取文件内容
-      let content = fs.readFileSync(implPath, 'utf8');
-      
-      // 检查是否已有条件编译
-      if (!content.includes('#if RCT_NEW_ARCH_ENABLED')) {
-        // 添加条件编译
-        content = `
+    // 读取已有的实现文件内容
+    const originalContent = fs.readFileSync(implPath, 'utf8');
+    
+    // 检查是否已有条件编译
+    if (!originalContent.includes('#if RCT_NEW_ARCH_ENABLED')) {
+      // 添加条件编译
+      implContent = `/*
+ * 由fix-fabric-components.js修改，添加条件编译
+ * 原始文件已备份为${path.basename(implPath)}.original
+ */
+#import <React/RCTDefines.h>
+
 #if RCT_NEW_ARCH_ENABLED
-
-${content}
-
-#endif // RCT_NEW_ARCH_ENABLED
-
-#if !RCT_NEW_ARCH_ENABLED
+// 原始新架构实现
+${originalContent}
+#else // !RCT_NEW_ARCH_ENABLED
 // 旧架构兼容的简化实现
 #import "RCT${componentName}ComponentView.h"
 
@@ -590,7 +624,7 @@ ${content}
 
 - (instancetype)initWithFrame:(CGRect)frame {
   if (self = [super initWithFrame:frame]) {
-    // 初始化为空，仅用于编译通过
+    // 基本初始化
   }
   return self;
 }
@@ -600,24 +634,49 @@ ${content}
   [super updateProps:props oldProps:oldProps];
 }
 
-- (void)prepareForRecycle {
-  [super prepareForRecycle];
+@end
+#endif // RCT_NEW_ARCH_ENABLED
+`;
+    } else {
+      console.log(`文件已包含条件编译，无需修改: ${implPath}`);
+      implContent = originalContent;
+    }
+  } else {
+    // 创建新的实现文件
+    implContent = `/*
+ * 由fix-fabric-components.js创建的占位符文件
+ * 用于解决Fabric相关编译错误
+ */
+#import <React/RCTDefines.h>
+
+#if RCT_NEW_ARCH_ENABLED
+// 新架构实现应在构建时被正确包含
+#else // !RCT_NEW_ARCH_ENABLED
+// 旧架构兼容的简化实现
+#import "RCT${componentName}ComponentView.h"
+
+@implementation RCT${componentName}ComponentView
+
+- (instancetype)initWithFrame:(CGRect)frame {
+  if (self = [super initWithFrame:frame]) {
+    // 基本初始化
+  }
+  return self;
 }
 
-+ (Class)ComponentViewClass {
-  return RCT${componentName}ComponentView.class;
+- (void)updateProps:(void *)props oldProps:(void *)oldProps {
+  // 空实现
+  [super updateProps:props oldProps:oldProps];
 }
 
 @end
-#endif // !RCT_NEW_ARCH_ENABLED
+#endif // RCT_NEW_ARCH_ENABLED
 `;
-        fs.writeFileSync(implPath, content);
-        console.log(`已修改文件，添加条件编译: ${implPath}`);
-      } else {
-        console.log(`文件已包含条件编译，无需修改: ${implPath}`);
-      }
-    }
   }
+  
+  // 写入实现文件
+  fs.writeFileSync(implPath, implContent);
+  console.log(`${fs.existsSync(implPath) ? '更新' : '创建'}了组件实现文件: ${implPath}`);
 });
 
 // 4. 修改Podfile以禁用React-RCTFabric和修复文件冲突
@@ -744,6 +803,73 @@ end
   }
 } else {
   console.log('未找到Podfile');
+}
+
+// 创建或修改RCTDefines.h确保包含正确的宏定义
+const rctDefinesPath = path.join(reactNativePath, 'React/RCTDefines.h');
+if (fs.existsSync(rctDefinesPath)) {
+  console.log(`修改RCTDefines.h文件以确保正确定义宏...`);
+  
+  // 创建备份
+  const backupPath = `${rctDefinesPath}.original`;
+  if (!fs.existsSync(backupPath)) {
+    fs.copyFileSync(rctDefinesPath, backupPath);
+    console.log(`创建了备份: ${backupPath}`);
+  }
+  
+  // 读取文件内容
+  let content = fs.readFileSync(rctDefinesPath, 'utf8');
+  
+  // 检查是否已经包含我们的定义
+  if (!content.includes('// FABRIC_DISABLE_PATCH')) {
+    // 在文件末尾添加我们的定义
+    content += `
+// FABRIC_DISABLE_PATCH - Added by fix-fabric-components.js
+#ifndef RCT_NEW_ARCH_ENABLED
+#define RCT_NEW_ARCH_ENABLED 0
+#endif
+
+#ifndef REACT_NATIVE_DEBUG
+#define REACT_NATIVE_DEBUG 0
+#endif
+
+`;
+    
+    fs.writeFileSync(rctDefinesPath, content);
+    console.log(`已修改RCTDefines.h，添加RCT_NEW_ARCH_ENABLED宏定义`);
+  } else {
+    console.log(`RCTDefines.h已包含我们的宏定义，无需修改`);
+  }
+} else {
+  console.log(`未找到RCTDefines.h文件，创建新文件...`);
+  
+  // 创建必要的目录
+  const dir = path.dirname(rctDefinesPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  
+  // 创建基本的RCTDefines.h文件
+  const content = `/**
+ * 由fix-fabric-components.js创建的占位符文件
+ * 定义了关闭Fabric架构的必要宏
+ */
+
+#pragma once
+
+// 关闭新架构标志
+#ifndef RCT_NEW_ARCH_ENABLED
+#define RCT_NEW_ARCH_ENABLED 0
+#endif
+
+// 调试标志
+#ifndef REACT_NATIVE_DEBUG
+#define REACT_NATIVE_DEBUG 0
+#endif
+`;
+  
+  fs.writeFileSync(rctDefinesPath, content);
+  console.log(`创建了RCTDefines.h文件: ${rctDefinesPath}`);
 }
 
 console.log('\n修复完成！已修复React Native Fabric组件的编译问题和文件冲突。'); 
