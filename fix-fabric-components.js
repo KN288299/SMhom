@@ -548,7 +548,7 @@ commonFabricComponents.forEach(componentName => {
  * 由fix-fabric-components.js修改，添加条件编译
  * 原始文件已备份为${path.basename(headerPath)}.original
  */
-#import <React/RCTDefines.h>
+#import <React/Base/RCTDefines.h>
 
 #if RCT_NEW_ARCH_ENABLED
 // 原始新架构实现
@@ -572,7 +572,7 @@ ${originalContent}
  * 由fix-fabric-components.js创建的占位符文件
  * 用于解决Fabric相关编译错误
  */
-#import <React/RCTDefines.h>
+#import <React/Base/RCTDefines.h>
 
 #if RCT_NEW_ARCH_ENABLED
 // 新架构实现应在构建时被正确包含
@@ -611,7 +611,7 @@ ${originalContent}
  * 由fix-fabric-components.js修改，添加条件编译
  * 原始文件已备份为${path.basename(implPath)}.original
  */
-#import <React/RCTDefines.h>
+#import <React/Base/RCTDefines.h>
 
 #if RCT_NEW_ARCH_ENABLED
 // 原始新架构实现
@@ -647,7 +647,7 @@ ${originalContent}
  * 由fix-fabric-components.js创建的占位符文件
  * 用于解决Fabric相关编译错误
  */
-#import <React/RCTDefines.h>
+#import <React/Base/RCTDefines.h>
 
 #if RCT_NEW_ARCH_ENABLED
 // 新架构实现应在构建时被正确包含
@@ -806,9 +806,26 @@ end
 }
 
 // 创建或修改RCTDefines.h确保包含正确的宏定义
-const rctDefinesPath = path.join(reactNativePath, 'React/RCTDefines.h');
+const rctDefinesPath = path.join(reactNativePath, 'React/Base/RCTDefines.h');
+const incorrectDefinesPath = path.join(reactNativePath, 'React/RCTDefines.h');
+
+// 先检查错误路径的文件是否存在，如果存在则删除
+if (fs.existsSync(incorrectDefinesPath)) {
+  console.log(`发现位置错误的RCTDefines.h文件，删除它...`);
+  fs.unlinkSync(incorrectDefinesPath);
+  
+  // 删除包含目录（如果为空）
+  const incorrectDir = path.dirname(incorrectDefinesPath);
+  try {
+    fs.rmdirSync(incorrectDir);
+    console.log(`删除了空目录: ${incorrectDir}`);
+  } catch (err) {
+    // 目录可能不为空，忽略错误
+  }
+}
+
 if (fs.existsSync(rctDefinesPath)) {
-  console.log(`修改RCTDefines.h文件以确保正确定义宏...`);
+  console.log(`修改正确位置的RCTDefines.h文件以确保正确定义宏...`);
   
   // 创建备份
   const backupPath = `${rctDefinesPath}.original`;
@@ -841,12 +858,13 @@ if (fs.existsSync(rctDefinesPath)) {
     console.log(`RCTDefines.h已包含我们的宏定义，无需修改`);
   }
 } else {
-  console.log(`未找到RCTDefines.h文件，创建新文件...`);
+  console.log(`未找到正确位置的RCTDefines.h文件，创建必要的目录...`);
   
   // 创建必要的目录
-  const dir = path.dirname(rctDefinesPath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  const baseDir = path.dirname(rctDefinesPath);
+  if (!fs.existsSync(baseDir)) {
+    fs.mkdirSync(baseDir, { recursive: true });
+    console.log(`创建了目录: ${baseDir}`);
   }
   
   // 创建基本的RCTDefines.h文件
@@ -869,7 +887,38 @@ if (fs.existsSync(rctDefinesPath)) {
 `;
   
   fs.writeFileSync(rctDefinesPath, content);
-  console.log(`创建了RCTDefines.h文件: ${rctDefinesPath}`);
+  console.log(`在正确位置创建了RCTDefines.h文件: ${rctDefinesPath}`);
 }
+
+// 确保组件文件导入正确的RCTDefines.h
+const correctInclude = '#import <React/Base/RCTDefines.h>';
+const incorrectInclude = '#import <React/RCTDefines.h>';
+
+function updateIncludesInDirectory(dir) {
+  if (!fs.existsSync(dir)) return;
+  
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  
+  entries.forEach(entry => {
+    const entryPath = path.join(dir, entry.name);
+    
+    if (entry.isDirectory()) {
+      updateIncludesInDirectory(entryPath);
+    } else if (entry.isFile() && 
+              (entry.name.endsWith('.h') || entry.name.endsWith('.m') || entry.name.endsWith('.mm'))) {
+      
+      let content = fs.readFileSync(entryPath, 'utf8');
+      
+      if (content.includes(incorrectInclude)) {
+        content = content.replace(new RegExp(incorrectInclude, 'g'), correctInclude);
+        fs.writeFileSync(entryPath, content);
+        console.log(`更新了文件中的头文件引用: ${entryPath}`);
+      }
+    }
+  });
+}
+
+// 更新我们创建或修改的所有文件中的包含路径
+updateIncludesInDirectory(path.join(reactNativePath, 'React/Fabric'));
 
 console.log('\n修复完成！已修复React Native Fabric组件的编译问题和文件冲突。'); 
