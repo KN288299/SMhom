@@ -179,31 +179,61 @@ const fabricComponentsDir = path.join(reactNativePath, 'React/Fabric/Mounting/Co
       console.log(`创建了备份: ${backupPath}`);
     }
     
-    // 读取内容
-    let content = fs.readFileSync(viewFinderPath, 'utf8');
-    
-    // 替换头文件引用
-    content = content.replace(
-      /#import <React\/Base\/RCTDefines\.h>/g,
-      '#import <React/RCTDefines.h>'
-    );
-    
-    // 添加条件编译
-    if (!content.includes('#if RCT_NEW_ARCH_ENABLED')) {
-      content = `/*
- * 由fix-fabric-components.js修改，添加条件编译
- * 原始文件已备份为${path.basename(viewFinderPath)}.original
+    // 完全重写文件内容，确保引入正确
+    const newContent = `/*
+ * 由fix-fabric-components.js完全重写
+ * 原始文件已备份为RCTViewFinder.mm.original
  */
 #import <React/RCTDefines.h>
 
 #if RCT_NEW_ARCH_ENABLED
-${content}
-#else
-#import <React/RCTDefines.h>
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+#import "RCTViewFinder.h"
+// 确保导入RCTViewComponentView.h
 #import <React/RCTViewComponentView.h>
+
+@implementation RCTViewFinder
+
++ (UIView *)findView:(UIView *)root withNativeId:(NSString *)nativeId
+{
+  if (!nativeId) {
+    return nil;
+  }
+
+  if ([root isKindOfClass:[RCTViewComponentView class]] &&
+      [nativeId isEqualToString:((RCTViewComponentView *)root).nativeId]) {
+    return root;
+  }
+
+  for (UIView *subview in root.subviews) {
+    UIView *result = [RCTViewFinder findView:subview withNativeId:nativeId];
+    if (result) {
+      return result;
+    }
+  }
+
+  return nil;
+}
+
+@end
+
+#else
+// 旧架构兼容代码
 #import <UIKit/UIKit.h>
+// 确保导入RCTViewComponentView.h
+#import <React/RCTViewComponentView.h>
 
 UIView *RCTFindComponentViewWithName(UIView *view, NSString *nativeId) {
+  if (!nativeId) {
+    return nil;
+  }
+
   // 简化实现，在非Fabric架构下提供基本功能
   if ([view isKindOfClass:[RCTViewComponentView class]]) {
     if ([nativeId isEqualToString:((RCTViewComponentView *)view).nativeId]) {
@@ -222,13 +252,9 @@ UIView *RCTFindComponentViewWithName(UIView *view, NSString *nativeId) {
 }
 #endif
 `;
-      
-      fs.writeFileSync(viewFinderPath, content);
-      console.log(`已添加RCTViewFinder.mm的条件编译`);
-    } else {
-      fs.writeFileSync(viewFinderPath, content);
-      console.log(`已修复RCTViewFinder.mm中的引用路径`);
-    }
+    
+    fs.writeFileSync(viewFinderPath, newContent);
+    console.log(`已完全重写RCTViewFinder.mm文件，确保正确导入RCTViewComponentView.h`);
   }
 
 function processDirectory(dir) {
