@@ -187,13 +187,6 @@ if (fs.existsSync(podfilePath)) {
     const postInstallMatch = podfileContent.match(/post_install\s+do\s+\|installer\|/);
     
     if (postInstallMatch) {
-      // 在post_install块内添加代码
-      const insertPosition = postInstallMatch.index + postInstallMatch[0].length;
-      const disableReactFabricCode = `
-    # 禁用React-RCTFabric目标
-    disable_react_fabric_target(installer)
-`;
-      
       // 添加辅助函数
       const helperFunctionCode = `
 # 辅助函数：禁用React-RCTFabric目标
@@ -228,24 +221,51 @@ end
       
       // 检查是否已有这个函数
       if (!podfileContent.includes('def disable_react_fabric_target')) {
-        // 找到适当位置添加辅助函数
-        const targetPodsDo = podfileContent.indexOf("target 'HomeServiceChat' do");
-        if (targetPodsDo !== -1) {
-          podfileContent = 
-            podfileContent.slice(0, targetPodsDo) + 
-            helperFunctionCode + 
-            podfileContent.slice(targetPodsDo);
+        // 找到适当位置添加辅助函数 - 在fix_duplicate_headers函数后
+        const fixDuplicateHeadersPos = podfileContent.indexOf("def fix_duplicate_headers");
+        if (fixDuplicateHeadersPos !== -1) {
+          // 找到函数末尾
+          const endDefPos = podfileContent.indexOf("end", fixDuplicateHeadersPos);
+          if (endDefPos !== -1) {
+            // 在函数后添加我们的新函数
+            const insertPos = podfileContent.indexOf("\n", endDefPos) + 1;
+            podfileContent = 
+              podfileContent.slice(0, insertPos) + 
+              helperFunctionCode + 
+              podfileContent.slice(insertPos);
+          } else {
+            // 如果找不到end，添加到文件开头
+            podfileContent = helperFunctionCode + podfileContent;
+          }
         } else {
-          // 如果找不到特定位置，添加到文件末尾
-          podfileContent += helperFunctionCode;
+          // 如果找不到fix_duplicate_headers函数，添加到文件开头
+          podfileContent = helperFunctionCode + podfileContent;
         }
       }
       
-      // 在post_install中添加调用
-      podfileContent = 
-        podfileContent.slice(0, insertPosition) + 
-        disableReactFabricCode + 
-        podfileContent.slice(insertPosition);
+      // 在post_install中添加调用 - 在fix_duplicate_headers调用之后
+      const fixDuplicateCallPos = podfileContent.indexOf("fix_duplicate_headers(installer)");
+      if (fixDuplicateCallPos !== -1) {
+        const afterFixCall = podfileContent.indexOf("\n", fixDuplicateCallPos) + 1;
+        const disableReactFabricCode = `    # 禁用React-RCTFabric目标
+    disable_react_fabric_target(installer)
+`;
+        podfileContent = 
+          podfileContent.slice(0, afterFixCall) + 
+          disableReactFabricCode + 
+          podfileContent.slice(afterFixCall);
+      } else {
+        // 在post_install块内添加代码
+        const insertPosition = postInstallMatch.index + postInstallMatch[0].length;
+        const disableReactFabricCode = `
+    # 禁用React-RCTFabric目标
+    disable_react_fabric_target(installer)
+`;
+        podfileContent = 
+          podfileContent.slice(0, insertPosition) + 
+          disableReactFabricCode + 
+          podfileContent.slice(insertPosition);
+      }
       
       fs.writeFileSync(podfilePath, podfileContent);
       console.log('已修改Podfile，添加禁用React-RCTFabric的代码');
