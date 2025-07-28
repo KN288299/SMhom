@@ -84,6 +84,12 @@ jobs:
           pod cache clean --all
           mkdir -p build
           chmod -R 755 .
+      
+      # 添加修复react-native-permissions的步骤
+      - name: 修复react-native-permissions
+        run: |
+          echo "=== 修复react-native-permissions问题 ==="
+          node fix-rn-permissions.js
 
       # 有选择地执行自定义修复脚本，避免重复
       - name: 检查是否需要执行自定义修复脚本
