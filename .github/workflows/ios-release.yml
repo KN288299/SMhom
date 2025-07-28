@@ -18,8 +18,6 @@ env:
   # 显式禁用新架构
   RCT_NEW_ARCH_ENABLED: "0"
   USE_HERMES: "0"
-  # 不再需要禁用RNPermissions自动链接，3.x版本不需要这个设置
-  # RN_PERMISSIONS_DISABLE_AUTOLINKING: "1"
 
 jobs:
   build:
@@ -49,10 +47,6 @@ jobs:
           echo "系统信息: $(sw_vers)"
           echo "工作目录: $(pwd)"
           ls -la
-          
-          # 检查react-native-permissions版本
-          PERMISSIONS_VERSION=$(node -e "console.log(require('./package.json').dependencies['react-native-permissions'])")
-          echo "React Native Permissions版本: $PERMISSIONS_VERSION"
 
       - name: 缓存 node_modules
         id: cache-node-modules
@@ -91,111 +85,488 @@ jobs:
           mkdir -p build
           chmod -R 755 .
 
-      # 其他修复步骤保持不变...
-
-      - name: 配置React Native Permissions（简化版）
-        run: |-
-          echo "=== 配置React Native Permissions - 解决podspec路径问题 ==="
-          
-          # 检查react-native-permissions版本
-          PERMISSIONS_VERSION=$(node -e "console.log(require('./package.json').dependencies['react-native-permissions'] || 'undefined')")
-          echo "检测到React Native Permissions版本: $PERMISSIONS_VERSION"
-          
-          # 确保我们使用的是3.x版本
-          if [[ "$PERMISSIONS_VERSION" == *"3."* ]]; then
-            echo "✅ 使用3.x版本的React Native Permissions，但仍需处理podspec路径问题"
-          else
-            echo "⚠️ 警告：非3.x版本的React Native Permissions可能需要额外修复"
-          fi
-          
-          # 调试文件结构
-          echo "调试react-native-permissions目录结构:"
-          ls -la ./node_modules/react-native-permissions/ || echo "目录不存在"
-          echo "检查podspec文件位置:"
-          find ./node_modules -name "RNPermissions.podspec" || echo "找不到podspec文件"
-          
-          # 关键修复：确保podspec文件在iOS子目录中
-          RN_PERMISSIONS_DIR="./node_modules/react-native-permissions"
-          if [ -f "${RN_PERMISSIONS_DIR}/RNPermissions.podspec" ]; then
-            echo "找到podspec文件，创建ios子目录副本..."
-            mkdir -p "${RN_PERMISSIONS_DIR}/ios"
-            cp "${RN_PERMISSIONS_DIR}/RNPermissions.podspec" "${RN_PERMISSIONS_DIR}/ios/"
-            echo "✅ podspec已复制到ios目录: ${RN_PERMISSIONS_DIR}/ios/RNPermissions.podspec"
-            
-            # 验证复制成功
-            ls -la "${RN_PERMISSIONS_DIR}/ios/" || echo "复制后ios目录不存在"
-          else
-            echo "❌ 严重错误：找不到RNPermissions.podspec文件"
-            find ./node_modules -name "*.podspec" | head -10
-            exit 1
-          fi
-          
-          # 为了安全起见，确保Podfile配置正确
-          cd ios
-          
-          # 备份原始Podfile
-          cp Podfile Podfile.backup
-          
-          # 检查并修改Podfile（如果需要）
-          if ! grep -q "RCT_NEW_ARCH_ENABLED.*0" Podfile; then
-            echo "修改Podfile以确保禁用新架构..."
-            echo "# 确保禁用新架构 - 自动添加" >> Podfile
-            echo "ENV['RCT_NEW_ARCH_ENABLED'] = '0'" >> Podfile
-          else
-            echo "✅ Podfile已正确配置新架构设置"
-          fi
-          
-          # 修复方案：尝试添加手动权限pod配置
-          if ! grep -q "RNPermissions.*:path" Podfile; then
-            echo "添加手动权限pod配置..."
-            echo "" >> Podfile
-            echo "# 手动添加权限库配置" >> Podfile
-            echo "  pod 'RNPermissions', :path => '../node_modules/react-native-permissions'" >> Podfile
-            echo "  pod 'Permission-Camera', :path => '../node_modules/react-native-permissions'" >> Podfile
-            echo "  pod 'Permission-Microphone', :path => '../node_modules/react-native-permissions'" >> Podfile
-            echo "  pod 'Permission-PhotoLibrary', :path => '../node_modules/react-native-permissions'" >> Podfile
-            echo "  pod 'Permission-LocationWhenInUse', :path => '../node_modules/react-native-permissions'" >> Podfile
-          fi
-          
-          echo "修改后的Podfile末尾内容:"
-          tail -20 Podfile
-          
-          echo "✅ React Native Permissions配置完成"
-
-      # 添加一个调试步骤来检查CocoaPods环境
-      - name: 调试CocoaPods环境
+      # 有选择地执行自定义修复脚本，避免重复
+      - name: 检查是否需要执行自定义修复脚本
         run: |
-          echo "=== 调试CocoaPods环境 ==="
+          echo "=== 检查是否需要执行自定义修复脚本 ==="
           
-          # 检查Pod环境
-          pod --version
-          pod env
+          # 确认已移除react-native-svg
+          SVG_VERSION=$(node -e "try { console.log(require('./package.json').dependencies['react-native-svg'] || '未安装') } catch (e) { console.log('未安装') }")
+          echo "检测到React Native SVG版本: $SVG_VERSION"
           
-          # 检查react-native-permissions的podspec
-          cd node_modules/react-native-permissions
-          echo "react-native-permissions目录内容:"
-          ls -la
-          
-          if [ -f "RNPermissions.podspec" ]; then
-            echo "根目录podspec内容预览:"
-            head -20 RNPermissions.podspec
-            
-            # 确保iOS目录存在
-            mkdir -p ios
-            cp RNPermissions.podspec ios/
-            echo "✅ 已复制podspec到ios目录"
-            ls -la ios/
+          if [ "$SVG_VERSION" != "未安装" ]; then
+            echo "⚠️ 警告: 仍然检测到react-native-svg依赖，但我们已使用react-native-vector-icons替代"
           else
-            echo "❌ 警告：根目录中找不到podspec文件"
+            echo "✅ 已成功移除react-native-svg依赖"
           fi
           
-          # 返回到workspace根目录
-          cd ../..
+          # 跳过所有SVG相关检查
+          echo "已使用react-native-vector-icons替代SVG，跳过相关修复步骤"
           
-          # 检查Podfile是否引用了这个路径
+          echo "继续使用工作流内置的修复步骤..."
+
+      - name: 修复依赖包架构配置
+        run: |
+          echo "=== 修复依赖包的新架构配置 ==="
+          
+          # 执行全局修复脚本
+          echo "执行全局修复脚本..."
+          node fix-fabric-modules.js
+          
+          # 1. 修复 react-native-safe-area-context
+          SAFE_AREA_DIR="node_modules/react-native-safe-area-context"
+          if [ -d "$SAFE_AREA_DIR" ]; then
+            echo "修复 react-native-safe-area-context..."
+            
+            # 1.1 备份并修改RNCSafeAreaContext.mm文件，移除所有新架构相关代码
+            MM_FILE="$SAFE_AREA_DIR/ios/RNCSafeAreaContext.mm"
+            if [ -f "$MM_FILE" ]; then
+              cp "$MM_FILE" "${MM_FILE}.bak"
+              
+              # 1.1.1 注释掉新架构相关的import
+              sed -i '' 's/#import <safeareacontext\/safeareacontext.h>/\/\/#import <safeareacontext\/safeareacontext.h>/' "$MM_FILE"
+              
+              # 1.1.2 将facebook::react::命名空间使用注释掉
+              sed -i '' 's/using namespace facebook::react;/\/\/using namespace facebook::react;/' "$MM_FILE"
+              
+              # 1.1.3 注释掉TurboModule相关方法
+              sed -i '' '/getTurboModule:/,/}/s/^/\/\//' "$MM_FILE"
+
+              # 1.1.4 直接注释掉NativeSafeAreaContextSpec协议
+              sed -i '' 's/<NativeSafeAreaContextSpec>/\/\*<NativeSafeAreaContextSpec>\*\//' "$MM_FILE"
+              
+              echo "已修复 RNCSafeAreaContext.mm"
+            fi
+            
+            # 1.2 创建空的头文件夹和头文件(如果需要)
+            mkdir -p "$SAFE_AREA_DIR/ios/build/generated/ios/safeareacontext"
+            touch "$SAFE_AREA_DIR/ios/build/generated/ios/safeareacontext/safeareacontext.h"
+            
+            # 1.3 修改头文件，移除新架构相关的接口
+            H_FILE="$SAFE_AREA_DIR/ios/RNCSafeAreaContext.h"
+            if [ -f "$H_FILE" ]; then
+              cp "$H_FILE" "${H_FILE}.bak"
+              # 移除TurboModule相关内容
+              sed -i '' '/RCTTurboModule/d' "$H_FILE"
+              sed -i '' '/<NativeSafeAreaContextSpec>/d' "$H_FILE"
+            fi
+            
+            # 1.4 添加.xcode.env.local文件以确保正确禁用新架构
+            echo 'ENV["RCT_NEW_ARCH_ENABLED"] = "0"' > ios/.xcode.env.local
+
+            # 1.5 尝试创建一个空的NativeSafeAreaContextSpec.h文件作为备用
+            mkdir -p "$SAFE_AREA_DIR/ios/safeareacontext"
+            echo "// 空的协议声明用于修复编译问题" > "$SAFE_AREA_DIR/ios/safeareacontext/safeareacontext.h"
+            echo "#pragma once" >> "$SAFE_AREA_DIR/ios/safeareacontext/safeareacontext.h"
+            echo "#include <React/RCTBridgeModule.h>" >> "$SAFE_AREA_DIR/ios/safeareacontext/safeareacontext.h"
+            echo "@protocol NativeSafeAreaContextSpec <NSObject>" >> "$SAFE_AREA_DIR/ios/safeareacontext/safeareacontext.h"
+            echo "@end" >> "$SAFE_AREA_DIR/ios/safeareacontext/safeareacontext.h"
+          fi
+          
+          # 2. 手动禁用所有第三方库的新架构支持
+          echo "=== 禁用第三方库的新架构支持 ==="
+          for PODSPEC in $(find node_modules -name "*.podspec" -type f); do
+            if grep -q "fabric_enabled" "$PODSPEC"; then
+              echo "发现使用新架构的库: $PODSPEC"
+              cp "$PODSPEC" "${PODSPEC}.bak"
+              # 替换fabric_enabled = true为false
+              sed -i '' 's/fabric_enabled\s*=\s*true/fabric_enabled = false/g' "$PODSPEC"
+              # 删除React-RCTFabric依赖
+              sed -i '' '/React-RCTFabric/d' "$PODSPEC"
+              echo "已修复: $PODSPEC"
+            fi
+          done
+          
+          # 3. 为所有新架构相关代码添加条件编译
+          echo "=== 为新架构代码添加条件编译 ==="
+          for FILE in $(grep -l "RCTViewComponentView" --include="*.h" --include="*.m" --include="*.mm" -r "node_modules"); do
+            echo "为文件添加条件编译: $FILE"
+            cp "$FILE" "${FILE}.bak"
+            sed -i '' 's/#import <React\/RCTViewComponentView.h>/#if RCT_NEW_ARCH_ENABLED\n#import <React\/RCTViewComponentView.h>\n#endif/g' "$FILE"
+          done
+          
+          # 4. 修复React Native核心代码中的问题
+          echo "=== 修复React Native核心代码中的Fabric相关问题 ==="
+          # 4.1 修复RCTUnimplementedViewComponentView
+          UNIMPL_HEADER="node_modules/react-native/React/Fabric/Mounting/ComponentViews/UnimplementedView/RCTUnimplementedViewComponentView.h"
+          UNIMPL_MM="node_modules/react-native/React/Fabric/Mounting/ComponentViews/UnimplementedView/RCTUnimplementedViewComponentView.mm"
+          
+          if [ -f "$UNIMPL_HEADER" ]; then
+            echo "修复 RCTUnimplementedViewComponentView.h..."
+            cp "$UNIMPL_HEADER" "${UNIMPL_HEADER}.bak"
+            # 在文件顶部添加条件编译
+            echo '#if RCT_NEW_ARCH_ENABLED' | cat - "$UNIMPL_HEADER" > temp && mv temp "$UNIMPL_HEADER"
+            # 在文件末尾添加条件编译结束
+            echo "#endif // RCT_NEW_ARCH_ENABLED" >> "$UNIMPL_HEADER"
+          fi
+          
+          if [ -f "$UNIMPL_MM" ]; then
+            echo "修复 RCTUnimplementedViewComponentView.mm..."
+            cp "$UNIMPL_MM" "${UNIMPL_MM}.bak"
+            # 在文件顶部添加条件编译
+            echo '#if RCT_NEW_ARCH_ENABLED' | cat - "$UNIMPL_MM" > temp && mv temp "$UNIMPL_MM"
+            # 在文件末尾添加条件编译结束
+            echo "#endif // RCT_NEW_ARCH_ENABLED" >> "$UNIMPL_MM"
+          fi
+
+      - name: 应用所有必要补丁
+        id: apply-patches
+        run: |
+          echo "=== 应用所有必要补丁 ==="
+          START_TIME=$(date +%s)
+          
+          # Patch 1: FuseboxTracer.cpp for C++ compatibility
+          if [ -f "node_modules/react-native/ReactCommon/reactperflogger/fusebox/FuseboxTracer.cpp" ]; then
+            echo "1️⃣ 修补 FuseboxTracer.cpp..."
+            perl -pi -e "s/!trackIdMap\.contains\(([^)]+)\)/trackIdMap.find(\$1) == trackIdMap.end()/g" node_modules/react-native/ReactCommon/reactperflogger/fusebox/FuseboxTracer.cpp
+            perl -pi -e "s/trackIdMap\.contains\(([^)]+)\)/trackIdMap.find(\$1) != trackIdMap.end()/g" node_modules/react-native/ReactCommon/reactperflogger/fusebox/FuseboxTracer.cpp
+          else
+            echo "⚠️ 警告: 找不到 FuseboxTracer.cpp 文件，跳过修补"
+          fi
+
+          # Patch 2: react-native-screens constexpr bug
+          if [ -f "node_modules/react-native-screens/ios/RNSScreenStackHeaderConfig.mm" ]; then
+            echo "2️⃣ 修补 RNSScreenStackHeaderConfig.mm..."
+            sed -i '' 's/static constexpr auto DEFAULT_TITLE_FONT_SIZE = @17;/static NSNumber* const DEFAULT_TITLE_FONT_SIZE = @17;/g' node_modules/react-native-screens/ios/RNSScreenStackHeaderConfig.mm
+            sed -i '' 's/static constexpr auto DEFAULT_TITLE_LARGE_FONT_SIZE = @34;/static NSNumber* const DEFAULT_TITLE_LARGE_FONT_SIZE = @34;/g' node_modules/react-native-screens/ios/RNSScreenStackHeaderConfig.mm
+          else
+            echo "⚠️ 警告: 找不到 RNSScreenStackHeaderConfig.mm 文件，跳过修补"
+          fi
+          
+          # Patch 3: RNSScreenStackHeaderConfig.h nullable warning
+          if [ -f "node_modules/react-native-screens/ios/RNSScreenStackHeaderConfig.h" ]; then
+            echo "3️⃣ 修补 RNSScreenStackHeaderConfig.h 添加 _Nullable/_Nonnull 修饰符..."
+            sed -i '' 's/@property (nonatomic, weak) RNSScreenView \*screenView;/@property (nonatomic, weak) RNSScreenView * _Nullable screenView;/g' node_modules/react-native-screens/ios/RNSScreenStackHeaderConfig.h
+          else
+            echo "⚠️ 警告: 找不到 RNSScreenStackHeaderConfig.h 文件，跳过修补"
+          fi
+          
+          # Patch 4: 修复React/UIView.h错误导入问题
+          SVG_VIEW_PATH="node_modules/react-native-svg/apple/Elements/RNSVGSvgView.h"
+          if [ -f "$SVG_VIEW_PATH" ]; then
+            echo "4️⃣ 修补 RNSVGSvgView.h 导入错误..."
+            # 创建备份
+            cp "$SVG_VIEW_PATH" "${SVG_VIEW_PATH}.bak"
+            # 替换错误的导入
+            sed -i '' 's/#import <React\/UIView.h>/#import <UIKit\/UIView.h>/g' "$SVG_VIEW_PATH"
+            echo "✅ 已修复 $SVG_VIEW_PATH"
+            
+            # 在React目录下创建UIView.h占位符
+            mkdir -p "node_modules/react-native/React"
+            echo "// 占位符: 这个文件应该从UIKit导入, 而不是从React" > "node_modules/react-native/React/UIView.h"
+            echo "#import <UIKit/UIView.h>" >> "node_modules/react-native/React/UIView.h"
+            echo "✅ 已创建React/UIView.h占位符"
+          else
+            echo "⚠️ 警告: 找不到 RNSVGSvgView.h 文件，跳过修补"
+          fi
+          
+          # 递归搜索和修复所有错误导入
+          echo "5️⃣ 全局搜索和修复React/UIView.h错误导入..."
+          find ./node_modules/react-native-svg -type f -name "*.h" -o -name "*.m" -o -name "*.mm" | xargs grep -l "React/UIView.h" 2>/dev/null | while read file; do
+            echo "修复文件: $file"
+            sed -i '' 's/#import <React\/UIView.h>/#import <UIKit\/UIView.h>/g' "$file"
+          done
+          echo "✅ 完成全局修复"
+          
+          # Patch 5: 自动修复所有使用Fabric的MM文件
+          echo "6️⃣ 批量修复所有使用Fabric的SVG文件..."
+          
+          # 查找所有包含facebook::react的文件
+          FABRIC_FILES=$(find ./node_modules/react-native-svg -name "*.mm" | xargs grep -l "facebook::react" 2>/dev/null || true)
+          
+          for file in $FABRIC_FILES; do
+            echo "修复Fabric文件: $file"
+            
+            # 获取对应的头文件路径
+            header_file=${file/.mm/.h}
+            
+            # 如果头文件存在，读取类名
+            if [ -f "$header_file" ]; then
+              # 提取类名 - 尝试从@interface行获取
+              CLASS_NAME=$(grep -m 1 "@interface" "$header_file" | awk '{print $2}')
+              echo "检测到类名: $CLASS_NAME"
+              
+              # 备份原始文件
+              cp "$file" "${file}.original"
+              
+              # 创建简化实现
+              {
+                echo '/**'
+                echo ' * Copyright (c) 2015-present, Horcrux.'
+                echo ' * All rights reserved.'
+                echo ' *'
+                echo ' * This source code is licensed under the MIT-style license found in the'
+                echo ' * LICENSE file in the root directory of this source tree.'
+                echo ' */'
+                echo ''
+                echo "#import \"${CLASS_NAME}.h\""
+                echo '#import <React/RCTLog.h>'
+                echo ''
+                echo "@implementation ${CLASS_NAME}"
+                echo ''
+                echo '// 简化实现以避免Fabric架构错误'
+                echo "@end"
+              } > "$file"
+              
+              echo "✅ 已简化文件: $file"
+            else
+              echo "⚠️ 找不到对应的头文件: $header_file，无法自动修复"
+            fi
+          done
+          
+          # 特殊处理RNSVGTextPath.mm文件
+          TEXT_PATH_FILE="node_modules/react-native-svg/apple/Text/RNSVGTextPath.mm"
+          if [ -f "$TEXT_PATH_FILE" ]; then
+            echo "7️⃣ 特殊处理RNSVGTextPath.mm文件..."
+            cp "$TEXT_PATH_FILE" "${TEXT_PATH_FILE}.bak"
+            
+            # 创建最小化实现
+            echo '/**' > "$TEXT_PATH_FILE"
+            echo ' * Copyright (c) 2015-present, Horcrux.' >> "$TEXT_PATH_FILE"
+            echo ' * All rights reserved.' >> "$TEXT_PATH_FILE"
+            echo ' *' >> "$TEXT_PATH_FILE"
+            echo ' * This source code is licensed under the MIT-style license found in the' >> "$TEXT_PATH_FILE"
+            echo ' * LICENSE file in the root directory of this source tree.' >> "$TEXT_PATH_FILE"
+            echo ' */' >> "$TEXT_PATH_FILE"
+            echo '' >> "$TEXT_PATH_FILE"
+            echo '#import "RNSVGTextPath.h"' >> "$TEXT_PATH_FILE"
+            echo '#import <React/RCTLog.h>' >> "$TEXT_PATH_FILE"
+            echo '' >> "$TEXT_PATH_FILE"
+            echo '@implementation RNSVGTextPath' >> "$TEXT_PATH_FILE"
+            echo '' >> "$TEXT_PATH_FILE"
+            echo '- (void)setHref:(NSString *)href' >> "$TEXT_PATH_FILE"
+            echo '{' >> "$TEXT_PATH_FILE"
+            echo '    if ([href isEqualToString:_href]) {' >> "$TEXT_PATH_FILE"
+            echo '        return;' >> "$TEXT_PATH_FILE"
+            echo '    }' >> "$TEXT_PATH_FILE"
+            echo '    [self invalidate];' >> "$TEXT_PATH_FILE"
+            echo '    _href = href;' >> "$TEXT_PATH_FILE"
+            echo '}' >> "$TEXT_PATH_FILE"
+            echo '' >> "$TEXT_PATH_FILE"
+            echo '- (void)setStartOffset:(RNSVGLength *)startOffset' >> "$TEXT_PATH_FILE"
+            echo '{' >> "$TEXT_PATH_FILE"
+            echo '    if ([startOffset isEqualTo:_startOffset]) {' >> "$TEXT_PATH_FILE"
+            echo '        return;' >> "$TEXT_PATH_FILE"
+            echo '    }' >> "$TEXT_PATH_FILE"
+            echo '    [self invalidate];' >> "$TEXT_PATH_FILE"
+            echo '    _startOffset = startOffset;' >> "$TEXT_PATH_FILE"
+            echo '}' >> "$TEXT_PATH_FILE"
+            echo '' >> "$TEXT_PATH_FILE"
+            echo '- (void)setMethod:(enum RNSVGTextPathMethod)method' >> "$TEXT_PATH_FILE"
+            echo '{' >> "$TEXT_PATH_FILE"
+            echo '    if (method == _method) {' >> "$TEXT_PATH_FILE"
+            echo '        return;' >> "$TEXT_PATH_FILE"
+            echo '    }' >> "$TEXT_PATH_FILE"
+            echo '    [self invalidate];' >> "$TEXT_PATH_FILE"
+            echo '    _method = method;' >> "$TEXT_PATH_FILE"
+            echo '}' >> "$TEXT_PATH_FILE"
+            echo '' >> "$TEXT_PATH_FILE"
+            echo '- (void)setMidLine:(enum RNSVGTextPathMidLine)midLine' >> "$TEXT_PATH_FILE"
+            echo '{' >> "$TEXT_PATH_FILE"
+            echo '    if (midLine == _midLine) {' >> "$TEXT_PATH_FILE"
+            echo '        return;' >> "$TEXT_PATH_FILE"
+            echo '    }' >> "$TEXT_PATH_FILE"
+            echo '    [self invalidate];' >> "$TEXT_PATH_FILE"
+            echo '    _midLine = midLine;' >> "$TEXT_PATH_FILE"
+            echo '}' >> "$TEXT_PATH_FILE"
+            echo '' >> "$TEXT_PATH_FILE"
+            echo '- (void)setSpacing:(enum RNSVGTextPathSpacing)spacing' >> "$TEXT_PATH_FILE"
+            echo '{' >> "$TEXT_PATH_FILE"
+            echo '    if (spacing == _spacing) {' >> "$TEXT_PATH_FILE"
+            echo '        return;' >> "$TEXT_PATH_FILE"
+            echo '    }' >> "$TEXT_PATH_FILE"
+            echo '    [self invalidate];' >> "$TEXT_PATH_FILE"
+            echo '    _spacing = spacing;' >> "$TEXT_PATH_FILE"
+            echo '}' >> "$TEXT_PATH_FILE"
+            echo '' >> "$TEXT_PATH_FILE"
+            echo '- (void)setSide:(enum RNSVGTextPathSide)side' >> "$TEXT_PATH_FILE"
+            echo '{' >> "$TEXT_PATH_FILE"
+            echo '    if (side == _side) {' >> "$TEXT_PATH_FILE"
+            echo '        return;' >> "$TEXT_PATH_FILE"
+            echo '    }' >> "$TEXT_PATH_FILE"
+            echo '    [self invalidate];' >> "$TEXT_PATH_FILE"
+            echo '    _side = side;' >> "$TEXT_PATH_FILE"
+            echo '}' >> "$TEXT_PATH_FILE"
+            echo '' >> "$TEXT_PATH_FILE"
+            echo '@end' >> "$TEXT_PATH_FILE"
+            
+            echo "✅ 已修复 RNSVGTextPath.mm"
+          else
+            echo "⚠️ 找不到 RNSVGTextPath.mm 文件"
+          fi
+          
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          echo "✅ 所有补丁应用完成，耗时: ${DURATION}秒"
+
+      - name: 修复react-native-svg重复文件问题
+        run: |
+          echo "=== 跳过react-native-svg相关修复 ==="
+          
+          # 检查是否已经完全移除react-native-svg
+          if [ ! -d "./node_modules/react-native-svg" ]; then
+            echo "✅ react-native-svg已完全移除，无需修复"
+          else
+            echo "⚠️ 警告: node_modules中仍存在react-native-svg目录，可能是其他依赖项引入的"
+          fi
+          
+      - name: 彻底修复RNSVGUse文件
+        run: |
+          echo "=== 跳过react-native-svg相关修复 ==="
+          echo "已使用react-native-vector-icons替代SVG，无需修复SVG文件"
+          
+      - name: 修复react-native-svg导入问题
+        run: |
+          echo "=== 跳过react-native-svg相关修复 ==="
+          
+          # 创建React缺失头文件占位符
+          echo "创建React缺失的头文件占位符..."
+          mkdir -p "./node_modules/react-native/React"
+          echo "// Empty placeholder for missing header" > "./node_modules/react-native/React/RCTConversions.h"
+          echo "// Empty placeholder for missing header" > "./node_modules/react-native/React/RCTFabricComponentsPlugins.h"
+          
+          echo "✅ 已创建React缺失头文件占位符"
+          
+      - name: 全局修复React Native头文件问题
+        run: |
+          echo "=== 全局修复React Native头文件问题 ==="
+          
+          # 只保留创建必要的头文件目录
+          mkdir -p "./node_modules/react/renderer/components"
+          echo "// Empty placeholder" > "./node_modules/react/renderer/components/ComponentDescriptors.h"
+          
+          echo "✅ 已创建React Renderer组件占位符"
+
+      - name: 修复react-native-svg组件问题
+        run: |
+          echo "=== 跳过react-native-svg组件问题修复 ==="
+          echo "已使用react-native-vector-icons替代SVG，无需修复SVG组件问题"
+          
+      - name: 预处理安全区域上下文库以避免重复头文件
+        run: |
+          echo "=== 预处理安全区域上下文库以避免重复头文件 ==="
+          
+          # 直接删除生成的目录，因为这些文件会导致冲突
+          echo "删除生成的头文件..."
+          rm -rf "./node_modules/react-native-safe-area-context/ios/build"
+          
+          # 如果需要，创建一个空的占位符目录结构，防止构建过程中的路径错误
+          mkdir -p "./node_modules/react-native-safe-area-context/ios/build/generated/ios/safeareacontext"
+          
+          echo "✅ 完成预处理"
+
+      - name: 修复Podfile
+        run: |
+          echo "=== 修复Podfile以确保禁用新架构 ==="
           cd ios
-          echo "Podfile中的权限相关配置:"
-          grep -A 10 "RNPermissions" Podfile || echo "未找到RNPermissions配置"
+          
+          if [ -f "Podfile" ]; then
+            cp Podfile Podfile.bak
+            
+            # 确保环境变量在Podfile中正确设置
+            grep -q "ENV\['RCT_NEW_ARCH_ENABLED'\]" Podfile && \
+              sed -i '' 's/ENV\[\x27RCT_NEW_ARCH_ENABLED\x27\][[:space:]]*=[[:space:]]*\x271\x27/ENV[\x27RCT_NEW_ARCH_ENABLED\x27] = \x270\x27/g' Podfile || \
+              echo "# 强制禁用新架构" >> Podfile
+            
+            # 写入禁用Fabric的配置
+            echo "# 确保禁用新架构" >> Podfile
+            echo "ENV[\"RCT_NEW_ARCH_ENABLED\"] = \"0\"" >> Podfile
+            echo "ENV[\"USE_FABRIC\"] = \"0\"" >> Podfile
+            echo "ENV[\"USE_HERMES\"] = \"0\"" >> Podfile
+            echo "" >> Podfile
+            echo "# 禁用所有Fabric相关设置" >> Podfile
+            echo "\$RCT_NEW_ARCH_ENABLED = false" >> Podfile
+            echo "\$fabric_enabled = false" >> Podfile
+            echo "\$USE_FABRIC = false" >> Podfile
+            echo "\$USE_HERMES = false" >> Podfile
+            echo "\$RCT_FABRIC_ENABLED = false" >> Podfile
+            
+            # 创建ruby函数修复重复文件问题
+            echo "" >> Podfile
+            echo "# 修复重复头文件的函数" >> Podfile
+            echo "def fix_duplicate_headers(installer)" >> Podfile
+            echo "  puts \"正在修复重复头文件...\"" >> Podfile
+            echo "  installer.pods_project.targets.each do |target|" >> Podfile
+            echo "    if target.name == 'RNSVG'" >> Podfile
+            echo "      puts \"修复RNSVG头文件...\"" >> Podfile
+            echo "      # 找到所有的复制头文件阶段" >> Podfile
+            echo "      target.build_phases.each do |phase|" >> Podfile
+            echo "        if phase.is_a?(Xcodeproj::Project::Object::PBXHeadersBuildPhase)" >> Podfile
+            echo "          puts \"处理头文件阶段...\"" >> Podfile
+            echo "          # 查找重复的RNSVGFabricConversions.h文件引用" >> Podfile
+            echo "          fabric_files = phase.files.select do |file|" >> Podfile
+            echo "            file.display_name == 'RNSVGFabricConversions.h'" >> Podfile
+            echo "          end" >> Podfile
+            echo "          if fabric_files.count > 1" >> Podfile
+            echo "            puts \"找到#{fabric_files.count}个重复的RNSVGFabricConversions.h引用，保留第一个，移除其余的...\"" >> Podfile
+            echo "            # 保留第一个，删除其他" >> Podfile
+            echo "            fabric_files[1..-1].each do |file|" >> Podfile
+            echo "              file.remove_from_project" >> Podfile
+            echo "            end" >> Podfile
+            echo "            puts \"已解决重复文件问题\"" >> Podfile
+            echo "          end" >> Podfile
+            echo "        end" >> Podfile
+            echo "      end" >> Podfile
+            echo "    end" >> Podfile
+            echo "  end" >> Podfile
+            echo "end" >> Podfile
+            
+            # 检查是否已有post_install并修改，而不是添加新的
+            if grep -q "post_install" Podfile; then
+              echo "Podfile已包含post_install，将修改而不是添加新的..."
+              
+              # 在post_install块中查找代码插入位置
+              if grep -q "installer.pods_project.targets.each" Podfile; then
+                # 已经有target循环，在合适的位置添加我们的代码
+                SEARCH_PATTERN="post_install do |installer|"
+                INSERT_AFTER_LINE=$(grep -n "$SEARCH_PATTERN" Podfile | head -1 | cut -d: -f1)
+                
+                if [ ! -z "$INSERT_AFTER_LINE" ]; then
+                  # 创建临时文件
+                  cp Podfile Podfile.tmp
+                  HEAD_PART=$(head -n $INSERT_AFTER_LINE Podfile.tmp)
+                  TAIL_PART=$(tail -n +$(($INSERT_AFTER_LINE + 1)) Podfile.tmp)
+                  
+                  # 写入合并后的文件
+                  echo "$HEAD_PART" > Podfile
+                  echo "  # 修复重复头文件" >> Podfile
+                  echo "  fix_duplicate_headers(installer)" >> Podfile
+                  echo "$TAIL_PART" >> Podfile
+                  
+                  echo "✅ 成功在post_install开头添加修复重复头文件的代码"
+                fi
+              else
+                # 找不到插入点，使用sed替换
+                sed -i '' '/post_install do |installer|/a\
+                \ \ # 修复重复头文件\
+                \ \ fix_duplicate_headers(installer)
+                ' Podfile
+              fi
+            else
+              # 没有现有的post_install，可以安全地添加一个新的
+              echo "" >> Podfile
+              echo "# 添加自定义头文件搜索路径" >> Podfile
+              echo "post_install do |installer|" >> Podfile
+              echo "  # 修复重复头文件" >> Podfile
+              echo "  fix_duplicate_headers(installer)" >> Podfile
+              echo "  installer.pods_project.targets.each do |target|" >> Podfile
+              echo "    if target.name == 'react-native-safe-area-context'" >> Podfile
+              echo "      target.build_configurations.each do |config|" >> Podfile
+              echo "        config.build_settings['HEADER_SEARCH_PATHS'] ||= ''" >> Podfile
+              echo "        config.build_settings['HEADER_SEARCH_PATHS'] << ' \$(PODS_ROOT)/../../node_modules/react-native-safe-area-context/ios'" >> Podfile
+              echo "        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= '$(inherited)'" >> Podfile
+              echo "        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << ' RCT_NEW_ARCH_ENABLED=0'" >> Podfile
+              echo "      end" >> Podfile
+              echo "    end" >> Podfile
+              echo "  end" >> Podfile
+              echo "end" >> Podfile
+            fi
+            
+            echo "Podfile已修复，内容:"
+            cat Podfile | tail -n 20
+          else
+            echo "⚠️ 警告: 找不到Podfile"
+          fi
 
       - name: 安装CocoaPods依赖
         run: |
