@@ -148,28 +148,19 @@ function createRCTViewComponentViewImplementation() {
   return implPath;
 }
 
-// 复制到其他可能需要的位置
+// 复制到其他位置（修复版本：避免 Xcode 构建冲突）
 function copyToAdditionalLocations(headerPath, implPath) {
-  const additionalLocations = [
-    'React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.h',
-    'React/Fabric/RCTViewComponentView.h'
-  ];
+  // 注释：删除额外复制以避免 "Multiple commands produce" 错误
+  // 只保留主要文件位置：React/RCTViewComponentView.h
+  // 
+  // 之前的额外位置导致 Xcode 构建冲突：
+  // - React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.h
+  // - React/Fabric/RCTViewComponentView.h
+  // 
+  // 这些文件会被 React-RCTFabric 目标复制到同一个框架头文件目录，导致冲突
   
-  additionalLocations.forEach(location => {
-    const targetPath = path.join(reactNativePath, location);
-    const targetDir = path.dirname(targetPath);
-    
-    try {
-      if (!fs.existsSync(targetDir)) {
-        fs.mkdirSync(targetDir, { recursive: true });
-      }
-      
-      fs.copyFileSync(headerPath, targetPath);
-      console.log(`✅ 复制到: ${targetPath}`);
-    } catch (error) {
-      console.log(`⚠️  无法复制到 ${targetPath}: ${error.message}`);
-    }
-  });
+  console.log(`✅ 跳过额外复制（避免 Xcode 构建冲突）`);
+  console.log(`✅ 主文件位置已足够: ${headerPath}`);
 }
 
 // 主执行函数
