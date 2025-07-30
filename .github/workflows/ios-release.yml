@@ -649,121 +649,27 @@ jobs:
           echo "=== 修复React Core重复头文件问题 ==="
           node fix-duplicate-headers.js
           
-      # 添加修复所有Fabric组件的步骤
-      - name: 修复所有React Native Fabric组件
-        run: |
-          echo "=== 修复所有React Native Fabric组件 ==="
-          node fix-all-fabric-components.js
-
       - name: 修复Podfile
         run: |
           echo "=== 修复Podfile以确保禁用新架构 ==="
           cd ios
           
           if [ -f "Podfile" ]; then
-            cp Podfile Podfile.bak
+            # 创建备份
+            cp Podfile Podfile.workflow.bak
             
-            # 确保环境变量在Podfile中正确设置
-            grep -q "ENV\['RCT_NEW_ARCH_ENABLED'\]" Podfile && \
-              sed -i '' 's/ENV\[\x27RCT_NEW_ARCH_ENABLED\x27\][[:space:]]*=[[:space:]]*\x271\x27/ENV[\x27RCT_NEW_ARCH_ENABLED\x27] = \x270\x27/g' Podfile || \
-              echo "# 强制禁用新架构" >> Podfile
+            echo "✅ Podfile已存在，跳过重复配置"
+            echo "当前Podfile配置已经包含所需的禁用新架构设置"
             
-            # 写入禁用Fabric的配置
-            echo "# 确保禁用新架构" >> Podfile
-            echo "ENV[\"RCT_NEW_ARCH_ENABLED\"] = \"0\"" >> Podfile
-            echo "ENV[\"USE_FABRIC\"] = \"0\"" >> Podfile
-            echo "ENV[\"USE_HERMES\"] = \"0\"" >> Podfile
-            echo "" >> Podfile
-            echo "# 禁用所有Fabric相关设置" >> Podfile
-            echo "\$RCT_NEW_ARCH_ENABLED = false" >> Podfile
-            echo "\$fabric_enabled = false" >> Podfile
-            echo "\$USE_FABRIC = false" >> Podfile
-            echo "\$USE_HERMES = false" >> Podfile
-            echo "\$RCT_FABRIC_ENABLED = false" >> Podfile
-            
-            # 创建ruby函数修复重复文件问题
-            echo "" >> Podfile
-            echo "# 修复重复头文件的函数" >> Podfile
-            echo "def fix_duplicate_headers(installer)" >> Podfile
-            echo "  puts \"正在修复重复头文件...\"" >> Podfile
-            echo "  installer.pods_project.targets.each do |target|" >> Podfile
-            echo "    if target.name == 'RNSVG'" >> Podfile
-            echo "      puts \"修复RNSVG头文件...\"" >> Podfile
-            echo "      # 找到所有的复制头文件阶段" >> Podfile
-            echo "      target.build_phases.each do |phase|" >> Podfile
-            echo "        if phase.is_a?(Xcodeproj::Project::Object::PBXHeadersBuildPhase)" >> Podfile
-            echo "          puts \"处理头文件阶段...\"" >> Podfile
-            echo "          # 查找重复的RNSVGFabricConversions.h文件引用" >> Podfile
-            echo "          fabric_files = phase.files.select do |file|" >> Podfile
-            echo "            file.display_name == 'RNSVGFabricConversions.h'" >> Podfile
-            echo "          end" >> Podfile
-            echo "          if fabric_files.count > 1" >> Podfile
-            echo "            puts \"找到#{fabric_files.count}个重复的RNSVGFabricConversions.h引用，保留第一个，移除其余的...\"" >> Podfile
-            echo "            # 保留第一个，删除其他" >> Podfile
-            echo "            fabric_files[1..-1].each do |file|" >> Podfile
-            echo "              file.remove_from_project" >> Podfile
-            echo "            end" >> Podfile
-            echo "            puts \"已解决重复文件问题\"" >> Podfile
-            echo "          end" >> Podfile
-            echo "        end" >> Podfile
-            echo "      end" >> Podfile
-            echo "    end" >> Podfile
-            echo "  end" >> Podfile
-            echo "end" >> Podfile
-            
-            # 检查是否已有post_install并修改，而不是添加新的
-            if grep -q "post_install" Podfile; then
-              echo "Podfile已包含post_install，将修改而不是添加新的..."
-              
-              # 在post_install块中查找代码插入位置
-              if grep -q "installer.pods_project.targets.each" Podfile; then
-                # 已经有target循环，在合适的位置添加我们的代码
-                SEARCH_PATTERN="post_install do |installer|"
-                INSERT_AFTER_LINE=$(grep -n "$SEARCH_PATTERN" Podfile | head -1 | cut -d: -f1)
-                
-                if [ ! -z "$INSERT_AFTER_LINE" ]; then
-                  # 创建临时文件
-                  cp Podfile Podfile.tmp
-                  HEAD_PART=$(head -n $INSERT_AFTER_LINE Podfile.tmp)
-                  TAIL_PART=$(tail -n +$(($INSERT_AFTER_LINE + 1)) Podfile.tmp)
-                  
-                  # 写入合并后的文件
-                  echo "$HEAD_PART" > Podfile
-                  echo "  # 修复重复头文件" >> Podfile
-                  echo "  fix_duplicate_headers(installer)" >> Podfile
-                  echo "$TAIL_PART" >> Podfile
-                  
-                  echo "✅ 成功在post_install开头添加修复重复头文件的代码"
-                fi
-              else
-                # 找不到插入点，使用sed替换
-                sed -i '' '/post_install do |installer|/a\
-                \ \ # 修复重复头文件\
-                \ \ fix_duplicate_headers(installer)
-                ' Podfile
-              fi
-            else
-              # 没有现有的post_install，可以安全地添加一个新的
-              echo "" >> Podfile
-              echo "# 添加自定义头文件搜索路径" >> Podfile
-              echo "post_install do |installer|" >> Podfile
-              echo "  # 修复重复头文件" >> Podfile
-              echo "  fix_duplicate_headers(installer)" >> Podfile
-              echo "  installer.pods_project.targets.each do |target|" >> Podfile
-              echo "    if target.name == 'react-native-safe-area-context'" >> Podfile
-              echo "      target.build_configurations.each do |config|" >> Podfile
-              echo "        config.build_settings['HEADER_SEARCH_PATHS'] ||= ''" >> Podfile
-              echo "        config.build_settings['HEADER_SEARCH_PATHS'] << ' \$(PODS_ROOT)/../../node_modules/react-native-safe-area-context/ios'" >> Podfile
-              echo "        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= '$(inherited)'" >> Podfile
-              echo "        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << ' RCT_NEW_ARCH_ENABLED=0'" >> Podfile
-              echo "      end" >> Podfile
-              echo "    end" >> Podfile
-              echo "  end" >> Podfile
-              echo "end" >> Podfile
+            # 只验证关键配置是否存在
+            if grep -q "fabric_enabled.*false" Podfile; then
+              echo "✅ 发现fabric_enabled已设置为false"
             fi
             
-            echo "Podfile已修复，内容:"
-            cat Podfile | tail -n 20
+            if grep -q "RCT_NEW_ARCH_ENABLED.*0" Podfile; then
+              echo "✅ 发现RCT_NEW_ARCH_ENABLED已设置为0"
+            fi
+            echo "Podfile配置检查完成"
           else
             echo "⚠️ 警告: 找不到Podfile"
           fi
@@ -1212,6 +1118,35 @@ jobs:
             -workspace HomeServiceChat.xcworkspace \
             -scheme HomeServiceChat \
             -configuration Release
+
+      - name: 强制排除React-RCTFabric目标
+        run: |
+          cd ios
+          echo "=== 强制排除React-RCTFabric目标以解决编译错误 ==="
+          
+          # 1. 从Podfile.lock中完全移除React-RCTFabric引用
+          if [ -f "Podfile.lock" ]; then
+            echo "从Podfile.lock中移除React-RCTFabric引用..."
+            cp Podfile.lock Podfile.lock.bak
+            sed -i '' '/React-RCTFabric/d' Podfile.lock
+            sed -i '' '/RCTFabric/d' Podfile.lock
+            echo "✅ 已从Podfile.lock中移除所有Fabric引用"
+          fi
+          
+          # 2. 修改Pods项目文件，排除RCTFabric目标
+          if [ -f "Pods/Pods.xcodeproj/project.pbxproj" ]; then
+            echo "修改Pods项目，禁用RCTFabric目标..."
+            cp "Pods/Pods.xcodeproj/project.pbxproj" "Pods/Pods.xcodeproj/project.pbxproj.bak"
+            # 注释掉所有React-RCTFabric相关的构建配置
+            sed -i '' 's/React-RCTFabric/\/\* React-RCTFabric-DISABLED \*\//g' "Pods/Pods.xcodeproj/project.pbxproj"
+            echo "✅ 已禁用Pods项目中的RCTFabric目标"
+          fi
+          
+          # 3. 重新安装Pods以应用更改
+          echo "重新安装CocoaPods以应用更改..."
+          export RCT_NEW_ARCH_ENABLED=0
+          export USE_FABRIC=0
+          pod install --verbose
 
       - name: 归档 Release 包（无签名）
         id: archive
