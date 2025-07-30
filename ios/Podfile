@@ -34,6 +34,29 @@ if linkage != nil
   use_frameworks! :linkage => linkage.to_sym
 end
 
+# 修复重复头文件的函数
+def fix_duplicate_headers(installer)
+    # 禁用React-RCTFabric目标
+    disable_react_fabric_target(installer)
+  puts "正在修复重复头文件..."
+  installer.pods_project.targets.each do |target|
+    if target.name == 'RNPermissions'
+      puts "修复RNPermissions头文件..."
+      # 找到所有的复制头文件阶段
+      target.build_phases.each do |phase|
+        if phase.is_a?(Xcodeproj::Project::Object::PBXHeadersBuildPhase)
+          puts "处理头文件阶段..."
+          # 查找重复的头文件引用
+          duplicate_files = phase.files.group_by(&:display_name).select { |_, v| v.size > 1 }
+          if duplicate_files.any?
+            puts "发现重复头文件: #{duplicate_files.keys.join(', ')}"
+            duplicate_files.each do |name, files|
+              puts "处理重复头文件: #{name} (#{files.count}个实例)"
+              # 保留第一个，删除其他
+              files[1..-1].each do |file|
+                file.remove_from_project
+              end
+
 # 辅助函数：禁用React-RCTFabric目标
 def disable_react_fabric_target(installer)
   puts "禁用React-RCTFabric目标..."
@@ -77,30 +100,6 @@ def disable_react_fabric_target(installer)
     end
   end
 end
-
-# 修复重复头文件的函数
-def fix_duplicate_headers(installer)
-  # 禁用React-RCTFabric目标
-  disable_react_fabric_target(installer)
-  
-  puts "正在修复重复头文件..."
-  installer.pods_project.targets.each do |target|
-    if target.name == 'RNPermissions'
-      puts "修复RNPermissions头文件..."
-      # 找到所有的复制头文件阶段
-      target.build_phases.each do |phase|
-        if phase.is_a?(Xcodeproj::Project::Object::PBXHeadersBuildPhase)
-          puts "处理头文件阶段..."
-          # 查找重复的头文件引用
-          duplicate_files = phase.files.group_by(&:display_name).select { |_, v| v.size > 1 }
-          if duplicate_files.any?
-            puts "发现重复头文件: #{duplicate_files.keys.join(', ')}"
-            duplicate_files.each do |name, files|
-              puts "处理重复头文件: #{name} (#{files.count}个实例)"
-              # 保留第一个，删除其他
-              files[1..-1].each do |file|
-                file.remove_from_project
-              end
             end
           end
         end
