@@ -984,9 +984,8 @@ jobs:
           echo '#endif' >> "$TEXT_IMPL"
           
           # 修复其他常见组件的头文件，确保它们可以找到RCTViewComponentView
-          echo "=== 复制RCTViewComponentView.h到更多位置 ==="
-          mkdir -p "node_modules/react-native/React/Fabric/Mounting/ComponentViews/View"
-          cp "$VIEW_HEADER" "node_modules/react-native/React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.h"
+          echo "=== 跳过手动复制（统一脚本已完成复制） ==="
+          # 注释：统一脚本已经完成了所有必要的文件复制，无需重复操作
           
           # 搜索并修复其他组件
           echo "=== 查找和修复其他依赖RCTViewComponentView的组件 ==="
