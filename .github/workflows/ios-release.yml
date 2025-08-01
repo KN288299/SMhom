@@ -182,6 +182,11 @@ jobs:
           echo "🔧 使用统一脚本创建 RCTViewComponentView 文件..."
           node fix-rct-viewcomponent-unified.js
           echo "✅ 统一脚本执行完成"
+          
+          # 修复原始 React Native Fabric 文件的编译问题
+          echo "🔧 修复原始 Fabric 文件的编译问题..."
+          node fix-fabric-original-files.js
+          echo "✅ 原始 Fabric 文件修复完成"
           echo "已创建 $VIEW_IMPL_TARGET"
 
       # 有选择地执行自定义修复脚本，避免重复
@@ -834,6 +839,11 @@ jobs:
           echo "🔧 运行统一脚本创建关键的React Native文件..."
           node fix-rct-viewcomponent-unified.js
           echo "✅ 统一脚本执行完成，所有关键文件已创建"
+          
+          # 修复原始 React Native Fabric 文件的编译问题
+          echo "🔧 修复原始 Fabric 文件的编译问题..."
+          node fix-fabric-original-files.js
+          echo "✅ 原始 Fabric 文件修复完成"
           
           # 确保RCTViewFinder.mm文件存在
           FINDER_FILE="node_modules/react-native/React/Fabric/Utils/RCTViewFinder.mm"
