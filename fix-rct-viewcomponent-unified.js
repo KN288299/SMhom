@@ -18,10 +18,11 @@ if (!fs.existsSync(reactNativePath)) {
 function createRCTViewComponentViewHeader() {
   const headerPath = path.join(reactNativePath, 'React/RCTViewComponentView.h');
   
-  // 标准的、完整的头文件内容
+  // 标准的、完整的头文件内容（双架构兼容版本）
   const headerContent = `/*
  * 此文件由 fix-rct-viewcomponent-unified.js 创建
  * 统一解决 React Native Fabric 组件兼容性问题
+ * 支持新旧双架构兼容
  * 
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  * This source code is licensed under the MIT license.
@@ -35,9 +36,22 @@ function createRCTViewComponentViewHeader() {
 #define RCT_NEW_ARCH_ENABLED 0
 #endif
 
-// 只在非 Fabric 架构下定义这个类
-#if !RCT_NEW_ARCH_ENABLED
+#if RCT_NEW_ARCH_ENABLED
+// 新架构（Fabric）下的兼容性定义
+#import <React/RCTComponentViewProtocol.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
+@interface RCTViewComponentView : UIView <RCTComponentViewProtocol>
+
+@property (nonatomic, copy, nullable) NSString *nativeId;
+
+@end
+
+NS_ASSUME_NONNULL_END
+
+#else
+// 旧架构下的完整定义
 @interface RCTViewComponentView : UIView
 
 @property (nonatomic, copy, nullable) NSString *nativeId;
@@ -48,7 +62,7 @@ function createRCTViewComponentViewHeader() {
 
 @end
 
-#endif // !RCT_NEW_ARCH_ENABLED
+#endif // RCT_NEW_ARCH_ENABLED
 `;
 
   // 创建目录（如果不存在）
