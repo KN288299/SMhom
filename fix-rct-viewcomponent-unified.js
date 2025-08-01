@@ -129,23 +129,22 @@ const implContent = `/*
 #endif // !RCT_NEW_ARCH_ENABLED
 `;
 
-// 需要创建文件的所有位置
+// 只创建主要位置的文件，避免"Multiple commands produce"错误
 const headerLocations = [
-  // 主要位置
-  'React/RCTViewComponentView.h',
-  // Fabric 架构位置
-  'React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.h',
-  'React/Fabric/RCTViewComponentView.h',
-  // 其他可能的位置
-  'ReactCommon/react/renderer/components/view/RCTViewComponentView.h'
+  // 只保留主要位置，避免Xcode构建冲突
+  'React/RCTViewComponentView.h'
+  // 注释掉会导致冲突的位置：
+  // 'React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.h',
+  // 'React/Fabric/RCTViewComponentView.h',
+  // 'ReactCommon/react/renderer/components/view/RCTViewComponentView.h'
 ];
 
 const implLocations = [
-  // 主要位置
-  'React/RCTViewComponentView.mm',
-  // Fabric 架构位置
-  'React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.mm',
-  'React/Fabric/RCTViewComponentView.mm'
+  // 只保留主要位置
+  'React/RCTViewComponentView.mm'
+  // 注释掉会导致冲突的位置：
+  // 'React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.mm',
+  // 'React/Fabric/RCTViewComponentView.mm'
 ];
 
 // 创建文件的函数
@@ -165,19 +164,42 @@ function createFileAtLocation(relativePath, content, description) {
   return fullPath;
 }
 
+// 删除可能导致冲突的文件
+function removeConflictingFiles() {
+  const conflictingFiles = [
+    'React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.h',
+    'React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.mm',
+    'React/Fabric/RCTViewComponentView.h',
+    'React/Fabric/RCTViewComponentView.mm',
+    'ReactCommon/react/renderer/components/view/RCTViewComponentView.h'
+  ];
+  
+  console.log('\n🗑️ 删除可能导致冲突的文件...');
+  conflictingFiles.forEach(relativePath => {
+    const fullPath = path.join(reactNativePath, relativePath);
+    if (fs.existsSync(fullPath)) {
+      fs.unlinkSync(fullPath);
+      console.log(`✅ 删除冲突文件: ${relativePath}`);
+    }
+  });
+}
+
 // 主执行函数
 function main() {
   try {
     console.log('🚀 开始统一修复 RCTViewComponentView 文件...');
     
-    // 创建所有位置的头文件
-    console.log('\n📄 创建头文件到所有位置...');
+    // 首先删除可能导致冲突的文件
+    removeConflictingFiles();
+    
+    // 创建主要位置的头文件
+    console.log('\n📄 创建头文件（避免冲突）...');
     headerLocations.forEach(location => {
       createFileAtLocation(location, headerContent, 'RCTViewComponentView.h');
     });
     
-    // 创建所有位置的实现文件
-    console.log('\n📄 创建实现文件到所有位置...');
+    // 创建主要位置的实现文件
+    console.log('\n📄 创建实现文件（避免冲突）...');
     implLocations.forEach(location => {
       createFileAtLocation(location, implContent, 'RCTViewComponentView.mm');
     });
@@ -301,7 +323,7 @@ UIView *RCTFindComponentViewWithName(UIView *view, NSString *nativeId);
     console.log(`✅ 创建 RCTViewFinder.h: React/Fabric/Utils/RCTViewFinder.h`);
     
     console.log('\n🎉 RCTViewComponentView 文件统一修复完成！');
-    console.log('\n📋 创建的文件位置:');
+    console.log('\n📋 创建的文件位置（避免冲突版本）:');
     
     console.log('\n头文件:');
     headerLocations.forEach(location => {
@@ -316,6 +338,8 @@ UIView *RCTFindComponentViewWithName(UIView *view, NSString *nativeId);
     console.log('\n修复文件:');
     console.log('   - React/Fabric/Utils/RCTViewFinder.mm');
     console.log('   - React/Fabric/Utils/RCTViewFinder.h');
+    
+    console.log('\n⚠️ 已删除会导致Xcode构建冲突的重复文件');
     
   } catch (error) {
     console.error('❌ 修复过程中出现错误:', error);
