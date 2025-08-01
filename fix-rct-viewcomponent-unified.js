@@ -14,12 +14,8 @@ if (!fs.existsSync(reactNativePath)) {
   process.exit(1);
 }
 
-// 创建标准的 RCTViewComponentView.h 文件
-function createRCTViewComponentViewHeader() {
-  const headerPath = path.join(reactNativePath, 'React/RCTViewComponentView.h');
-  
-  // 标准的、完整的头文件内容（双架构兼容版本）
-  const headerContent = `/*
+// 标准的 RCTViewComponentView.h 文件内容（完全兼容版本）
+const headerContent = `/*
  * 此文件由 fix-rct-viewcomponent-unified.js 创建
  * 统一解决 React Native Fabric 组件兼容性问题
  * 支持新旧双架构兼容
@@ -65,24 +61,8 @@ NS_ASSUME_NONNULL_END
 #endif // RCT_NEW_ARCH_ENABLED
 `;
 
-  // 创建目录（如果不存在）
-  const headerDir = path.dirname(headerPath);
-  if (!fs.existsSync(headerDir)) {
-    fs.mkdirSync(headerDir, { recursive: true });
-  }
-
-  // 写入文件
-  fs.writeFileSync(headerPath, headerContent, 'utf-8');
-  console.log(`✅ 创建标准 RCTViewComponentView.h: ${headerPath}`);
-  
-  return headerPath;
-}
-
-// 创建标准的 RCTViewComponentView.mm 文件
-function createRCTViewComponentViewImplementation() {
-  const implPath = path.join(reactNativePath, 'React/RCTViewComponentView.mm');
-  
-  const implContent = `/*
+// 标准的 RCTViewComponentView.mm 文件内容
+const implContent = `/*
  * 此文件由 fix-rct-viewcomponent-unified.js 创建
  * 统一解决 React Native Fabric 组件兼容性问题
  *
@@ -149,32 +129,40 @@ function createRCTViewComponentViewImplementation() {
 #endif // !RCT_NEW_ARCH_ENABLED
 `;
 
+// 需要创建文件的所有位置
+const headerLocations = [
+  // 主要位置
+  'React/RCTViewComponentView.h',
+  // Fabric 架构位置
+  'React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.h',
+  'React/Fabric/RCTViewComponentView.h',
+  // 其他可能的位置
+  'ReactCommon/react/renderer/components/view/RCTViewComponentView.h'
+];
+
+const implLocations = [
+  // 主要位置
+  'React/RCTViewComponentView.mm',
+  // Fabric 架构位置
+  'React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.mm',
+  'React/Fabric/RCTViewComponentView.mm'
+];
+
+// 创建文件的函数
+function createFileAtLocation(relativePath, content, description) {
+  const fullPath = path.join(reactNativePath, relativePath);
+  const dir = path.dirname(fullPath);
+  
   // 创建目录（如果不存在）
-  const implDir = path.dirname(implPath);
-  if (!fs.existsSync(implDir)) {
-    fs.mkdirSync(implDir, { recursive: true });
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
 
   // 写入文件
-  fs.writeFileSync(implPath, implContent, 'utf-8');
-  console.log(`✅ 创建标准 RCTViewComponentView.mm: ${implPath}`);
+  fs.writeFileSync(fullPath, content, 'utf-8');
+  console.log(`✅ 创建 ${description}: ${relativePath}`);
   
-  return implPath;
-}
-
-// 复制到其他位置（修复版本：避免 Xcode 构建冲突）
-function copyToAdditionalLocations(headerPath, implPath) {
-  // 注释：删除额外复制以避免 "Multiple commands produce" 错误
-  // 只保留主要文件位置：React/RCTViewComponentView.h
-  // 
-  // 之前的额外位置导致 Xcode 构建冲突：
-  // - React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.h
-  // - React/Fabric/RCTViewComponentView.h
-  // 
-  // 这些文件会被 React-RCTFabric 目标复制到同一个框架头文件目录，导致冲突
-  
-  console.log(`✅ 跳过额外复制（避免 Xcode 构建冲突）`);
-  console.log(`✅ 主文件位置已足够: ${headerPath}`);
+  return fullPath;
 }
 
 // 主执行函数
@@ -182,17 +170,152 @@ function main() {
   try {
     console.log('🚀 开始统一修复 RCTViewComponentView 文件...');
     
-    // 创建标准文件
-    const headerPath = createRCTViewComponentViewHeader();
-    const implPath = createRCTViewComponentViewImplementation();
+    // 创建所有位置的头文件
+    console.log('\n📄 创建头文件到所有位置...');
+    headerLocations.forEach(location => {
+      createFileAtLocation(location, headerContent, 'RCTViewComponentView.h');
+    });
     
-    // 复制到其他位置
-    copyToAdditionalLocations(headerPath, implPath);
+    // 创建所有位置的实现文件
+    console.log('\n📄 创建实现文件到所有位置...');
+    implLocations.forEach(location => {
+      createFileAtLocation(location, implContent, 'RCTViewComponentView.mm');
+    });
     
-    console.log('🎉 RCTViewComponentView 文件统一修复完成！');
-    console.log('\n📋 创建的文件:');
-    console.log(`   - ${headerPath}`);
-    console.log(`   - ${implPath}`);
+    // 特别修复 RCTViewFinder.mm 文件，确保它能正确导入 RCTViewComponentView
+    console.log('\n🔧 修复 RCTViewFinder.mm 文件...');
+    const viewFinderPath = path.join(reactNativePath, 'React/Fabric/Utils/RCTViewFinder.mm');
+    const viewFinderDir = path.dirname(viewFinderPath);
+    
+    if (!fs.existsSync(viewFinderDir)) {
+      fs.mkdirSync(viewFinderDir, { recursive: true });
+    }
+    
+    const fixedViewFinderContent = `/*
+ * 修复版本的 RCTViewFinder.mm
+ * 由 fix-rct-viewcomponent-unified.js 创建
+ * 解决 RCTViewComponentView 未声明的错误
+ */
+
+#import <React/RCTDefines.h>
+
+// 确保 RCT_NEW_ARCH_ENABLED 有默认值
+#ifndef RCT_NEW_ARCH_ENABLED
+#define RCT_NEW_ARCH_ENABLED 0
+#endif
+
+#if RCT_NEW_ARCH_ENABLED
+
+#import "RCTViewFinder.h"
+#import <React/RCTViewComponentView.h>
+
+@implementation RCTViewFinder
+
++ (UIView *)findView:(UIView *)root withNativeId:(NSString *)nativeId
+{
+  if (!nativeId) {
+    return nil;
+  }
+
+  if ([root isKindOfClass:[RCTViewComponentView class]] &&
+      [nativeId isEqualToString:((RCTViewComponentView *)root).nativeId]) {
+    return root;
+  }
+
+  for (UIView *subview in root.subviews) {
+    UIView *result = [RCTViewFinder findView:subview withNativeId:nativeId];
+    if (result) {
+      return result;
+    }
+  }
+
+  return nil;
+}
+
+@end
+
+#else
+
+// 旧架构下的简化实现
+#import <UIKit/UIKit.h>
+#import <React/RCTViewComponentView.h>
+
+UIView *RCTFindComponentViewWithName(UIView *view, NSString *nativeId) {
+  if (!nativeId) {
+    return nil;
+  }
+
+  if ([view isKindOfClass:[RCTViewComponentView class]]) {
+    if ([nativeId isEqualToString:((RCTViewComponentView *)view).nativeId]) {
+      return view;
+    }
+  }
+
+  for (UIView *subview in view.subviews) {
+    UIView *result = RCTFindComponentViewWithName(subview, nativeId);
+    if (result != nil) {
+      return result;
+    }
+  }
+
+  return nil;
+}
+
+#endif // RCT_NEW_ARCH_ENABLED
+`;
+
+    fs.writeFileSync(viewFinderPath, fixedViewFinderContent, 'utf-8');
+    console.log(`✅ 修复 RCTViewFinder.mm: React/Fabric/Utils/RCTViewFinder.mm`);
+    
+    // 创建对应的头文件
+    const viewFinderHeaderPath = path.join(reactNativePath, 'React/Fabric/Utils/RCTViewFinder.h');
+    const viewFinderHeaderContent = `/*
+ * RCTViewFinder.h
+ * 由 fix-rct-viewcomponent-unified.js 创建
+ */
+
+#import <React/RCTDefines.h>
+#import <UIKit/UIKit.h>
+
+#ifndef RCT_NEW_ARCH_ENABLED
+#define RCT_NEW_ARCH_ENABLED 0
+#endif
+
+#if RCT_NEW_ARCH_ENABLED
+
+@interface RCTViewFinder : NSObject
+
++ (UIView *)findView:(UIView *)root withNativeId:(NSString *)nativeId;
+
+@end
+
+#else
+
+// 旧架构下的函数声明
+UIView *RCTFindComponentViewWithName(UIView *view, NSString *nativeId);
+
+#endif // RCT_NEW_ARCH_ENABLED
+`;
+
+    fs.writeFileSync(viewFinderHeaderPath, viewFinderHeaderContent, 'utf-8');
+    console.log(`✅ 创建 RCTViewFinder.h: React/Fabric/Utils/RCTViewFinder.h`);
+    
+    console.log('\n🎉 RCTViewComponentView 文件统一修复完成！');
+    console.log('\n📋 创建的文件位置:');
+    
+    console.log('\n头文件:');
+    headerLocations.forEach(location => {
+      console.log(`   - ${location}`);
+    });
+    
+    console.log('\n实现文件:');
+    implLocations.forEach(location => {
+      console.log(`   - ${location}`);
+    });
+    
+    console.log('\n修复文件:');
+    console.log('   - React/Fabric/Utils/RCTViewFinder.mm');
+    console.log('   - React/Fabric/Utils/RCTViewFinder.h');
     
   } catch (error) {
     console.error('❌ 修复过程中出现错误:', error);
@@ -205,4 +328,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { main, createRCTViewComponentViewHeader, createRCTViewComponentViewImplementation }; 
+module.exports = { main }; 

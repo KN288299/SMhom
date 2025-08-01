@@ -97,6 +97,13 @@ jobs:
           echo "=== 修复@react-native-async-storage/async-storage问题 ==="
           node fix-async-storage.js
           
+      # 首先运行增强版RCTViewComponentView修复脚本
+      - name: 运行增强版RCTViewComponentView修复（优先）
+        run: |
+          echo "=== 运行增强版RCTViewComponentView修复脚本（优先） ==="
+          node fix-rct-viewcomponent-unified.js
+          echo "✅ 增强版修复完成，已创建所有必要的Fabric组件文件"
+          
       # 添加修复Fabric组件的步骤
       - name: 修复React Native Fabric组件
         run: |
@@ -107,87 +114,18 @@ jobs:
           # 创建临时文件后复制到目标位置
           mkdir -p temp_fix_files
           
-          # 创建RCTViewFinder.mm修复文件
-          echo "创建RCTViewFinder.mm修复文件..."
-          FINDER_FILE_TEMP="temp_fix_files/RCTViewFinder.mm"
-          FINDER_FILE_TARGET="node_modules/react-native/React/Fabric/Utils/RCTViewFinder.mm"
-          
-          # 创建内容到临时文件
-          touch "$FINDER_FILE_TEMP"
-          echo '/* 手动修复以解决编译错误 */' > "$FINDER_FILE_TEMP"
-          echo '#import <React/RCTDefines.h>' >> "$FINDER_FILE_TEMP"
-          echo '' >> "$FINDER_FILE_TEMP"
-          echo '#if RCT_NEW_ARCH_ENABLED' >> "$FINDER_FILE_TEMP"
-          echo '/* Copyright notice */' >> "$FINDER_FILE_TEMP"
-          echo '#import "RCTViewFinder.h"' >> "$FINDER_FILE_TEMP"
-          echo '#import <React/RCTViewComponentView.h>' >> "$FINDER_FILE_TEMP"
-          echo '' >> "$FINDER_FILE_TEMP"
-          echo '@implementation RCTViewFinder' >> "$FINDER_FILE_TEMP"
-          echo '' >> "$FINDER_FILE_TEMP"
-          echo '+ (UIView *)findView:(UIView *)root withNativeId:(NSString *)nativeId' >> "$FINDER_FILE_TEMP"
-          echo '{' >> "$FINDER_FILE_TEMP"
-          echo '  if (!nativeId) {' >> "$FINDER_FILE_TEMP"
-          echo '    return nil;' >> "$FINDER_FILE_TEMP"
-          echo '  }' >> "$FINDER_FILE_TEMP"
-          echo '' >> "$FINDER_FILE_TEMP"
-          echo '  if ([root isKindOfClass:[RCTViewComponentView class]] &&' >> "$FINDER_FILE_TEMP"
-          echo '      [nativeId isEqualToString:((RCTViewComponentView *)root).nativeId]) {' >> "$FINDER_FILE_TEMP"
-          echo '    return root;' >> "$FINDER_FILE_TEMP"
-          echo '  }' >> "$FINDER_FILE_TEMP"
-          echo '' >> "$FINDER_FILE_TEMP"
-          echo '  for (UIView *subview in root.subviews) {' >> "$FINDER_FILE_TEMP"
-          echo '    UIView *result = [RCTViewFinder findView:subview withNativeId:nativeId];' >> "$FINDER_FILE_TEMP"
-          echo '    if (result) {' >> "$FINDER_FILE_TEMP"
-          echo '      return result;' >> "$FINDER_FILE_TEMP"
-          echo '    }' >> "$FINDER_FILE_TEMP"
-          echo '  }' >> "$FINDER_FILE_TEMP"
-          echo '' >> "$FINDER_FILE_TEMP"
-          echo '  return nil;' >> "$FINDER_FILE_TEMP"
-          echo '}' >> "$FINDER_FILE_TEMP"
-          echo '' >> "$FINDER_FILE_TEMP"
-          echo '@end' >> "$FINDER_FILE_TEMP"
-          echo '' >> "$FINDER_FILE_TEMP"
-          echo '#else' >> "$FINDER_FILE_TEMP"
-          echo '#import <UIKit/UIKit.h>' >> "$FINDER_FILE_TEMP"
-          echo '#import <React/RCTViewComponentView.h>' >> "$FINDER_FILE_TEMP"
-          echo '' >> "$FINDER_FILE_TEMP"
-          echo 'UIView *RCTFindComponentViewWithName(UIView *view, NSString *nativeId) {' >> "$FINDER_FILE_TEMP"
-          echo '  if (!nativeId) {' >> "$FINDER_FILE_TEMP"
-          echo '    return nil;' >> "$FINDER_FILE_TEMP"
-          echo '  }' >> "$FINDER_FILE_TEMP"
-          echo '' >> "$FINDER_FILE_TEMP"
-          echo '  if ([view isKindOfClass:[RCTViewComponentView class]]) {' >> "$FINDER_FILE_TEMP"
-          echo '    if ([nativeId isEqualToString:((RCTViewComponentView *)view).nativeId]) {' >> "$FINDER_FILE_TEMP"
-          echo '      return view;' >> "$FINDER_FILE_TEMP"
-          echo '    }' >> "$FINDER_FILE_TEMP"
-          echo '  }' >> "$FINDER_FILE_TEMP"
-          echo '' >> "$FINDER_FILE_TEMP"
-          echo '  for (UIView *subview in view.subviews) {' >> "$FINDER_FILE_TEMP"
-          echo '    UIView *result = RCTFindComponentViewWithName(subview, nativeId);' >> "$FINDER_FILE_TEMP"
-          echo '    if (result != nil) {' >> "$FINDER_FILE_TEMP"
-          echo '      return result;' >> "$FINDER_FILE_TEMP"
-          echo '    }' >> "$FINDER_FILE_TEMP"
-          echo '  }' >> "$FINDER_FILE_TEMP"
-          echo '' >> "$FINDER_FILE_TEMP"
-          echo '  return nil;' >> "$FINDER_FILE_TEMP"
-          echo '}' >> "$FINDER_FILE_TEMP"
-          echo '#endif' >> "$FINDER_FILE_TEMP"
-          
-          # 复制到目标位置
-          mkdir -p "$(dirname "$FINDER_FILE_TARGET")"
-          cp "$FINDER_FILE_TEMP" "$FINDER_FILE_TARGET"
-          echo "已修复 $FINDER_FILE_TARGET"
+          # RCTViewFinder.mm 修复现在由增强版统一脚本处理
+          echo "🔧 RCTViewFinder.mm 修复将由统一脚本处理..."
           
           # 使用统一脚本创建 RCTViewComponentView 文件（替换重复逻辑）
-          echo "🔧 使用统一脚本创建 RCTViewComponentView 文件..."
+          echo "🔧 使用增强版统一脚本创建 RCTViewComponentView 文件..."
           node fix-rct-viewcomponent-unified.js
-          echo "✅ 统一脚本执行完成"
+          echo "✅ 增强版统一脚本执行完成，已修复所有 Fabric 组件问题"
           
           # 修复原始 React Native Fabric 文件的编译问题
           echo "🔧 修复原始 Fabric 文件的编译问题..."
           node fix-fabric-original-files.js
           echo "✅ 原始 Fabric 文件修复完成"
-          echo "已创建 $VIEW_IMPL_TARGET"
 
       # 有选择地执行自定义修复脚本，避免重复
       - name: 检查是否需要执行自定义修复脚本
@@ -845,71 +783,8 @@ jobs:
           node fix-fabric-original-files.js
           echo "✅ 原始 Fabric 文件修复完成"
           
-          # 确保RCTViewFinder.mm文件存在
-          FINDER_FILE="node_modules/react-native/React/Fabric/Utils/RCTViewFinder.mm"
-          mkdir -p "$(dirname "$FINDER_FILE")"
-          echo '/* 手动修复以解决编译错误 */' > "$FINDER_FILE"
-          echo '#import <React/RCTDefines.h>' >> "$FINDER_FILE"
-          echo '' >> "$FINDER_FILE"
-          echo '#ifndef RCT_NEW_ARCH_ENABLED' >> "$FINDER_FILE"
-          echo '#define RCT_NEW_ARCH_ENABLED 0' >> "$FINDER_FILE"
-          echo '#endif' >> "$FINDER_FILE"
-          echo '' >> "$FINDER_FILE" 
-          echo '#if RCT_NEW_ARCH_ENABLED' >> "$FINDER_FILE"
-          echo '/* Copyright notice */' >> "$FINDER_FILE"
-          echo '#import "RCTViewFinder.h"' >> "$FINDER_FILE"
-          echo '#import <React/RCTViewComponentView.h>' >> "$FINDER_FILE"
-          echo '' >> "$FINDER_FILE"
-          echo '@implementation RCTViewFinder' >> "$FINDER_FILE"
-          echo '' >> "$FINDER_FILE"
-          echo '+ (UIView *)findView:(UIView *)root withNativeId:(NSString *)nativeId' >> "$FINDER_FILE"
-          echo '{' >> "$FINDER_FILE"
-          echo '  if (!nativeId) {' >> "$FINDER_FILE"
-          echo '    return nil;' >> "$FINDER_FILE"
-          echo '  }' >> "$FINDER_FILE"
-          echo '' >> "$FINDER_FILE"
-          echo '  if ([root isKindOfClass:[RCTViewComponentView class]] &&' >> "$FINDER_FILE"
-          echo '      [nativeId isEqualToString:((RCTViewComponentView *)root).nativeId]) {' >> "$FINDER_FILE"
-          echo '    return root;' >> "$FINDER_FILE"
-          echo '  }' >> "$FINDER_FILE"
-          echo '' >> "$FINDER_FILE"
-          echo '  for (UIView *subview in root.subviews) {' >> "$FINDER_FILE"
-          echo '    UIView *result = [RCTViewFinder findView:subview withNativeId:nativeId];' >> "$FINDER_FILE"
-          echo '    if (result) {' >> "$FINDER_FILE"
-          echo '      return result;' >> "$FINDER_FILE"
-          echo '    }' >> "$FINDER_FILE"
-          echo '  }' >> "$FINDER_FILE"
-          echo '' >> "$FINDER_FILE"
-          echo '  return nil;' >> "$FINDER_FILE"
-          echo '}' >> "$FINDER_FILE"
-          echo '' >> "$FINDER_FILE"
-          echo '@end' >> "$FINDER_FILE"
-          echo '' >> "$FINDER_FILE"
-          echo '#else' >> "$FINDER_FILE"
-          echo '#import <UIKit/UIKit.h>' >> "$FINDER_FILE"
-          echo '#import <React/RCTViewComponentView.h>' >> "$FINDER_FILE"
-          echo '' >> "$FINDER_FILE"
-          echo 'UIView *RCTFindComponentViewWithName(UIView *view, NSString *nativeId) {' >> "$FINDER_FILE"
-          echo '  if (!nativeId) {' >> "$FINDER_FILE"
-          echo '    return nil;' >> "$FINDER_FILE"
-          echo '  }' >> "$FINDER_FILE"
-          echo '' >> "$FINDER_FILE"
-          echo '  if ([view isKindOfClass:[RCTViewComponentView class]]) {' >> "$FINDER_FILE"
-          echo '    if ([nativeId isEqualToString:((RCTViewComponentView *)view).nativeId]) {' >> "$FINDER_FILE"
-          echo '      return view;' >> "$FINDER_FILE"
-          echo '    }' >> "$FINDER_FILE"
-          echo '  }' >> "$FINDER_FILE"
-          echo '' >> "$FINDER_FILE"
-          echo '  for (UIView *subview in view.subviews) {' >> "$FINDER_FILE"
-          echo '    UIView *result = RCTFindComponentViewWithName(subview, nativeId);' >> "$FINDER_FILE"
-          echo '    if (result != nil) {' >> "$FINDER_FILE"
-          echo '      return result;' >> "$FINDER_FILE"
-          echo '    }' >> "$FINDER_FILE"
-          echo '  }' >> "$FINDER_FILE"
-          echo '' >> "$FINDER_FILE"
-          echo '  return nil;' >> "$FINDER_FILE"
-          echo '}' >> "$FINDER_FILE"
-          echo '#endif' >> "$FINDER_FILE"
+          # RCTViewFinder.mm 已由增强版统一脚本创建，无需重复处理
+          echo "✅ RCTViewFinder.mm 已由增强版统一脚本创建"
           
           # 修复RCTTextComponentView
           echo "=== 修复RCTTextComponentView ==="
