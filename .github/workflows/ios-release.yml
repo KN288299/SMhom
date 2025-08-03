@@ -132,6 +132,13 @@ jobs:
           node fix-fabric-headers.js
           echo "✅ Fabric头文件修复完成"
           
+      # 修复React Native Runtime缺失函数
+      - name: 修复React Native Runtime缺失函数
+        run: |
+          echo "=== 修复React Native Runtime中缺失的函数 ==="
+          node fix-fabric-runtime.js
+          echo "✅ React Native Runtime修复完成"
+          
       # 添加修复Fabric组件的步骤
       - name: 修复React Native Fabric组件
         run: |
