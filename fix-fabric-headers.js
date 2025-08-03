@@ -24,7 +24,8 @@ const headerFilesToFix = [
 
 // 需要修复的实现文件
 const implementationFilesToFix = [
-  'React/Fabric/Mounting/RCTMountingTransactionObserverCoordinator.mm'
+  'React/Fabric/Mounting/RCTMountingTransactionObserverCoordinator.mm',
+  'React/Fabric/Mounting/RCTMountingManager.mm'
 ];
 
 // 修复单个头文件
@@ -44,13 +45,15 @@ function fixHeaderFile(headerPath, fileName) {
     let content = fs.readFileSync(headerPath, 'utf-8');
     let modified = false;
 
-    // 检查是否使用了协议或描述符但没有导入
+    // 检查是否使用了协议、描述符或工厂但没有导入
     const needsProtocolImport = content.includes('RCTComponentViewProtocol') && 
         !content.includes('#import <React/RCTComponentViewProtocol.h>');
     const needsDescriptorImport = content.includes('RCTComponentViewDescriptor') && 
         !content.includes('#import <React/RCTComponentViewDescriptor.h>');
+    const needsFactoryImport = content.includes('RCTComponentViewFactory') && 
+        !content.includes('#import <React/RCTComponentViewFactory.h>');
     
-    if (needsProtocolImport || needsDescriptorImport) {
+    if (needsProtocolImport || needsDescriptorImport || needsFactoryImport) {
       
       // 在头文件开头添加必要的导入
       const headerStart = content.indexOf('#import');
@@ -68,6 +71,10 @@ function fixHeaderFile(headerPath, fileName) {
         
         if (needsDescriptorImport) {
           newImports.push('#import <React/RCTComponentViewDescriptor.h>');
+        }
+        
+        if (needsFactoryImport) {
+          newImports.push('#import <React/RCTComponentViewFactory.h>');
         }
         
         // 检查是否已经有这些导入
@@ -279,6 +286,58 @@ NS_ASSUME_NONNULL_END
   console.log(`✅ 创建简化的组件视图工厂: ${path.relative(reactNativePath, factoryPath)}`);
 }
 
+// 创建一个简化的 RCTMountingTransactionObserverCoordinator.h
+function createSimpleMountingObserverCoordinator() {
+  const observerPath = path.join(reactNativePath, 'React/Fabric/Mounting/RCTMountingTransactionObserverCoordinator.h');
+  
+  const simpleContent = `/*
+ * 简化版本的 RCTMountingTransactionObserverCoordinator.h
+ * 由 fix-fabric-headers.js 创建
+ * 解决观察者协调器引用问题
+ */
+
+#import <React/RCTDefines.h>
+
+#if RCT_NEW_ARCH_ENABLED
+
+#import <Foundation/Foundation.h>
+#import <React/RCTComponentViewDescriptor.h>
+
+NS_ASSUME_NONNULL_BEGIN
+
+/*
+ * 挂载事务观察者协调器
+ * 简化版本避免复杂的C++依赖
+ */
+@interface RCTMountingTransactionObserverCoordinator : NSObject
+
+/*
+ * 注册组件视图描述符
+ */
+- (void)registerViewComponentDescriptor:(const RCTComponentViewDescriptor &)componentViewDescriptor;
+
+/*
+ * 取消注册组件视图描述符
+ */
+- (void)unregisterViewComponentDescriptor:(const RCTComponentViewDescriptor &)componentViewDescriptor;
+
+@end
+
+NS_ASSUME_NONNULL_END
+
+#endif // RCT_NEW_ARCH_ENABLED
+`;
+
+  // 确保目录存在
+  const dir = path.dirname(observerPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  fs.writeFileSync(observerPath, simpleContent, 'utf-8');
+  console.log(`✅ 创建简化的挂载观察者协调器: ${path.relative(reactNativePath, observerPath)}`);
+}
+
 // 修复实现文件
 function fixImplementationFile(filePath, fileName) {
   if (!fs.existsSync(filePath)) {
@@ -296,10 +355,16 @@ function fixImplementationFile(filePath, fileName) {
     let content = fs.readFileSync(filePath, 'utf-8');
     let modified = false;
 
-    // 检查是否使用了 RCTComponentViewDescriptor 但没有导入
-    if (content.includes('RCTComponentViewDescriptor') && 
+    // 检查各种类型的缺失导入
+    const needsDescriptorImport = content.includes('RCTComponentViewDescriptor') && 
         !content.includes('#import <React/RCTComponentViewDescriptor.h>') &&
-        !content.includes('#import "RCTComponentViewDescriptor.h"')) {
+        !content.includes('#import "RCTComponentViewDescriptor.h"');
+        
+    const needsObserverCoordinatorImport = content.includes('RCTMountingTransactionObserverCoordinator') && 
+        !content.includes('#import <React/RCTMountingTransactionObserverCoordinator.h>') &&
+        !content.includes('#import "RCTMountingTransactionObserverCoordinator.h"');
+        
+    if (needsDescriptorImport || needsObserverCoordinatorImport) {
       
       // 在现有导入之后添加新的导入
       const importRegex = /#import\s+[<"].*?[>"]\s*\n/g;
@@ -309,21 +374,29 @@ function fixImplementationFile(filePath, fileName) {
         const lastImport = imports[imports.length - 1];
         const insertIndex = content.indexOf(lastImport) + lastImport.length;
         
-        const newImports = `#import <React/RCTComponentViewDescriptor.h>
-
-`;
+        let newImports = '';
+        
+        if (needsDescriptorImport) {
+          newImports += '#import <React/RCTComponentViewDescriptor.h>\n';
+        }
+        
+        if (needsObserverCoordinatorImport) {
+          newImports += '#import <React/RCTMountingTransactionObserverCoordinator.h>\n';
+        }
+        
+        newImports += '\n';
         
         content = content.substring(0, insertIndex) + newImports + content.substring(insertIndex);
         modified = true;
       }
     }
 
-    // 特殊处理 RCTMountingTransactionObserverCoordinator.mm
-    if (fileName === 'RCTMountingTransactionObserverCoordinator.mm') {
+    // 特殊处理特定的实现文件
+    if (fileName === 'RCTMountingTransactionObserverCoordinator.mm' || fileName === 'RCTMountingManager.mm') {
       // 添加条件编译保护
       if (!content.includes('#if RCT_NEW_ARCH_ENABLED')) {
         content = `/*
- * 修复版本的 RCTMountingTransactionObserverCoordinator.mm
+ * 修复版本的 ${fileName}
  * 由 fix-fabric-headers.js 修复
  */
 
@@ -364,6 +437,7 @@ function main() {
     console.log('\n📄 创建简化版本的关键头文件...');
     createSimpleComponentViewDescriptor();
     createSimpleComponentViewFactory();
+    createSimpleMountingObserverCoordinator();
     
     // 修复其他头文件
     console.log('\n🔧 修复其他头文件...');
@@ -392,15 +466,19 @@ function main() {
     console.log('\n📋 修复/创建的文件:');
     console.log('   - React/Fabric/Mounting/RCTComponentViewDescriptor.h (重新创建)');
     console.log('   - React/Fabric/Mounting/RCTComponentViewFactory.h (重新创建)');
+    console.log('   - React/Fabric/Mounting/RCTMountingTransactionObserverCoordinator.h (重新创建)');
     console.log('   - React/Fabric/Mounting/RCTComponentViewRegistry.h (修复导入)');
-    console.log('   - React/Fabric/Mounting/RCTMountingTransactionObserverCoordinator.h (修复导入)');
     console.log('   - React/Fabric/Mounting/RCTMountingTransactionObserverCoordinator.mm (修复导入和条件编译)');
+    console.log('   - React/Fabric/Mounting/RCTMountingManager.mm (修复导入和条件编译)');
     
     console.log('\n✅ 应该解决以下编译错误:');
     console.log('   - no type or protocol named \'RCTComponentViewProtocol\' 在头文件中');
     console.log('   - unknown class name \'RCTComponentViewProtocol\'');
     console.log('   - type arguments cannot be applied to non-class type \'Class\'');
     console.log('   - unknown type name \'RCTComponentViewDescriptor\'');
+    console.log('   - unknown type name \'RCTComponentViewFactory\'');
+    console.log('   - unknown type name \'RCTMountingTransactionObserverCoordinator\'');
+    console.log('   - does not have a member named \'view\'');
     console.log('   - out-of-line definition does not match any declaration');
     
   } catch (error) {
