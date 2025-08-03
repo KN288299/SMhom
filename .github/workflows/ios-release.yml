@@ -104,6 +104,13 @@ jobs:
           node fix-rct-viewcomponent-unified.js
           echo "✅ 增强版修复完成，已创建所有必要的Fabric组件文件"
           
+      # 修复条件编译指令问题
+      - name: 修复React Native Fabric条件编译指令
+        run: |
+          echo "=== 修复React Native Fabric条件编译指令问题 ==="
+          node fix-fabric-conditional-compilation.js
+          echo "✅ 条件编译指令修复完成"
+          
       # 添加修复Fabric组件的步骤
       - name: 修复React Native Fabric组件
         run: |
@@ -230,23 +237,8 @@ jobs:
           UNIMPL_HEADER="node_modules/react-native/React/Fabric/Mounting/ComponentViews/UnimplementedView/RCTUnimplementedViewComponentView.h"
           UNIMPL_MM="node_modules/react-native/React/Fabric/Mounting/ComponentViews/UnimplementedView/RCTUnimplementedViewComponentView.mm"
           
-          if [ -f "$UNIMPL_HEADER" ]; then
-            echo "修复 RCTUnimplementedViewComponentView.h..."
-            cp "$UNIMPL_HEADER" "${UNIMPL_HEADER}.bak"
-            # 在文件顶部添加条件编译
-            echo '#if RCT_NEW_ARCH_ENABLED' | cat - "$UNIMPL_HEADER" > temp && mv temp "$UNIMPL_HEADER"
-            # 在文件末尾添加条件编译结束
-            echo "#endif // RCT_NEW_ARCH_ENABLED" >> "$UNIMPL_HEADER"
-          fi
-          
-          if [ -f "$UNIMPL_MM" ]; then
-            echo "修复 RCTUnimplementedViewComponentView.mm..."
-            cp "$UNIMPL_MM" "${UNIMPL_MM}.bak"
-            # 在文件顶部添加条件编译
-            echo '#if RCT_NEW_ARCH_ENABLED' | cat - "$UNIMPL_MM" > temp && mv temp "$UNIMPL_MM"
-            # 在文件末尾添加条件编译结束
-            echo "#endif // RCT_NEW_ARCH_ENABLED" >> "$UNIMPL_MM"
-          fi
+          # 跳过手动修复 - 由专门的条件编译修复脚本处理
+          echo "⚠️ RCTUnimplementedViewComponentView 文件将由专门的条件编译修复脚本处理"
 
       - name: 应用所有必要补丁
         id: apply-patches
@@ -880,28 +872,8 @@ jobs:
               # 备份原始文件
               cp "$file" "${file}.bak"
               # 添加必要的导入
-              if [[ "$file" == *.h ]]; then
-                # 对于头文件，在文件顶部添加导入
-                sed -i '' '1i\
-                #import <React/RCTDefines.h>\
-                #import <React/RCTViewComponentView.h>\
-                ' "$file"
-                # 使用条件编译包装类定义
-                sed -i '' 's/@interface \(.*\) : RCTViewComponentView/#if RCT_NEW_ARCH_ENABLED\
-                @interface \1 : RCTViewComponentView/g' "$file"
-                # 在文件末尾添加#endif
-                echo "#endif" >> "$file"
-              elif [[ "$file" == *.mm ]]; then
-                # 对于实现文件，在文件顶部添加定义
-                sed -i '' '1i\
-                #import <React/RCTDefines.h>\
-                \
-                #ifndef RCT_NEW_ARCH_ENABLED\
-                #define RCT_NEW_ARCH_ENABLED 0\
-                #endif\
-                \
-                ' "$file"
-              fi
+              # 跳过手动条件编译修改 - 由专门的修复脚本处理
+              echo "⚠️ 文件 $file 将由专门的条件编译修复脚本处理"
             fi
           done
           
