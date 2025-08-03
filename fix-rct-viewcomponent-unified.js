@@ -15,7 +15,7 @@ if (!fs.existsSync(reactNativePath)) {
 }
 
 // 标准的 RCTViewComponentView.h 文件内容（完全兼容版本）
-const headerContent = `/*
+  const headerContent = `/*
  * 此文件由 fix-rct-viewcomponent-unified.js 创建
  * 统一解决 React Native Fabric 组件兼容性问题
  * 支持新旧双架构兼容
@@ -62,7 +62,7 @@ NS_ASSUME_NONNULL_END
 `;
 
 // 标准的 RCTViewComponentView.mm 文件内容
-const implContent = `/*
+  const implContent = `/*
  * 此文件由 fix-rct-viewcomponent-unified.js 创建
  * 统一解决 React Native Fabric 组件兼容性问题
  *
@@ -151,7 +151,7 @@ const implLocations = [
 function createFileAtLocation(relativePath, content, description) {
   const fullPath = path.join(reactNativePath, relativePath);
   const dir = path.dirname(fullPath);
-  
+
   // 创建目录（如果不存在）
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });

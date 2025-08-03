@@ -111,6 +111,13 @@ jobs:
           node fix-fabric-conditional-compilation.js
           echo "✅ 条件编译指令修复完成"
           
+      # 修复Unimplemented组件编译错误
+      - name: 修复Unimplemented组件编译错误
+        run: |
+          echo "=== 修复Unimplemented组件的_props和updateProps错误 ==="
+          node fix-unimplemented-components.js
+          echo "✅ Unimplemented组件修复完成"
+          
       # 添加修复Fabric组件的步骤
       - name: 修复React Native Fabric组件
         run: |
