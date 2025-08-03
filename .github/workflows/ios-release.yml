@@ -118,6 +118,13 @@ jobs:
           node fix-unimplemented-components.js
           echo "✅ Unimplemented组件修复完成"
           
+      # 修复Fabric核心组件缺失
+      - name: 修复Fabric核心组件缺失
+        run: |
+          echo "=== 修复Fabric核心组件协议和功能函数缺失 ==="
+          node fix-fabric-core-components.js
+          echo "✅ Fabric核心组件修复完成"
+          
       # 添加修复Fabric组件的步骤
       - name: 修复React Native Fabric组件
         run: |
