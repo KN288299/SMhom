@@ -18,7 +18,13 @@ if (!fs.existsSync(reactNativePath)) {
 const headerFilesToFix = [
   'React/Fabric/Mounting/RCTComponentViewDescriptor.h',
   'React/Fabric/Mounting/RCTComponentViewFactory.h',
-  'React/Fabric/Mounting/RCTComponentViewRegistry.h'
+  'React/Fabric/Mounting/RCTComponentViewRegistry.h',
+  'React/Fabric/Mounting/RCTMountingTransactionObserverCoordinator.h'
+];
+
+// 需要修复的实现文件
+const implementationFilesToFix = [
+  'React/Fabric/Mounting/RCTMountingTransactionObserverCoordinator.mm'
 ];
 
 // 修复单个头文件
@@ -38,9 +44,13 @@ function fixHeaderFile(headerPath, fileName) {
     let content = fs.readFileSync(headerPath, 'utf-8');
     let modified = false;
 
-    // 检查是否使用了协议但没有导入
-    if (content.includes('RCTComponentViewProtocol') && 
-        !content.includes('#import <React/RCTComponentViewProtocol.h>')) {
+    // 检查是否使用了协议或描述符但没有导入
+    const needsProtocolImport = content.includes('RCTComponentViewProtocol') && 
+        !content.includes('#import <React/RCTComponentViewProtocol.h>');
+    const needsDescriptorImport = content.includes('RCTComponentViewDescriptor') && 
+        !content.includes('#import <React/RCTComponentViewDescriptor.h>');
+    
+    if (needsProtocolImport || needsDescriptorImport) {
       
       // 在头文件开头添加必要的导入
       const headerStart = content.indexOf('#import');
@@ -50,10 +60,15 @@ function fixHeaderFile(headerPath, fileName) {
         const lines = content.split('\n');
         
         // 插入新的导入
-        const newImports = [
-          '#import <React/RCTDefines.h>',
-          '#import <React/RCTComponentViewProtocol.h>'
-        ];
+        let newImports = ['#import <React/RCTDefines.h>'];
+        
+        if (needsProtocolImport) {
+          newImports.push('#import <React/RCTComponentViewProtocol.h>');
+        }
+        
+        if (needsDescriptorImport) {
+          newImports.push('#import <React/RCTComponentViewDescriptor.h>');
+        }
         
         // 检查是否已经有这些导入
         const importsToAdd = newImports.filter(imp => !content.includes(imp.replace('#import ', '').replace('<', '').replace('>', '')));
@@ -75,6 +90,31 @@ function fixHeaderFile(headerPath, fileName) {
           // 包装整个文件内容
           content = `/*
  * 修复版本的 RCTComponentViewDescriptor.h
+ * 由 fix-fabric-headers.js 修复
+ */
+
+#import <React/RCTDefines.h>
+
+#if RCT_NEW_ARCH_ENABLED
+
+${content}
+
+#endif // RCT_NEW_ARCH_ENABLED
+`;
+          modified = true;
+        }
+      }
+    }
+
+    // 特殊处理 RCTMountingTransactionObserverCoordinator.h
+    if (fileName === 'RCTMountingTransactionObserverCoordinator.h') {
+      // 添加条件编译保护
+      if (!content.includes('#if RCT_NEW_ARCH_ENABLED')) {
+        const descriptorUsage = content.includes('RCTComponentViewDescriptor');
+        if (descriptorUsage) {
+          // 包装整个文件内容
+          content = `/*
+ * 修复版本的 RCTMountingTransactionObserverCoordinator.h
  * 由 fix-fabric-headers.js 修复
  */
 
@@ -239,6 +279,81 @@ NS_ASSUME_NONNULL_END
   console.log(`✅ 创建简化的组件视图工厂: ${path.relative(reactNativePath, factoryPath)}`);
 }
 
+// 修复实现文件
+function fixImplementationFile(filePath, fileName) {
+  if (!fs.existsSync(filePath)) {
+    console.log(`⚠️ 实现文件不存在，跳过: ${fileName}`);
+    return false;
+  }
+
+  try {
+    // 备份原文件
+    const backupPath = filePath + '.backup';
+    if (!fs.existsSync(backupPath)) {
+      fs.copyFileSync(filePath, backupPath);
+    }
+
+    let content = fs.readFileSync(filePath, 'utf-8');
+    let modified = false;
+
+    // 检查是否使用了 RCTComponentViewDescriptor 但没有导入
+    if (content.includes('RCTComponentViewDescriptor') && 
+        !content.includes('#import <React/RCTComponentViewDescriptor.h>') &&
+        !content.includes('#import "RCTComponentViewDescriptor.h"')) {
+      
+      // 在现有导入之后添加新的导入
+      const importRegex = /#import\s+[<"].*?[>"]\s*\n/g;
+      const imports = content.match(importRegex) || [];
+      
+      if (imports.length > 0) {
+        const lastImport = imports[imports.length - 1];
+        const insertIndex = content.indexOf(lastImport) + lastImport.length;
+        
+        const newImports = `#import <React/RCTComponentViewDescriptor.h>
+
+`;
+        
+        content = content.substring(0, insertIndex) + newImports + content.substring(insertIndex);
+        modified = true;
+      }
+    }
+
+    // 特殊处理 RCTMountingTransactionObserverCoordinator.mm
+    if (fileName === 'RCTMountingTransactionObserverCoordinator.mm') {
+      // 添加条件编译保护
+      if (!content.includes('#if RCT_NEW_ARCH_ENABLED')) {
+        content = `/*
+ * 修复版本的 RCTMountingTransactionObserverCoordinator.mm
+ * 由 fix-fabric-headers.js 修复
+ */
+
+#import <React/RCTDefines.h>
+
+#if RCT_NEW_ARCH_ENABLED
+
+${content}
+
+#endif // RCT_NEW_ARCH_ENABLED
+`;
+        modified = true;
+      }
+    }
+
+    if (modified) {
+      fs.writeFileSync(filePath, content, 'utf-8');
+      console.log(`✅ 修复实现文件: ${fileName}`);
+      return true;
+    } else {
+      console.log(`ℹ️ 实现文件无需修改: ${fileName}`);
+      return false;
+    }
+
+  } catch (error) {
+    console.error(`❌ 修复实现文件时出错 ${fileName}:`, error.message);
+    return false;
+  }
+}
+
 function main() {
   try {
     console.log('🚀 开始修复 Fabric 头文件协议引用问题...');
@@ -261,17 +376,32 @@ function main() {
       }
     }
     
+    // 修复实现文件
+    console.log('\n🔧 修复实现文件...');
+    for (const relativePath of implementationFilesToFix) {
+      const fullPath = path.join(reactNativePath, relativePath);
+      const fileName = path.basename(relativePath);
+      
+      if (fixImplementationFile(fullPath, fileName)) {
+        fixedCount++;
+      }
+    }
+    
     console.log('\n🎉 Fabric 头文件修复完成！');
     
-    console.log('\n📋 修复/创建的头文件:');
+    console.log('\n📋 修复/创建的文件:');
     console.log('   - React/Fabric/Mounting/RCTComponentViewDescriptor.h (重新创建)');
     console.log('   - React/Fabric/Mounting/RCTComponentViewFactory.h (重新创建)');
     console.log('   - React/Fabric/Mounting/RCTComponentViewRegistry.h (修复导入)');
+    console.log('   - React/Fabric/Mounting/RCTMountingTransactionObserverCoordinator.h (修复导入)');
+    console.log('   - React/Fabric/Mounting/RCTMountingTransactionObserverCoordinator.mm (修复导入和条件编译)');
     
     console.log('\n✅ 应该解决以下编译错误:');
     console.log('   - no type or protocol named \'RCTComponentViewProtocol\' 在头文件中');
     console.log('   - unknown class name \'RCTComponentViewProtocol\'');
     console.log('   - type arguments cannot be applied to non-class type \'Class\'');
+    console.log('   - unknown type name \'RCTComponentViewDescriptor\'');
+    console.log('   - out-of-line definition does not match any declaration');
     
   } catch (error) {
     console.error('❌ 修复过程中出现错误:', error);
