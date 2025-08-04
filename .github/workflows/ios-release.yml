@@ -186,48 +186,37 @@ jobs:
             echo "⚠️ 未找到RCTReactNativeFactory.mm文件"
           fi
           
-          # 2. 创建缺失的RCTComponentViewFactory类声明
-          COMPONENT_FACTORY_DIR="node_modules/react-native/React/Fabric/Mounting/ComponentViews/View"
-          mkdir -p "$COMPONENT_FACTORY_DIR"
-          
-          # 创建RCTComponentViewFactory.h
-          FACTORY_HEADER="$COMPONENT_FACTORY_DIR/RCTComponentViewFactory.h"
-          echo '#import <Foundation/Foundation.h>' > "$FACTORY_HEADER"
-          echo '#import <React/RCTDefines.h>' >> "$FACTORY_HEADER"
-          echo '' >> "$FACTORY_HEADER"
-          echo '#ifndef RCT_NEW_ARCH_ENABLED' >> "$FACTORY_HEADER"
-          echo '#define RCT_NEW_ARCH_ENABLED 0' >> "$FACTORY_HEADER"
-          echo '#endif' >> "$FACTORY_HEADER"
-          echo '' >> "$FACTORY_HEADER"
-          echo '// 协议声明' >> "$FACTORY_HEADER"
-          echo '@protocol RCTComponentViewFactoryComponentProvider <NSObject>' >> "$FACTORY_HEADER"
-          echo '@end' >> "$FACTORY_HEADER"
-          echo '' >> "$FACTORY_HEADER"
-          echo '// 类声明' >> "$FACTORY_HEADER"
-          echo '@interface RCTComponentViewFactory : NSObject' >> "$FACTORY_HEADER"
-          echo '@property (nonatomic, weak, nullable) id<RCTComponentViewFactoryComponentProvider> thirdPartyFabricComponentsProvider;' >> "$FACTORY_HEADER"
-          echo '+ (instancetype)currentComponentViewFactory;' >> "$FACTORY_HEADER"
-          echo '@end' >> "$FACTORY_HEADER"
-          
-          # 创建RCTComponentViewFactory.mm
-          FACTORY_IMPL="$COMPONENT_FACTORY_DIR/RCTComponentViewFactory.mm"
-          echo '#import "RCTComponentViewFactory.h"' > "$FACTORY_IMPL"
-          echo '#import <React/RCTDefines.h>' >> "$FACTORY_IMPL"
-          echo '' >> "$FACTORY_IMPL"
-          echo '@implementation RCTComponentViewFactory' >> "$FACTORY_IMPL"
-          echo '' >> "$FACTORY_IMPL"
-          echo '+ (instancetype)currentComponentViewFactory {' >> "$FACTORY_IMPL"
-          echo '  static RCTComponentViewFactory *instance = nil;' >> "$FACTORY_IMPL"
-          echo '  static dispatch_once_t onceToken;' >> "$FACTORY_IMPL"
-          echo '  dispatch_once(&onceToken, ^{' >> "$FACTORY_IMPL"
-          echo '    instance = [[RCTComponentViewFactory alloc] init];' >> "$FACTORY_IMPL"
-          echo '  });' >> "$FACTORY_IMPL"
-          echo '  return instance;' >> "$FACTORY_IMPL"
-          echo '}' >> "$FACTORY_IMPL"
-          echo '' >> "$FACTORY_IMPL"
-          echo '@end' >> "$FACTORY_IMPL"
-          
-          echo "✅ 已创建RCTComponentViewFactory类"
+          # 2. 修复已有的RCTComponentViewFactory文件而不是创建新的
+          EXISTING_FACTORY="node_modules/react-native/React/Fabric/Mounting/RCTComponentViewFactory.h"
+          if [ -f "$EXISTING_FACTORY" ]; then
+            echo "发现已有的RCTComponentViewFactory.h，进行修复..."
+            cp "$EXISTING_FACTORY" "${EXISTING_FACTORY}.bak"
+            
+            # 检查是否已包含协议定义
+            if ! grep -q "RCTComponentViewFactoryComponentProvider" "$EXISTING_FACTORY"; then
+              echo "添加缺失的协议定义到已有文件..."
+              
+              # 创建临时文件包含协议定义
+              echo "// 添加缺失的协议定义" > temp_protocol.h
+              echo "@protocol RCTComponentViewFactoryComponentProvider <NSObject>" >> temp_protocol.h
+              echo "@end" >> temp_protocol.h
+              echo "" >> temp_protocol.h
+              cat "$EXISTING_FACTORY" >> temp_protocol.h
+              mv temp_protocol.h "$EXISTING_FACTORY"
+              
+              echo "✅ 已在现有文件中添加协议定义"
+            fi
+          else
+            echo "⚠️ 未找到现有的RCTComponentViewFactory.h文件"
+            
+            # 创建最小化的协议定义文件到正确位置
+            PROTOCOL_FILE="node_modules/react-native/React/Fabric/RCTComponentViewFactoryComponentProvider.h"
+            echo "#import <Foundation/Foundation.h>" > "$PROTOCOL_FILE"
+            echo "" >> "$PROTOCOL_FILE"
+            echo "@protocol RCTComponentViewFactoryComponentProvider <NSObject>" >> "$PROTOCOL_FILE"
+            echo "@end" >> "$PROTOCOL_FILE"
+            echo "✅ 已创建协议定义文件"
+          fi
           echo "✅ RCTComponentViewFactory相关错误修复完成"
           
       # 添加修复Fabric组件的步骤
