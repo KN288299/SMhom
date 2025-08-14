@@ -8,6 +8,21 @@ jest.mock('react-native/Libraries/Alert/Alert', () => ({
   alert: jest.fn(),
 }));
 
+// Mock NetInfo to prevent NativeModule errors in Jest
+jest.mock('@react-native-community/netinfo', () => {
+  const listeners = new Set();
+  return {
+    addEventListener: (handler) => {
+      listeners.add(handler);
+      // Immediately call with connected state for tests
+      handler({ type: 'wifi', isConnected: true, isInternetReachable: true });
+      return () => listeners.delete(handler);
+    },
+    fetch: jest.fn().mockResolvedValue({ type: 'wifi', isConnected: true, isInternetReachable: true }),
+    useNetInfo: jest.fn(() => ({ type: 'wifi', isConnected: true, isInternetReachable: true })),
+  };
+});
+
 // Mock react-native-incall-manager to avoid ESM parsing and native calls
 jest.mock('react-native-incall-manager', () => ({
   start: jest.fn(),
