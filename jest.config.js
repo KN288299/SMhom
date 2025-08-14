@@ -6,6 +6,6 @@ module.exports = {
     '^react-native-gesture-handler$': '<rootDir>/__mocks__/react-native-gesture-handler.js',
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(react-native|@react-native|@react-navigation|@react-native-community|react-native-vector-icons|react-native-image-picker|react-native-permissions|react-native-video|react-native-fs|react-native-create-thumbnail|react-native-webrtc|react-native-compressor)/)'
+    'node_modules/(?!(react-native|@react-native|@react-navigation|@react-native-community|react-native-vector-icons|react-native-image-picker|react-native-permissions|react-native-video|react-native-fs|react-native-create-thumbnail|react-native-webrtc|react-native-compressor|react-native-safe-area-context)/)'
   ],
 };
