@@ -23,6 +23,47 @@ jest.mock('@react-native-community/netinfo', () => {
   };
 });
 
+// Mock react-native-image-picker
+jest.mock('react-native-image-picker', () => ({
+  launchCamera: jest.fn().mockResolvedValue({ didCancel: true }),
+  launchImageLibrary: jest.fn().mockResolvedValue({ didCancel: true }),
+}));
+
+// Mock react-native-permissions
+jest.mock('react-native-permissions', () => ({
+  check: jest.fn().mockResolvedValue('granted'),
+  request: jest.fn().mockResolvedValue('granted'),
+  RESULTS: { GRANTED: 'granted' },
+  PERMISSIONS: {},
+}));
+
+// Mock react-native-video
+jest.mock('react-native-video', () => {
+  const React = require('react');
+  return React.forwardRef(() => null);
+});
+
+// Mock react-native-fs
+jest.mock('react-native-fs', () => ({
+  readFile: jest.fn(),
+  writeFile: jest.fn(),
+}));
+
+// Mock react-native-create-thumbnail
+jest.mock('react-native-create-thumbnail', () => ({
+  createThumbnail: jest.fn().mockResolvedValue({ path: 'thumb.jpg' }),
+}));
+
+// Mock react-native-webrtc
+jest.mock('react-native-webrtc', () => ({
+  mediaDevices: { getUserMedia: jest.fn() },
+}));
+
+// Mock socket.io-client
+jest.mock('socket.io-client', () => ({
+  io: jest.fn(() => ({ on: jest.fn(), emit: jest.fn(), off: jest.fn(), disconnect: jest.fn() })),
+}));
+
 // Mock react-native-incall-manager to avoid ESM parsing and native calls
 jest.mock('react-native-incall-manager', () => ({
   start: jest.fn(),
