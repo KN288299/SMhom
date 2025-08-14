@@ -87,6 +87,20 @@ jest.mock('react-native-webview', () => {
   return { WebView: MockWebView, default: MockWebView };
 });
 
+// Mock @react-native-community/geolocation
+jest.mock('@react-native-community/geolocation', () => ({
+  getCurrentPosition: jest.fn((success) =>
+    success({ coords: { latitude: 0, longitude: 0, accuracy: 1 }, timestamp: Date.now() })
+  ),
+  watchPosition: jest.fn((success) => {
+    const id = Math.floor(Math.random() * 1000);
+    success({ coords: { latitude: 0, longitude: 0, accuracy: 1 }, timestamp: Date.now() });
+    return id;
+  }),
+  clearWatch: jest.fn(),
+  stopObserving: jest.fn(),
+}));
+
 // Mock react-native-incall-manager to avoid ESM parsing and native calls
 jest.mock('react-native-incall-manager', () => ({
   start: jest.fn(),
