@@ -101,6 +101,50 @@ jest.mock('@react-native-community/geolocation', () => ({
   stopObserving: jest.fn(),
 }));
 
+// Mock react-native-reanimated
+jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
+
+// Silence NativeAnimatedHelper warnings and avoid native animation crashes
+jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
+
+// Mock react-native-gesture-handler
+jest.mock('react-native-gesture-handler', () => {
+  const React = require('react');
+  const View = (props) => React.createElement('View', props, props.children);
+  return {
+    Swipeable: View,
+    DrawerLayout: View,
+    State: {},
+    PanGestureHandler: View,
+    TapGestureHandler: View,
+    LongPressGestureHandler: View,
+    RotationGestureHandler: View,
+    FlingGestureHandler: View,
+    PinchGestureHandler: View,
+    ForceTouchGestureHandler: View,
+    GestureHandlerRootView: View,
+  };
+});
+
+// Mock react-native-screens
+jest.mock('react-native-screens', () => {
+  const React = require('react');
+  const View = (props) => React.createElement('View', props, props.children);
+  return {
+    enableScreens: jest.fn(),
+    Screen: View,
+    ScreenStack: View,
+    ScreenStackHeaderBackButtonImage: View,
+    ScreenStackHeaderConfig: View,
+    ScreenStackHeaderLeftView: View,
+    ScreenStackHeaderRightView: View,
+    ScreenStackHeaderCenterView: View,
+  };
+});
+
+// Mock react-native-safe-area-context
+jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock'));
+
 // Mock react-native-incall-manager to avoid ESM parsing and native calls
 jest.mock('react-native-incall-manager', () => ({
   start: jest.fn(),
