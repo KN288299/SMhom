@@ -59,6 +59,22 @@ jest.mock('react-native-webrtc', () => ({
   mediaDevices: { getUserMedia: jest.fn() },
 }));
 
+// Mock react-native-audio-recorder-player
+jest.mock('react-native-audio-recorder-player', () => {
+  return function MockAudioRecorderPlayer() {
+    return {
+      startRecorder: jest.fn().mockResolvedValue('mockPath'),
+      stopRecorder: jest.fn().mockResolvedValue('mockPath'),
+      addRecordBackListener: jest.fn(() => () => {}),
+      removeRecordBackListener: jest.fn(),
+      startPlayer: jest.fn().mockResolvedValue('mockPath'),
+      stopPlayer: jest.fn().mockResolvedValue('mockPath'),
+      addPlayBackListener: jest.fn(() => () => {}),
+      removePlayBackListener: jest.fn(),
+    };
+  };
+});
+
 // Mock socket.io-client
 jest.mock('socket.io-client', () => ({
   io: jest.fn(() => ({ on: jest.fn(), emit: jest.fn(), off: jest.fn(), disconnect: jest.fn() })),
