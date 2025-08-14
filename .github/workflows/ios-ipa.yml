@@ -1,0 +1,135 @@
+name: iOS IPA (Unsigned)
+
+on:
+  workflow_dispatch:
+    inputs:
+      scheme:
+        description: Xcode scheme to build
+        required: false
+        default: HomeServiceChat
+      configuration:
+        description: Build configuration
+        required: false
+        default: Release
+
+jobs:
+  build-ios:
+    runs-on: macos-14
+    env:
+      CI: true
+      XCODE_SCHEME: ${{ github.event.inputs.scheme || 'HomeServiceChat' }}
+      XCODE_CONFIGURATION: ${{ github.event.inputs.configuration || 'Release' }}
+      WORKSPACE_PATH: ios/HomeServiceChat.xcworkspace
+      ARCHIVE_PATH: build/HomeServiceChat.xcarchive
+      EXPORT_PATH: build/ipa
+      EXPORT_PLIST: ios/exportOptions.plist
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install JS dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Install CocoaPods
+        working-directory: ios
+        run: |
+          pod install --repo-update
+
+      - name: Show Xcode and Ruby versions
+        run: |
+          xcodebuild -version
+          ruby -v
+
+      - name: Install xcpretty
+        run: sudo gem install xcpretty --no-document
+
+      - name: Clean previous build
+        run: |
+          rm -rf build || true
+
+      - name: Archive (code signing disabled)
+        run: |
+          set -e
+          xcodebuild \
+            -workspace "$WORKSPACE_PATH" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration "$XCODE_CONFIGURATION" \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            -archivePath "$ARCHIVE_PATH" \
+            clean archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            | xcpretty && exit ${PIPESTATUS[0]}
+        shell: bash
+
+      - name: Package unsigned IPA manually
+        run: |
+          set -e
+          mkdir -p "$EXPORT_PATH"
+          APP_PATH="$ARCHIVE_PATH/Products/Applications/${XCODE_SCHEME}.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "App not found at $APP_PATH" >&2
+            exit 1
+          fi
+          WORK_DIR=$(mktemp -d)
+          mkdir -p "$WORK_DIR/Payload"
+          cp -R "$APP_PATH" "$WORK_DIR/Payload/"
+          cd "$WORK_DIR"
+          zip -r "${XCODE_SCHEME}-unsigned.ipa" Payload > /dev/null
+          cd -
+          mv "$WORK_DIR/${XCODE_SCHEME}-unsigned.ipa" "$EXPORT_PATH/"
+          rm -rf "$WORK_DIR"
+
+      - name: List exported files
+        run: |
+          ls -R "$EXPORT_PATH" || true
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: |
+            build/ipa/**/*.ipa
+          if-no-files-found: warn
+
+      - name: Upload .xcarchive (debugging)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-xcarchive
+          path: build/HomeServiceChat.xcarchive
+          if-no-files-found: warn
+
+      - name: Upload build logs (if present)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcode-logs
+          path: |
+            ~/Library/Logs/Build/*.xcactivitylog
+            ~/Library/Logs/Build
+          if-no-files-found: ignore
+
+

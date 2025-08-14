@@ -24,82 +24,64 @@ ENV['NO_FLIPPER'] = '1'
 ENV['USE_FABRIC'] = '0'
 ENV['USE_HERMES'] = '0'
 
-# 添加这些配置来解决 Swift 模块问题
-use_modular_headers!
-use_frameworks! :linkage => :static
-
-linkage = ENV['USE_FRAMEWORKS']
-if linkage != nil
-  Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
-  use_frameworks! :linkage => linkage.to_sym
-end
-
-# 修复重复头文件的函数
-def fix_duplicate_headers(installer)
-    # 禁用React-RCTFabric目标
-    disable_react_fabric_target(installer)
-  puts "正在修复重复头文件..."
-  installer.pods_project.targets.each do |target|
-    if target.name == 'RNPermissions'
-      puts "修复RNPermissions头文件..."
-      # 找到所有的复制头文件阶段
-      target.build_phases.each do |phase|
-        if phase.is_a?(Xcodeproj::Project::Object::PBXHeadersBuildPhase)
-          puts "处理头文件阶段..."
-          # 查找重复的头文件引用
-          duplicate_files = phase.files.group_by(&:display_name).select { |_, v| v.size > 1 }
-          if duplicate_files.any?
-            puts "发现重复头文件: #{duplicate_files.keys.join(', ')}"
-            duplicate_files.each do |name, files|
-              puts "处理重复头文件: #{name} (#{files.count}个实例)"
-              # 保留第一个，删除其他
-              files[1..-1].each do |file|
-                file.remove_from_project
-              end
+# 不全局开启 modular headers 或 use_frameworks，避免广泛冲突
 
 # 辅助函数：禁用React-RCTFabric目标
 def disable_react_fabric_target(installer)
   puts "禁用React-RCTFabric目标..."
-  
+
   installer.pods_project.targets.each do |target|
     if target.name == 'React-RCTFabric'
       puts "找到React-RCTFabric目标，禁用新架构相关代码"
-      
+
       # 处理重复的头文件问题
       target.headers_build_phase.files.each do |build_file|
-        # 检查是否存在重复的RCTViewComponentView.h文件
         if build_file.display_name == 'RCTViewComponentView.h'
           file_path = build_file.file_ref.real_path.to_s
           puts "找到头文件: #{file_path}"
-          
-          # 如果是来自ComponentViews/View/目录的文件，删除它以解决冲突
           if file_path.include?('ComponentViews/View')
             build_file.remove_from_build_phase
             puts "已移除冲突的RCTViewComponentView.h文件: #{file_path}"
           end
         end
       end
-      
+
       target.build_configurations.each do |config|
-        # 添加预处理器定义以禁用新架构
         config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
-        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'RCT_NEW_ARCH_ENABLED=0'
-        
-        # 修改其他编译设置
+        unless config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'].any? { |d| d.include?('RCT_NEW_ARCH_ENABLED=0') }
+          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'RCT_NEW_ARCH_ENABLED=0'
+        end
         config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
-        config.build_settings['GCC_OPTIMIZATION_LEVEL'] = '0'
       end
-      
+
       # 为所有源文件添加条件编译
       target.source_build_phase.files.each do |file|
-        next unless file.file_ref.path.end_with?('.mm', '.m', '.cpp')
+        next unless file.file_ref && file.file_ref.path =~ /\.(mm|m|cpp)$/
         file.settings ||= {}
-        file.settings['COMPILER_FLAGS'] ||= ''
-        file.settings['COMPILER_FLAGS'] += ' -DRCT_NEW_ARCH_ENABLED=0'
+        flags = file.settings['COMPILER_FLAGS'] || ''
+        unless flags.include?('-DRCT_NEW_ARCH_ENABLED=0')
+          file.settings['COMPILER_FLAGS'] = "#{flags} -DRCT_NEW_ARCH_ENABLED=0".strip
+        end
       end
     end
   end
 end
+
+# 修复重复头文件的函数
+def fix_duplicate_headers(installer)
+  # 禁用React-RCTFabric目标（优先处理潜在冲突）
+  disable_react_fabric_target(installer)
+  puts "正在修复重复头文件..."
+  installer.pods_project.targets.each do |target|
+    if target.name == 'RNPermissions'
+      puts "修复RNPermissions头文件..."
+      target.build_phases.each do |phase|
+        if phase.is_a?(Xcodeproj::Project::Object::PBXHeadersBuildPhase)
+          duplicate_files = phase.files.group_by(&:display_name).select { |_, v| v.size > 1 }
+          if duplicate_files.any?
+            puts "发现重复头文件: #{duplicate_files.keys.join(', ')}"
+            duplicate_files.each do |name, files|
+              files[1..-1].each { |file| file.remove_from_project }
             end
           end
         end
@@ -111,13 +93,12 @@ end
 target 'HomeServiceChat' do
   config = use_native_modules!
 
-  # 移除具体权限模块配置，只使用自动配置
-  # permissions_path = '../node_modules/react-native-permissions/ios'
-  # pod 'Permission-Camera', :path => "#{permissions_path}/Camera"
-  # pod 'Permission-Microphone', :path => "#{permissions_path}/Microphone"
-  # pod 'Permission-PhotoLibrary', :path => "#{permissions_path}/PhotoLibrary"
-  # pod 'Permission-Notifications', :path => "#{permissions_path}/Notifications"
-  # pod 'Permission-LocationWhenInUse', :path => "#{permissions_path}/LocationWhenInUse"
+  # 启用需要的权限模块（与 Info.plist 已声明的权限保持一致）
+  permissions_path = '../node_modules/react-native-permissions/ios'
+  pod 'Permission-Camera', :path => "#{permissions_path}/Camera"
+  pod 'Permission-Microphone', :path => "#{permissions_path}/Microphone"
+  pod 'Permission-PhotoLibrary', :path => "#{permissions_path}/PhotoLibrary"
+  pod 'Permission-LocationWhenInUse', :path => "#{permissions_path}/LocationWhenInUse"
 
   use_react_native!(
     :path => config[:reactNativePath],
@@ -149,12 +130,16 @@ target 'HomeServiceChat' do
     # 设置编译选项
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
-        # iOS 部署目标
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+        # iOS 部署目标，和 Xcode 工程保持一致
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
         
         # Swift 编译选项
         config.build_settings['SWIFT_VERSION'] = '5.0'
-        config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-O'
+        if config.name == 'Debug'
+          config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
+        else
+          config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Osize'
+        end
         
         # C++ 标准
         config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++20'
@@ -163,7 +148,11 @@ target 'HomeServiceChat' do
         config.build_settings["EXCLUDED_ARCHS[sdk=iphonesimulator*]"] = "arm64"
         
         # 其它优化
-        config.build_settings['GCC_OPTIMIZATION_LEVEL'] = '0'
+        if config.name == 'Debug'
+          config.build_settings['GCC_OPTIMIZATION_LEVEL'] = '0'
+        else
+          config.build_settings['GCC_OPTIMIZATION_LEVEL'] = 's'
+        end
         config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
         config.build_settings['ENABLE_BITCODE'] = 'NO'
         
