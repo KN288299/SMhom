@@ -158,8 +158,14 @@ jest.mock('react-native-screens', () => {
   };
 });
 
-// Mock react-native-safe-area-context
-jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock'));
+// Mock react-native-safe-area-context (CommonJS-friendly)
+jest.mock('react-native-safe-area-context', () => {
+  const React = require('react');
+  const SafeAreaProvider = ({ children }) => children;
+  const SafeAreaView = (props) => React.createElement('SafeAreaView', props, props.children);
+  const useSafeAreaInsets = () => ({ top: 0, bottom: 0, left: 0, right: 0 });
+  return { SafeAreaProvider, SafeAreaView, useSafeAreaInsets };
+});
 
 // Mock react-native-incall-manager to avoid ESM parsing and native calls
 jest.mock('react-native-incall-manager', () => ({
