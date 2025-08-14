@@ -8,6 +8,14 @@ jest.mock('react-native/Libraries/Alert/Alert', () => ({
   alert: jest.fn(),
 }));
 
+// Mock react-native-incall-manager to avoid ESM parsing and native calls
+jest.mock('react-native-incall-manager', () => ({
+  start: jest.fn(),
+  stop: jest.fn(),
+  setSpeakerphoneOn: jest.fn(),
+  setForceSpeakerphoneOn: jest.fn(),
+}));
+
 // Mock NativeEventEmitter to avoid requiring addListener/removeListeners on native modules
 jest.mock('react-native/Libraries/EventEmitter/NativeEventEmitter', () => {
   return jest.fn().mockImplementation(() => ({
