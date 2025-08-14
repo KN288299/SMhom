@@ -80,6 +80,13 @@ jest.mock('socket.io-client', () => ({
   io: jest.fn(() => ({ on: jest.fn(), emit: jest.fn(), off: jest.fn(), disconnect: jest.fn() })),
 }));
 
+// Mock react-native-webview
+jest.mock('react-native-webview', () => {
+  const React = require('react');
+  const MockWebView = (props) => React.createElement('WebView', props, props.children);
+  return { WebView: MockWebView, default: MockWebView };
+});
+
 // Mock react-native-incall-manager to avoid ESM parsing and native calls
 jest.mock('react-native-incall-manager', () => ({
   start: jest.fn(),
