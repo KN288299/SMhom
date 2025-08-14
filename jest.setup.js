@@ -101,8 +101,24 @@ jest.mock('@react-native-community/geolocation', () => ({
   stopObserving: jest.fn(),
 }));
 
-// Mock react-native-reanimated
-jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
+// Mock react-native-reanimated without installing the package
+jest.mock('react-native-reanimated', () => {
+  const mock = {
+    __esModule: true,
+    default: {},
+    View: () => null,
+    useSharedValue: jest.fn((init = 0) => ({ value: init })),
+    useAnimatedStyle: jest.fn(() => ({})),
+    withTiming: (v) => v,
+    withSpring: (v) => v,
+    withDelay: (_t, v) => v,
+    Easing: { linear: jest.fn() },
+    runOnJS: (fn) => fn,
+    interpolate: jest.fn((_x, _in, out) => out?.[0]),
+    Extrapolate: { CLAMP: 'clamp', EXTEND: 'extend', IDENTITY: 'identity' },
+  };
+  return mock;
+});
 
 // Silence NativeAnimatedHelper warnings and avoid native animation crashes
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
