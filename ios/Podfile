@@ -43,7 +43,8 @@ def disable_react_fabric_target(installer)
           file_path = build_file.file_ref.real_path.to_s
           puts "找到头文件: #{file_path}"
           if file_path.include?('ComponentViews/View')
-            build_file.remove_from_build_phase
+            # PBXBuildFile 没有 remove_from_build_phase，使用 remove_from_project 即可
+            build_file.remove_from_project
             puts "已移除冲突的RCTViewComponentView.h文件: #{file_path}"
           end
         end
