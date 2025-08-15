@@ -1,48 +1,24 @@
 import UIKit
 import React
 import React_RCTAppDelegate
- 
 
-@main
-class AppDelegate: UIResponder, UIApplicationDelegate {
-  var window: UIWindow?
 
-  var reactNativeDelegate: ReactNativeDelegate?
-  var reactNativeFactory: RCTReactNativeFactory?
-
-  func application(
+@UIApplicationMain
+class AppDelegate: RCTAppDelegate {
+  override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
-    let delegate = ReactNativeDelegate()
-    let factory = RCTReactNativeFactory(delegate: delegate)
-    // 省略依赖提供者，避免缺失 ReactAppDependencyProvider 模块导致编译失败
-
-    reactNativeDelegate = delegate
-    reactNativeFactory = factory
-
-    window = UIWindow(frame: UIScreen.main.bounds)
-
-    factory.startReactNative(
-      withModuleName: "HomeServiceChat",
-      in: window,
-      launchOptions: launchOptions
-    )
-
-    return true
-  }
-}
-
-class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
-  override func sourceURL(for bridge: RCTBridge) -> URL? {
-    self.bundleURL()
+    self.moduleName = "HomeServiceChat"
+    self.initialProps = [:]
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
-  override func bundleURL() -> URL? {
+  override func sourceURL(for bridge: RCTBridge!) -> URL! {
 #if DEBUG
-    RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
+    return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
 #else
-    Bundle.main.url(forResource: "main", withExtension: "jsbundle")
+    return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif
   }
 }
