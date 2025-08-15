@@ -51,21 +51,11 @@ def disable_react_fabric_target(installer)
       end
 
       target.build_configurations.each do |config|
-        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
-        unless config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'].any? { |d| d.include?('RCT_NEW_ARCH_ENABLED=0') }
-          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'RCT_NEW_ARCH_ENABLED=0'
-        end
+        # 确保未定义 RCT_NEW_ARCH_ENABLED 宏（而不是将其设置为 0）
+        defs = Array(config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] || ['$(inherited)'])
+        defs = defs.reject { |d| d.to_s.include?('RCT_NEW_ARCH_ENABLED') }
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs
         config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
-      end
-
-      # 为所有源文件添加条件编译
-      target.source_build_phase.files.each do |file|
-        next unless file.file_ref && file.file_ref.path =~ /\.(mm|m|cpp)$/
-        file.settings ||= {}
-        flags = file.settings['COMPILER_FLAGS'] || ''
-        unless flags.include?('-DRCT_NEW_ARCH_ENABLED=0')
-          file.settings['COMPILER_FLAGS'] = "#{flags} -DRCT_NEW_ARCH_ENABLED=0".strip
-        end
       end
     end
   end
@@ -161,9 +151,10 @@ target 'HomeServiceChat' do
         config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
         config.build_settings['ENABLE_BITCODE'] = 'NO'
         
-        # 禁用新架构的预处理器定义
-        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
-        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'RCT_NEW_ARCH_ENABLED=0'
+        # 确保未定义新架构宏，避免触发 #ifdef RCT_NEW_ARCH_ENABLED 代码路径
+        defs = Array(config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] || ['$(inherited)'])
+        defs = defs.reject { |d| d.to_s.include?('RCT_NEW_ARCH_ENABLED') }
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs
         
         # 为RNPermissions添加特殊处理
         if target.name == 'RNPermissions'
