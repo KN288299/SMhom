@@ -15,15 +15,17 @@ function applyPatch(filePath) {
 
   const original = fs.readFileSync(filePath, 'utf8');
 
-  // Target only the two known print lines to keep the change minimal and safe
+  // 仅在 print(...) 内部为可选的 localizedDescription 提供默认值，保留原有换行/缩进
+  const writingRegex = /(print\("Failed to start writing\. Error:",\s*writer\.error\?\.localizedDescription)(\)\s*)/g;
   let modified = original.replace(
-    /(print\("Failed to start writing\. Error:",\s*writer\.error\?\.localizedDescription\)\s*)/g,
-    'print("Failed to start writing. Error:", writer.error?.localizedDescription ?? "unknown")'
+    writingRegex,
+    '$1 ?? "unknown"$2'
   );
 
+  const readingRegex = /(print\("Failed to start reading\. Error:",\s*reader\.error\?\.localizedDescription)(\)\s*)/g;
   modified = modified.replace(
-    /(print\("Failed to start reading\. Error:",\s*reader\.error\?\.localizedDescription\)\s*)/g,
-    'print("Failed to start reading. Error:", reader.error?.localizedDescription ?? "unknown")'
+    readingRegex,
+    '$1 ?? "unknown"$2'
   );
 
   if (modified !== original) {
