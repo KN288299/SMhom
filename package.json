@@ -8,7 +8,7 @@
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
-    "postinstall": "patch-package",
+    "postinstall": "patch-package && node scripts/patch-rn-compressor.js",
     "server": "node server.js",
     "server:dev": "nodemon server.js",
     "dev": "concurrently \"npm run server:dev\" \"npm run start\""
