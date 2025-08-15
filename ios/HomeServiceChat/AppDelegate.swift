@@ -1,7 +1,7 @@
 import UIKit
 import React
 import React_RCTAppDelegate
-import ReactAppDependencyProvider
+ 
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -16,7 +16,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
   ) -> Bool {
     let delegate = ReactNativeDelegate()
     let factory = RCTReactNativeFactory(delegate: delegate)
-    delegate.dependencyProvider = RCTAppDependencyProvider()
+    // 省略依赖提供者，避免缺失 ReactAppDependencyProvider 模块导致编译失败
 
     reactNativeDelegate = delegate
     reactNativeFactory = factory
