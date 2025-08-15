@@ -8,6 +8,9 @@ require Pod::Executable.execute_command('node', ['-p',
 # 使用 CDN 源
 source 'https://cdn.cocoapods.org/'
 
+# react-native-permissions v5+ 集成脚本（以 setup_permissions 方式选择所需权限）
+require_relative '../node_modules/react-native-permissions/scripts/setup'
+
 # 全局强制设置，确保关闭新架构
 $RCT_NEW_ARCH_ENABLED = false
 $fabric_enabled = false
@@ -93,12 +96,13 @@ end
 target 'HomeServiceChat' do
   config = use_native_modules!
 
-  # 启用需要的权限模块（与 Info.plist 已声明的权限保持一致）
-  permissions_path = '../node_modules/react-native-permissions/ios'
-  pod 'Permission-Camera', :path => "#{permissions_path}/Camera"
-  pod 'Permission-Microphone', :path => "#{permissions_path}/Microphone"
-  pod 'Permission-PhotoLibrary', :path => "#{permissions_path}/PhotoLibrary"
-  pod 'Permission-LocationWhenInUse', :path => "#{permissions_path}/LocationWhenInUse"
+  # 选择需要的权限（需与 Info.plist 中的用途说明相匹配）
+  setup_permissions([
+    'Camera',
+    'Microphone',
+    'PhotoLibrary',
+    'LocationWhenInUse'
+  ])
 
   use_react_native!(
     :path => config[:reactNativePath],
