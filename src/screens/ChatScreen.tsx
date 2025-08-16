@@ -1961,8 +1961,9 @@ const ChatScreen: React.FC = () => {
 
   
   return (
-    <View style={styles.container}>
-      <StatusBar backgroundColor="#fff" barStyle="dark-content" />
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <StatusBar backgroundColor="#fff" barStyle="dark-content" />
       
       {/* 来电全屏界面已移至全局App层面处理 */}
       {/* 
@@ -2000,7 +2001,7 @@ const ChatScreen: React.FC = () => {
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         onStartShouldSetResponder={() => {
           if (showMoreOptions) {
             setShowMoreOptions(false);
@@ -2162,11 +2163,16 @@ const ChatScreen: React.FC = () => {
         />
       )}
 
-    </View>
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff', // 顶部安全区域背景色与header一致
+  },
   container: {
     flex: 1,
     backgroundColor: '#f8f8f8',

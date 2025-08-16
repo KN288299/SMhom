@@ -98,7 +98,7 @@ export const iOSChatStyles = StyleSheet.create({
     backgroundColor: '#F2F2F7', // iOS系统背景色
     paddingHorizontal: 16,
     paddingVertical: 8,
-    paddingBottom: 34, // iOS安全区域
+    paddingBottom: 8, // 减少底部padding，避免与SafeAreaView冲突
   },
   
   inputWrapper: {
