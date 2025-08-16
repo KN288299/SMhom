@@ -175,12 +175,14 @@ export const iOSChatStyles = StyleSheet.create({
   
   // 更多选项面板
   moreOptionsPanel: {
+    flexDirection: 'row', // 横向排列
     backgroundColor: '#F2F2F7',
     paddingHorizontal: 16,
     paddingVertical: 12,
     paddingBottom: 34, // 增加底部padding适配iOS底部安全区域
     borderTopWidth: 0.5,
     borderTopColor: '#c6c6c8',
+    justifyContent: 'space-around', // 平均分布
   },
   
   moreOptionsGrid: {
