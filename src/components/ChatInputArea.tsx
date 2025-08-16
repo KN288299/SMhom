@@ -87,95 +87,97 @@ const ChatInputArea: React.FC<ChatInputAreaProps> = ({
   return (
     <>
       <View style={getPlatformStyles(iOSChatStyles.inputContainer, styles.inputContainer)}>
-        <TouchableOpacity
-          style={[styles.voiceButton, isVoiceMode && styles.activeVoiceButton]}
-          onPress={onToggleVoiceMode}
-        >
-          <Icon 
-            name={isVoiceMode ? "chatbubble-outline" : "mic-outline"} 
-            size={24} 
-            color={isVoiceMode ? "#ff6b81" : "#666"} 
-          />
-        </TouchableOpacity>
-        
-        {isVoiceMode ? (
-          <Pressable
-            style={getVoiceInputStyle()}
-            onPressIn={onStartRecording}
-            onPressOut={onStopRecording}
-            delayLongPress={200}
+        <View style={getPlatformStyles(iOSChatStyles.inputWrapper, styles.inputWrapper)}>
+          <TouchableOpacity
+            style={[styles.voiceButton, isVoiceMode && styles.activeVoiceButton]}
+            onPress={onToggleVoiceMode}
           >
-            {isRecording ? (
-              <View style={styles.recordingContainer}>
-                <Animated.View 
-                  style={[
-                    styles.recordingIndicator, 
-                    { transform: [{ scale: pulseAnim }] }
-                  ]} 
-                />
-                <Text style={styles.voiceInputText}>
-                  {getVoiceInputText()}
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.voiceInputContainer}>
-                {!hasRecordingPermission && (
-                  <Icon 
-                    name="mic-off-outline" 
-                    size={20} 
-                    color="#ff6b81" 
-                    style={styles.permissionIcon}
-                  />
-                )}
-                <Text style={[
-                  styles.voiceInputText,
-                  !hasRecordingPermission && styles.permissionNeededText
-                ]}>
-                  {getVoiceInputText()}
-                </Text>
-              </View>
-            )}
-          </Pressable>
-        ) : (
-          <>
-            <TextInput
-              style={getPlatformStyles(iOSChatStyles.textInput, styles.input)}
-              value={messageText}
-              onChangeText={setMessageText}
-              placeholder="输入消息..."
-              multiline
-              onFocus={() => {
-                if (showMoreOptions) {
-                  onToggleMoreOptions();
-                }
-              }}
+            <Icon 
+              name={isVoiceMode ? "chatbubble-outline" : "mic-outline"} 
+              size={24} 
+              color={isVoiceMode ? "#ff6b81" : "#666"} 
             />
-            <TouchableOpacity
-              style={getPlatformStyles(iOSChatStyles.moreButton, styles.moreButton)}
-              onPress={onToggleMoreOptions}
+          </TouchableOpacity>
+          
+          {isVoiceMode ? (
+            <Pressable
+              style={getVoiceInputStyle()}
+              onPressIn={onStartRecording}
+              onPressOut={onStopRecording}
+              delayLongPress={200}
             >
-              <Icon 
-                name="add" 
-                size={isIOS ? 20 : 24} 
-                color="#fff" 
+              {isRecording ? (
+                <View style={styles.recordingContainer}>
+                  <Animated.View 
+                    style={[
+                      styles.recordingIndicator, 
+                      { transform: [{ scale: pulseAnim }] }
+                    ]} 
+                  />
+                  <Text style={styles.voiceInputText}>
+                    {getVoiceInputText()}
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.voiceInputContainer}>
+                  {!hasRecordingPermission && (
+                    <Icon 
+                      name="mic-off-outline" 
+                      size={20} 
+                      color="#ff6b81" 
+                      style={styles.permissionIcon}
+                    />
+                  )}
+                  <Text style={[
+                    styles.voiceInputText,
+                    !hasRecordingPermission && styles.permissionNeededText
+                  ]}>
+                    {getVoiceInputText()}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+          ) : (
+            <>
+              <TextInput
+                style={getPlatformStyles(iOSChatStyles.textInput, styles.input)}
+                value={messageText}
+                onChangeText={setMessageText}
+                placeholder="输入消息..."
+                multiline
+                onFocus={() => {
+                  if (showMoreOptions) {
+                    onToggleMoreOptions();
+                  }
+                }}
               />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                getPlatformStyles(iOSChatStyles.sendButton, styles.sendButton), 
-                !messageText.trim() && styles.disabledButton
-              ]}
-              onPress={onSendMessage}
-              disabled={!messageText.trim()}
-            >
-              <Icon 
-                name="paper-plane" 
-                size={isIOS ? 16 : 20} 
-                color="#fff" 
-              />
-            </TouchableOpacity>
-          </>
-        )}
+              <TouchableOpacity
+                style={getPlatformStyles(iOSChatStyles.moreButton, styles.moreButton)}
+                onPress={onToggleMoreOptions}
+              >
+                <Icon 
+                  name="add" 
+                  size={isIOS ? 20 : 24} 
+                  color="#fff" 
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  getPlatformStyles(iOSChatStyles.sendButton, styles.sendButton), 
+                  !messageText.trim() && styles.disabledButton
+                ]}
+                onPress={onSendMessage}
+                disabled={!messageText.trim()}
+              >
+                <Icon 
+                  name="paper-plane" 
+                  size={isIOS ? 16 : 20} 
+                  color="#fff" 
+                />
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
       </View>
       
       {/* 多功能选择面板 */}
@@ -239,6 +241,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#eee',
     minHeight: 60,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    flex: 1,
   },
   voiceButton: {
     width: 40,
