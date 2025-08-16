@@ -346,11 +346,11 @@ export const iOSMainHeaderStyles = StyleSheet.create({
   
   // 搜索按钮样式 - 优化iOS触摸体验
   searchButton: {
-    width: isIOSPlatform ? 44 : 30,     // iOS符合44pt最小触摸目标
-    height: isIOSPlatform ? 44 : 30,    // iOS符合44pt最小触摸目标
+    width: isIOSPlatform ? 36 : 30,     // iOS调整为更合适的尺寸
+    height: isIOSPlatform ? 36 : 30,    // iOS调整为更合适的尺寸
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: isIOSPlatform ? 22 : 15,     // iOS圆形按钮设计
+    borderRadius: isIOSPlatform ? 18 : 15,     // iOS圆形按钮设计，调整圆角
     backgroundColor: isIOSPlatform ? '#F2F2F7' : 'transparent', // iOS添加背景色增强视觉反馈
     // iOS添加轻微阴影增强按钮感知
     ...(isIOSPlatform && {
