@@ -10,6 +10,7 @@ import {
   Keyboard,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { iOSChatStyles, isIOS, getPlatformStyles, getIOSFontSize } from '../styles/iOSStyles';
 
 interface ChatInputAreaProps {
   // 文本消息相关
@@ -85,7 +86,7 @@ const ChatInputArea: React.FC<ChatInputAreaProps> = ({
 
   return (
     <>
-      <View style={styles.inputContainer}>
+      <View style={getPlatformStyles(iOSChatStyles.inputContainer, styles.inputContainer)}>
         <TouchableOpacity
           style={[styles.voiceButton, isVoiceMode && styles.activeVoiceButton]}
           onPress={onToggleVoiceMode}
@@ -138,7 +139,7 @@ const ChatInputArea: React.FC<ChatInputAreaProps> = ({
         ) : (
           <>
             <TextInput
-              style={styles.input}
+              style={getPlatformStyles(iOSChatStyles.textInput, styles.input)}
               value={messageText}
               onChangeText={setMessageText}
               placeholder="输入消息..."
@@ -150,23 +151,26 @@ const ChatInputArea: React.FC<ChatInputAreaProps> = ({
               }}
             />
             <TouchableOpacity
-              style={styles.moreButton}
+              style={getPlatformStyles(iOSChatStyles.moreButton, styles.moreButton)}
               onPress={onToggleMoreOptions}
             >
               <Icon 
                 name="add" 
-                size={24} 
+                size={isIOS ? 20 : 24} 
                 color="#fff" 
               />
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.sendButton, !messageText.trim() && styles.disabledButton]}
+              style={[
+                getPlatformStyles(iOSChatStyles.sendButton, styles.sendButton), 
+                !messageText.trim() && styles.disabledButton
+              ]}
               onPress={onSendMessage}
               disabled={!messageText.trim()}
             >
               <Icon 
                 name="paper-plane" 
-                size={20} 
+                size={isIOS ? 16 : 20} 
                 color="#fff" 
               />
             </TouchableOpacity>
@@ -176,7 +180,7 @@ const ChatInputArea: React.FC<ChatInputAreaProps> = ({
       
       {/* 多功能选择面板 */}
       {showMoreOptions && (
-        <View style={styles.optionsContainer}>
+        <View style={getPlatformStyles(iOSChatStyles.moreOptionsPanel, styles.optionsContainer)}>
           <TouchableOpacity 
             style={styles.optionButton} 
             onPress={onTakePhoto}
@@ -184,7 +188,7 @@ const ChatInputArea: React.FC<ChatInputAreaProps> = ({
             <View style={styles.optionIconContainer}>
               <Icon name="camera-outline" size={26} color="#ff6b81" />
             </View>
-            <Text style={styles.optionText}>拍照</Text>
+            <Text style={getPlatformStyles(iOSChatStyles.moreOptionText, styles.optionText)}>拍照</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -194,7 +198,7 @@ const ChatInputArea: React.FC<ChatInputAreaProps> = ({
             <View style={styles.optionIconContainer}>
               <Icon name="image-outline" size={26} color="#ff6b81" />
             </View>
-            <Text style={styles.optionText}>相册</Text>
+            <Text style={getPlatformStyles(iOSChatStyles.moreOptionText, styles.optionText)}>相册</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -207,7 +211,7 @@ const ChatInputArea: React.FC<ChatInputAreaProps> = ({
             <View style={styles.optionIconContainer}>
               <Icon name="location-outline" size={26} color="#ff6b81" />
             </View>
-            <Text style={styles.optionText}>位置</Text>
+            <Text style={getPlatformStyles(iOSChatStyles.moreOptionText, styles.optionText)}>位置</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -217,7 +221,7 @@ const ChatInputArea: React.FC<ChatInputAreaProps> = ({
             <View style={styles.optionIconContainer}>
               <Icon name="call-outline" size={26} color="#ff6b81" />
             </View>
-            <Text style={styles.optionText}>语音通话</Text>
+            <Text style={getPlatformStyles(iOSChatStyles.moreOptionText, styles.optionText)}>语音通话</Text>
           </TouchableOpacity>
         </View>
       )}

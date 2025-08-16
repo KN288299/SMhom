@@ -23,6 +23,7 @@ import {
   Linking,
   ToastAndroid,
 } from 'react-native';
+import { iOSChatStyles, iOSMessageStyles, isIOS, getPlatformStyles, getIOSFontSize } from '../styles/iOSStyles';
 import NetInfo from '@react-native-community/netinfo';
 import { getOptimizedConnectionStatus } from '../utils/iOSNetworkHelper';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
@@ -1975,20 +1976,20 @@ const ChatScreen: React.FC = () => {
       )}
       */}
       
-      <View style={styles.headerContainer}>
-        <View style={styles.chatHeader}>
+      <View style={getPlatformStyles(iOSChatStyles.headerContainer, styles.headerContainer)}>
+        <View style={getPlatformStyles(iOSChatStyles.chatHeader, styles.chatHeader)}>
           <TouchableOpacity 
-            style={styles.backButton}
+            style={getPlatformStyles(iOSChatStyles.backButton, styles.backButton)}
             onPress={() => navigation.goBack()}
             hitSlop={{top: 15, bottom: 15, left: 15, right: 15}}
           >
-            <Icon name="chevron-back" size={28} color="#007AFF" />
+            <Icon name="chevron-back" size={isIOS ? 24 : 28} color="#007AFF" />
           </TouchableOpacity>
           <View style={styles.headerCenter}>
-            <Text style={styles.chatHeaderName} numberOfLines={1}>{contactName}</Text>
+            <Text style={getPlatformStyles(iOSChatStyles.chatHeaderName, styles.chatHeaderName)} numberOfLines={1}>{contactName}</Text>
             <View style={styles.onlineStatusContainer}>
               <View style={styles.onlineIndicator} />
-              <Text style={styles.onlineStatusText}>在线</Text>
+              <Text style={getPlatformStyles(iOSChatStyles.onlineStatusText, styles.onlineStatusText)}>在线</Text>
             </View>
           </View>
           {/* 移除语音测试按钮 */}
@@ -2011,7 +2012,7 @@ const ChatScreen: React.FC = () => {
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#ff6b81" />
-            <Text style={styles.loadingText}>正在加载消息...</Text>
+            <Text style={getPlatformStyles(iOSChatStyles.loadingText, styles.loadingText)}>正在加载消息...</Text>
           </View>
         ) : (
           <FlatList
@@ -2021,7 +2022,7 @@ const ChatScreen: React.FC = () => {
             renderItem={renderMessageItem}
             keyExtractor={keyExtractor}
             getItemLayout={getItemLayout}
-            contentContainerStyle={styles.messagesList}
+            contentContainerStyle={getPlatformStyles(iOSChatStyles.messagesList, styles.messagesList)}
             ListHeaderComponent={
               <>
                 <View style={styles.listFooterSpace} />
@@ -2086,8 +2087,8 @@ const ChatScreen: React.FC = () => {
       
       {/* 网络状态横幅 */}
       {showNetworkBanner && (
-        <View style={styles.networkBanner}>
-          <Text style={styles.networkBannerText}>
+        <View style={getPlatformStyles(iOSChatStyles.networkBanner, styles.networkBanner)}>
+          <Text style={getPlatformStyles(iOSChatStyles.networkBannerText, styles.networkBannerText)}>
             ⚠️ 网络连接已断开，消息可能无法及时发送
           </Text>
         </View>
@@ -2095,9 +2096,9 @@ const ChatScreen: React.FC = () => {
       
       {/* Socket连接状态横幅 */}
       {connecting && (
-        <View style={styles.connectingBanner}>
+        <View style={getPlatformStyles(iOSChatStyles.connectingBanner, styles.connectingBanner)}>
           <ActivityIndicator size="small" color="#fff" />
-          <Text style={styles.connectingBannerText}>
+          <Text style={getPlatformStyles(iOSChatStyles.connectingBannerText, styles.connectingBannerText)}>
             正在连接服务器...
           </Text>
         </View>

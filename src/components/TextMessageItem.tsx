@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
 } from 'react-native';
+import { iOSMessageStyles, isIOS, getPlatformStyles } from '../styles/iOSStyles';
 
 // 工具函数
 const formatMessageTime = (timestamp: Date): string => {
@@ -22,13 +23,29 @@ const TextMessageItem: React.FC<TextMessageItemProps> = ({
   isMe,
 }) => {
   return (
-    <View style={[styles.messageContainer, isMe ? styles.myMessage : styles.otherMessage]}>
-      <View style={[styles.messageBubble, isMe ? styles.myBubble : styles.otherBubble]}>
-        <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.otherMessageText]}>
+    <View style={[
+      getPlatformStyles(iOSMessageStyles.messageContainer, styles.messageContainer), 
+      isMe ? styles.myMessage : styles.otherMessage
+    ]}>
+      <View style={[
+        getPlatformStyles(iOSMessageStyles.messageBubble, styles.messageBubble),
+        isMe ? getPlatformStyles(iOSMessageStyles.myBubble, styles.myBubble) : getPlatformStyles(iOSMessageStyles.otherBubble, styles.otherBubble)
+      ]}>
+        <Text style={[
+          getPlatformStyles(
+            isMe ? iOSMessageStyles.myMessageText : iOSMessageStyles.otherMessageText,
+            isMe ? styles.myMessageText : styles.otherMessageText
+          )
+        ]}>
           {content}
         </Text>
       </View>
-      <Text style={[styles.messageTime, isMe ? styles.myMessageTime : styles.otherMessageTime]}>
+      <Text style={[
+        getPlatformStyles(
+          isMe ? iOSMessageStyles.myMessageTime : iOSMessageStyles.otherMessageTime,
+          isMe ? styles.myMessageTime : styles.otherMessageTime
+        )
+      ]}>
         {formatMessageTime(timestamp)}
       </Text>
     </View>
