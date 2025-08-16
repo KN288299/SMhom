@@ -9,7 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AuthContext } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { getCurrentPlatformFeatures, isFeatureEnabled } from '../config/platformFeatures';
 
 interface MainScreenProps {
@@ -18,7 +18,7 @@ interface MainScreenProps {
 }
 
 const MainScreen: React.FC<MainScreenProps> = ({ navigation, route }) => {
-  const { logout, userInfo } = useContext(AuthContext);
+  const { logout, userInfo } = useAuth();
   
   // 获取平台特性配置
   const platformFeatures = getCurrentPlatformFeatures();

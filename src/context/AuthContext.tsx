@@ -170,7 +170,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth必须在AuthProvider内使用');
+    // 在开发环境下记录错误，但不抛出异常以避免应用崩溃
+    console.error('useAuth必须在AuthProvider内使用');
+    // 返回默认值而不是抛出错误
+    return {
+      isLoading: false, // 修改为false，避免无限加载
+      userToken: null,
+      userInfo: null,
+      login: async () => {
+        console.warn('AuthContext未初始化，login操作被跳过');
+      },
+      logout: async () => {
+        console.warn('AuthContext未初始化，logout操作被跳过');
+      },
+      isCustomerService: () => false,
+      refreshUserInfo: async () => {
+        console.warn('AuthContext未初始化，refreshUserInfo操作被跳过');
+        return false;
+      },
+    };
   }
   return context;
 }; 

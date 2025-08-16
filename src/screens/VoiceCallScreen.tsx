@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import {
   View,
   Text,
@@ -29,7 +29,7 @@ import {
 } from 'react-native-webrtc';
 import { Socket } from 'socket.io-client';
 import { BASE_URL } from '../config/api';
-import { AuthContext } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { useFloatingCall } from '../context/FloatingCallContext';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
@@ -47,7 +47,7 @@ interface RTCPeerConnectionWithEvents extends RTCPeerConnection {
 const VoiceCallScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { userInfo, userToken, isCustomerService } = React.useContext(AuthContext);
+  const { userInfo, userToken, isCustomerService } = useAuth();
   const { socket: globalSocket, isConnected } = useSocket();
   const { showFloatingCall, hideFloatingCall, updateCallDuration } = useFloatingCall();
   
@@ -147,9 +147,23 @@ const VoiceCallScreen: React.FC = () => {
       console.log('正在检查麦克风权限...');
       
       // 检查权限状态
-      const permissionStatus = Platform.OS === 'android' 
-        ? await check(PERMISSIONS.ANDROID.RECORD_AUDIO)
-        : await check(PERMISSIONS.IOS.MICROPHONE);
+      let permissionStatus;
+      if (Platform.OS === 'android') {
+        // 增强防御性编程：检查PERMISSIONS模块是否正确加载
+        try {
+          if (!PERMISSIONS || !PERMISSIONS.ANDROID || !PERMISSIONS.ANDROID.RECORD_AUDIO) {
+            console.warn('⚠️ [VoiceCall] PERMISSIONS.ANDROID未加载，使用默认权限字符串');
+            permissionStatus = await check('android.permission.RECORD_AUDIO' as any);
+          } else {
+            permissionStatus = await check(PERMISSIONS.ANDROID.RECORD_AUDIO);
+          }
+        } catch (permError) {
+          console.warn('⚠️ [VoiceCall] 权限检查异常，使用默认权限:', permError);
+          permissionStatus = await check('android.permission.RECORD_AUDIO' as any);
+        }
+      } else {
+        permissionStatus = await check(PERMISSIONS.IOS.MICROPHONE);
+      }
       
       console.log('麦克风权限状态:', permissionStatus);
       
@@ -188,9 +202,23 @@ const VoiceCallScreen: React.FC = () => {
       
       // 请求权限
       console.log('请求麦克风权限...');
-      const result = Platform.OS === 'android'
-        ? await request(PERMISSIONS.ANDROID.RECORD_AUDIO)
-        : await request(PERMISSIONS.IOS.MICROPHONE);
+      let result;
+      if (Platform.OS === 'android') {
+        // 增强防御性编程：检查PERMISSIONS模块是否正确加载
+        try {
+          if (!PERMISSIONS || !PERMISSIONS.ANDROID || !PERMISSIONS.ANDROID.RECORD_AUDIO) {
+            console.warn('⚠️ [VoiceCall] PERMISSIONS.ANDROID未加载，使用默认权限字符串');
+            result = await request('android.permission.RECORD_AUDIO' as any);
+          } else {
+            result = await request(PERMISSIONS.ANDROID.RECORD_AUDIO);
+          }
+        } catch (permError) {
+          console.warn('⚠️ [VoiceCall] 权限请求异常，使用默认权限:', permError);
+          result = await request('android.permission.RECORD_AUDIO' as any);
+        }
+      } else {
+        result = await request(PERMISSIONS.IOS.MICROPHONE);
+      }
       
       console.log('麦克风权限请求结果:', result);
       

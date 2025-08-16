@@ -136,8 +136,31 @@ class PushNotificationService {
         console.log('⚠️ [PushNotification] iOS通知权限请求已简化(无Firebase)');
         return true;
       } else {
-        // Android权限请求
-        const permission = await check(PERMISSIONS.ANDROID.POST_NOTIFICATIONS);
+        // Android权限请求（兼容处理：某些环境下 PERMISSIONS 可能为 undefined）
+        // 增强防御性编程：检查PERMISSIONS模块是否正确加载
+        if (!PERMISSIONS) {
+          console.warn('⚠️ [PushNotification] PERMISSIONS模块未加载，跳过通知权限检查');
+          return true;
+        }
+
+        let ANDROID_PERMISSIONS;
+        try {
+          ANDROID_PERMISSIONS = PERMISSIONS?.ANDROID as
+            | { POST_NOTIFICATIONS?: string }
+            | undefined;
+
+          if (!ANDROID_PERMISSIONS?.POST_NOTIFICATIONS) {
+            console.warn(
+              '⚠️ [PushNotification] PERMISSIONS.ANDROID 未定义，跳过通知权限检查以避免崩溃'
+            );
+            return true;
+          }
+        } catch (permError) {
+          console.warn('⚠️ [PushNotification] 权限模块加载异常，跳过权限检查:', permError);
+          return true;
+        }
+
+        const permission = await check(ANDROID_PERMISSIONS.POST_NOTIFICATIONS!);
         
         if (permission === RESULTS.GRANTED) {
           console.log('✅ [PushNotification] Android通知权限已存在');
@@ -145,7 +168,7 @@ class PushNotificationService {
         }
 
         if (permission === RESULTS.DENIED) {
-          const result = await request(PERMISSIONS.ANDROID.POST_NOTIFICATIONS);
+          const result = await request(ANDROID_PERMISSIONS.POST_NOTIFICATIONS!);
           return result === RESULTS.GRANTED;
         }
 
@@ -239,7 +262,28 @@ class PushNotificationService {
         // iOS权限检查简化版
         return true;
       } else {
-        const permission = await check(PERMISSIONS.ANDROID.POST_NOTIFICATIONS);
+        // 增强防御性编程：检查PERMISSIONS模块是否正确加载
+        if (!PERMISSIONS) {
+          console.warn('⚠️ [PushNotification] PERMISSIONS模块未加载，跳过权限状态检查');
+          return false;
+        }
+
+        let ANDROID_PERMISSIONS;
+        try {
+          ANDROID_PERMISSIONS = PERMISSIONS?.ANDROID as
+            | { POST_NOTIFICATIONS?: string }
+            | undefined;
+          if (!ANDROID_PERMISSIONS?.POST_NOTIFICATIONS) {
+            console.warn(
+              '⚠️ [PushNotification] PERMISSIONS.ANDROID 未定义，跳过权限状态检查'
+            );
+            return true;
+          }
+        } catch (permError) {
+          console.warn('⚠️ [PushNotification] 权限模块加载异常，跳过权限检查:', permError);
+          return true;
+        }
+        const permission = await check(ANDROID_PERMISSIONS.POST_NOTIFICATIONS!);
         return permission === RESULTS.GRANTED;
       }
     } catch (error) {

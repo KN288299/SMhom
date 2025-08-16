@@ -51,13 +51,32 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     try {
       console.log('📍 检查定位权限...');
       
-      // 同时检查粗略和精确位置权限
+      // 增强防御性编程：检查PERMISSIONS模块是否正确加载
+      let ANDROID_PERMISSIONS;
+      try {
+        if (!PERMISSIONS || !PERMISSIONS.ANDROID || !PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION) {
+          console.warn('⚠️ [LocationPicker] PERMISSIONS.ANDROID未加载，使用默认权限字符串');
+          ANDROID_PERMISSIONS = {
+            ACCESS_FINE_LOCATION: 'android.permission.ACCESS_FINE_LOCATION',
+            ACCESS_COARSE_LOCATION: 'android.permission.ACCESS_COARSE_LOCATION',
+          };
+        } else {
+          ANDROID_PERMISSIONS = PERMISSIONS.ANDROID;
+        }
+      } catch (permError) {
+        console.warn('⚠️ [LocationPicker] 权限模块加载异常，使用默认权限:', permError);
+        ANDROID_PERMISSIONS = {
+          ACCESS_FINE_LOCATION: 'android.permission.ACCESS_FINE_LOCATION',
+          ACCESS_COARSE_LOCATION: 'android.permission.ACCESS_COARSE_LOCATION',
+        };
+      }
+
       const fineLocationPermission = Platform.OS === 'ios' 
         ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE 
-        : PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION;
+        : ANDROID_PERMISSIONS.ACCESS_FINE_LOCATION as any;
         
       const coarseLocationPermission = Platform.OS === 'android'
-        ? PERMISSIONS.ANDROID.ACCESS_COARSE_LOCATION
+        ? ANDROID_PERMISSIONS.ACCESS_COARSE_LOCATION as any
         : fineLocationPermission;
 
       // 先检查现有权限状态

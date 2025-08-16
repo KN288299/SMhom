@@ -23,14 +23,12 @@ declare global {
 }
 
 function App(): React.JSX.Element {
-  const navigationRef = useRef<any>(null);
   const socketRef = useRef<any>(null);
 
-  // 设置全局引用
+  // 设置全局引用 (移除 navigationRef，由 AppNavigator 负责)
   useEffect(() => {
-    (global as any).navigationRef = navigationRef;
     (global as any).socketRef = socketRef;
-    console.log('🔗 [App] 全局引用已设置');
+    console.log('🔗 [App] 全局Socket引用已设置');
   }, []);
 
   // 初始化本地通知服务（原Android推送服务）

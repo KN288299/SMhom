@@ -96,13 +96,13 @@ class AndroidPushService {
 
   private navigateToChat(conversationId: string): void {
     try {
-      if (global.navigationRef?.current) {
-        global.navigationRef.current.navigate('Chat', {
+      if (global.navigationRef?.isReady?.()) {
+        global.navigationRef.navigate('Chat', {
           conversationId: conversationId,
         });
         console.log('✅ [PushService] 导航到聊天页面成功');
       } else {
-        console.warn('⚠️ [PushService] 导航引用不可用');
+        console.warn('⚠️ [PushService] 导航引用不可用或未就绪');
       }
     } catch (error) {
       console.error('❌ [PushService] 导航失败:', error);
@@ -111,15 +111,15 @@ class AndroidPushService {
 
   private navigateToVoiceCall(callId: string, conversationId: string): void {
     try {
-      if (global.navigationRef?.current) {
-        global.navigationRef.current.navigate('VoiceCall', {
+      if (global.navigationRef?.isReady?.()) {
+        global.navigationRef.navigate('VoiceCall', {
           callId: callId,
           conversationId: conversationId,
           isIncoming: true,
         });
         console.log('✅ [PushService] 导航到来电页面成功');
       } else {
-        console.warn('⚠️ [PushService] 导航引用不可用');
+        console.warn('⚠️ [PushService] 导航引用不可用或未就绪');
       }
     } catch (error) {
       console.error('❌ [PushService] 导航到来电页面失败:', error);

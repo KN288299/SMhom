@@ -1,11 +1,11 @@
 import React, { useContext, useEffect } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import { AuthContext } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import notificationService from '../services/NotificationService';
 
 const BackgroundNotificationManager: React.FC = () => {
-  const { userInfo } = useContext(AuthContext);
+  const { userInfo } = useAuth();
   const { subscribeToMessages, isConnected } = useSocket();
 
   // 应用状态管理

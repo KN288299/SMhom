@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { AuthContext } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { DEFAULT_AVATAR } from '../utils/DefaultAvatar';
 
@@ -22,7 +22,7 @@ interface PersonalInfoScreenProps {
 }
 
 const PersonalInfoScreen: React.FC<PersonalInfoScreenProps> = ({ navigation }) => {
-  const { logout, userInfo, isCustomerService, refreshUserInfo } = useContext(AuthContext);
+  const { logout, userInfo, isCustomerService, refreshUserInfo } = useAuth();
   const [avatarSource, setAvatarSource] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 

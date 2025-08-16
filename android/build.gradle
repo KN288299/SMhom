@@ -1,11 +1,11 @@
 buildscript {
     ext {
-        buildToolsVersion = "34.0.0"
+        buildToolsVersion = "35.0.0"
         minSdkVersion = 24
-        compileSdkVersion = 34
+        compileSdkVersion = 35
         targetSdkVersion = 34
         ndkVersion = "26.1.10909125"
-        kotlinVersion = "1.9.24"
+        kotlinVersion = "1.8.22"
     }
     repositories {
         google()
@@ -13,11 +13,40 @@ buildscript {
         maven { url = uri("https://jitpack.io") }
     }
     dependencies {
-        classpath("com.android.tools.build:gradle:8.2.2")
+        classpath("com.android.tools.build:gradle:8.6.0")
         classpath("com.facebook.react:react-native-gradle-plugin")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.8.22")
         classpath 'com.google.gms:google-services:4.3.15'
     }
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+// Ensure libraries depending on the old 'react-native' artifact resolve to the
+// correct Android artifact (react-android) that contains generated view manager interfaces.
+allprojects { project ->
+	configurations.configureEach { cfg ->
+		cfg.resolutionStrategy.eachDependency { details ->
+			if (details.requested.group == 'com.facebook.react' && details.requested.name == 'react-native') {
+				def rnVersion = details.requested.version ?: '0.74.4'
+				details.useTarget("com.facebook.react:react-android:${rnVersion}")
+			}
+		}
+	}
+}
+
+// Force consistent Kotlin stdlib across all subprojects to avoid unresolved references like `listOf`/`emptyList`
+subprojects { subproject ->
+	configurations.configureEach { cfg ->
+		cfg.resolutionStrategy {
+			force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+			force 'org.jetbrains.kotlin:kotlin-stdlib-common:1.8.22'
+			force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
+			force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+			force 'org.jetbrains.kotlin:kotlin-reflect:1.8.22'
+		}
+	}
+
+	// Ensure React Native codegen base interfaces are available for certain libraries
+	// (no-op)
+}

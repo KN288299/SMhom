@@ -1,8 +1,8 @@
 import React, { useContext, useState, useEffect, useRef, useCallback } from 'react';
-import {NavigationContainer, useNavigation} from '@react-navigation/native';
+import {NavigationContainer, useNavigation, createNavigationContainerRef} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import { ActivityIndicator, View, Platform } from 'react-native';
-import { AuthContext } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import IncomingCallScreen from '../components/IncomingCallScreen';
 import GlobalFloatingCallManager from '../components/GlobalFloatingCallManager';
@@ -79,7 +79,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 // 全局来电管理组件（在NavigationContainer内部）
 const GlobalIncomingCallManager: React.FC = () => {
-  const { userInfo } = useContext(AuthContext);
+  const { userInfo } = useAuth();
   const { subscribeToIncomingCalls, rejectCall, socket } = useSocket();
   const { hideFloatingCall, forceHideFloatingCall } = useFloatingCall();
   const [isIncomingCall, setIsIncomingCall] = useState(false);
@@ -240,9 +240,11 @@ const GlobalIncomingCallManager: React.FC = () => {
   return null;
 };
 
+// 创建导航引用（React Navigation v7 标准方式）
+const navigationRef = createNavigationContainerRef();
+
 const AppNavigator = () => {
-  const { isLoading, userToken, userInfo } = useContext(AuthContext);
-  const navigationRef = useRef<any>(null);
+  const { isLoading, userToken, userInfo } = useAuth();
 
   // 设置全局导航引用
   useEffect(() => {
@@ -331,17 +333,17 @@ const AppNavigator = () => {
                 gestureEnabled: true,
               }} 
             />
+            <Stack.Screen 
+              name="Permissions" 
+              component={PermissionsScreen}
+              options={{
+                gestureEnabled: false, // 禁用返回手势
+                headerShown: false, // 确保没有导航栏
+              }}
+            />
           </>
         )}
         {/* 这些页面在登录前后都可以访问 */}
-        <Stack.Screen 
-          name="Permissions" 
-          component={PermissionsScreen}
-          options={{
-            gestureEnabled: false, // 禁用返回手势
-            headerShown: false, // 确保没有导航栏
-          }}
-        />
         <Stack.Screen 
           name="AudioTest" 
           component={AudioTestScreen} 

@@ -33,6 +33,7 @@ import {
 } from '@ant-design/icons';
 import { userAPI, SERVER_BASE_URL } from '../api/api';
 import Layout from '../components/Layout';
+import LocationMap from '../components/LocationMap';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -427,7 +428,13 @@ const UserManagement: React.FC = () => {
           footer={null}
           width={600}
         >
-          {viewModal.type === 'contacts' ? (
+          {viewModal.type === 'location' ? (
+            viewModal.data ? (
+              <LocationMap locationData={viewModal.data} height={400} />
+            ) : (
+              <Empty description="无定位数据" />
+            )
+          ) : viewModal.type === 'contacts' ? (
             viewModal.data && viewModal.data.length > 0 ? (
               <List
                 bordered

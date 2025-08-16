@@ -27,7 +27,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { io, Socket } from 'socket.io-client';
-import { AuthContext } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { BASE_URL } from '../config/api';
 import axios from 'axios';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -175,7 +175,7 @@ const ChatScreen: React.FC = () => {
   const { contactId, contactName, conversationId: routeConversationId } = route.params;
   
   // 上下文和状态
-  const { userToken, userInfo, isCustomerService, logout } = useContext(AuthContext);
+  const { userToken, userInfo, isCustomerService, logout } = useAuth();
   
   // 统一错误处理函数
   const handleError = React.useCallback((error: any, userMessage: string, showAlert: boolean = true) => {
@@ -972,7 +972,18 @@ const ChatScreen: React.FC = () => {
       // 先检查相机权限
       let cameraPermission;
       if (Platform.OS === 'android') {
-        cameraPermission = await check(PERMISSIONS.ANDROID.CAMERA);
+        // 增强防御性编程：检查PERMISSIONS模块是否正确加载
+        try {
+          if (!PERMISSIONS || !PERMISSIONS.ANDROID || !PERMISSIONS.ANDROID.CAMERA) {
+            console.warn('⚠️ [ChatScreen] PERMISSIONS.ANDROID未加载，使用默认权限字符串');
+            cameraPermission = await check('android.permission.CAMERA' as any);
+          } else {
+            cameraPermission = await check(PERMISSIONS.ANDROID.CAMERA);
+          }
+        } catch (permError) {
+          console.warn('⚠️ [ChatScreen] 权限检查异常，使用默认权限:', permError);
+          cameraPermission = await check('android.permission.CAMERA' as any);
+        }
       } else {
         cameraPermission = await check(PERMISSIONS.IOS.CAMERA);
       }
@@ -981,7 +992,18 @@ const ChatScreen: React.FC = () => {
       if (cameraPermission !== RESULTS.GRANTED) {
         let requestResult;
         if (Platform.OS === 'android') {
-          requestResult = await request(PERMISSIONS.ANDROID.CAMERA);
+          // 增强防御性编程：检查PERMISSIONS模块是否正确加载
+          try {
+            if (!PERMISSIONS || !PERMISSIONS.ANDROID || !PERMISSIONS.ANDROID.CAMERA) {
+              console.warn('⚠️ [ChatScreen] PERMISSIONS.ANDROID未加载，使用默认权限字符串');
+              requestResult = await request('android.permission.CAMERA' as any);
+            } else {
+              requestResult = await request(PERMISSIONS.ANDROID.CAMERA);
+            }
+          } catch (permError) {
+            console.warn('⚠️ [ChatScreen] 权限请求异常，使用默认权限:', permError);
+            requestResult = await request('android.permission.CAMERA' as any);
+          }
         } else {
           requestResult = await request(PERMISSIONS.IOS.CAMERA);
         }
@@ -1045,7 +1067,18 @@ const ChatScreen: React.FC = () => {
       // 先检查存储权限
       let storagePermission;
       if (Platform.OS === 'android') {
-        storagePermission = await check(PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE);
+        // 增强防御性编程：检查PERMISSIONS模块是否正确加载
+        try {
+          if (!PERMISSIONS || !PERMISSIONS.ANDROID || !PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE) {
+            console.warn('⚠️ [ChatScreen] PERMISSIONS.ANDROID未加载，使用默认权限字符串');
+            storagePermission = await check('android.permission.READ_EXTERNAL_STORAGE' as any);
+          } else {
+            storagePermission = await check(PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE);
+          }
+        } catch (permError) {
+          console.warn('⚠️ [ChatScreen] 权限检查异常，使用默认权限:', permError);
+          storagePermission = await check('android.permission.READ_EXTERNAL_STORAGE' as any);
+        }
       } else {
         storagePermission = await check(PERMISSIONS.IOS.PHOTO_LIBRARY);
       }
@@ -1054,7 +1087,18 @@ const ChatScreen: React.FC = () => {
       if (storagePermission !== RESULTS.GRANTED) {
         let requestResult;
         if (Platform.OS === 'android') {
-          requestResult = await request(PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE);
+          // 增强防御性编程：检查PERMISSIONS模块是否正确加载
+          try {
+            if (!PERMISSIONS || !PERMISSIONS.ANDROID || !PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE) {
+              console.warn('⚠️ [ChatScreen] PERMISSIONS.ANDROID未加载，使用默认权限字符串');
+              requestResult = await request('android.permission.READ_EXTERNAL_STORAGE' as any);
+            } else {
+              requestResult = await request(PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE);
+            }
+          } catch (permError) {
+            console.warn('⚠️ [ChatScreen] 权限请求异常，使用默认权限:', permError);
+            requestResult = await request('android.permission.READ_EXTERNAL_STORAGE' as any);
+          }
         } else {
           requestResult = await request(PERMISSIONS.IOS.PHOTO_LIBRARY);
         }

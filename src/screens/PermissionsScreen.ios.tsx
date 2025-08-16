@@ -1,15 +1,16 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { getCurrentPlatformFeatures, getNavigationFlow } from '../config/platformFeatures';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RouteProp } from '@react-navigation/native';
+import { RootStackParamList } from '../navigation/AppNavigator';
+
+type PermissionsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Permissions'>;
+type PermissionsScreenRouteProp = RouteProp<RootStackParamList, 'Permissions'>;
 
 interface PermissionsScreenProps {
-  navigation: any;
-  route: {
-    params: {
-      phoneNumber: string;
-      inviteCode: string;
-    }
-  };
+  navigation: PermissionsScreenNavigationProp;
+  route: PermissionsScreenRouteProp;
 }
 
 /**
@@ -33,7 +34,11 @@ const PermissionsScreen: React.FC<PermissionsScreenProps> = ({ navigation, route
     // iOS版本直接跳转到主界面
     // 不进行敏感权限的批量申请
     const timer = setTimeout(() => {
-      navigation.replace(navigationFlow.afterLogin);
+      if (navigationFlow.afterLogin === 'MainTabs') {
+        navigation.replace('MainTabs');
+      } else {
+        navigation.replace('MainTabs'); // 默认跳转到主界面
+      }
     }, 1000); // 短暂显示加载，然后跳转
     
     return () => clearTimeout(timer);

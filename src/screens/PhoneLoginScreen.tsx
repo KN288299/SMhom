@@ -18,7 +18,7 @@ import Button from '../components/Button';
 
 import axios from 'axios';
 import { API_URL, API_ENDPOINTS } from '../config/api';
-import { AuthContext } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { getNavigationFlow } from '../config/platformFeatures';
 
 interface PhoneLoginScreenProps {
@@ -32,7 +32,7 @@ interface ApiErrorResponse {
 const {height} = Dimensions.get('window');
 
 const PhoneLoginScreen: React.FC<PhoneLoginScreenProps> = ({navigation}) => {
-  const { login } = useContext(AuthContext);
+  const { login } = useAuth();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [inviteCode, setInviteCode] = useState('6969');
   const [errors, setErrors] = useState<{

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { BASE_URL } from '../config/api';
-import { AuthContext } from './AuthContext';
+import { useAuth } from './AuthContext';
 import { Alert } from 'react-native';
 
 interface Message {
@@ -69,7 +69,7 @@ interface SocketProviderProps {
 }
 
 export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
-  const { userToken, logout, isCustomerService } = useContext(AuthContext);
+  const { userToken, logout, isCustomerService } = useAuth();
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);

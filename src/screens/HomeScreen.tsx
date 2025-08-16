@@ -26,7 +26,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { TabParamList } from '../navigation/TabNavigator';
 import { PROVINCES } from '../constants/provinces';
-import { AuthContext } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 
 // 组合导航类型
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'StaffDetail'> & 
@@ -83,7 +83,7 @@ const UserCard = React.memo(({ staffId, name, age, job, image, tag, onPress }: U
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
-  const { userInfo, isCustomerService } = useContext(AuthContext);
+  const { userInfo, isCustomerService } = useAuth();
   const [staffData, setStaffData] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

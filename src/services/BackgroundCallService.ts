@@ -133,8 +133,8 @@ class BackgroundCallService {
     console.log('📱 [BackgroundCall] 导航到通话页面:', callData);
     
     // 这里需要全局导航引用
-    if ((global as any).navigationRef?.current) {
-      (global as any).navigationRef.current.navigate('VoiceCall', {
+    if ((global as any).navigationRef?.isReady?.()) {
+      (global as any).navigationRef.navigate('VoiceCall', {
         contactId: callData.callerId,
         contactName: callData.callerName,
         contactAvatar: callData.callerAvatar,
@@ -143,7 +143,7 @@ class BackgroundCallService {
         conversationId: callData.conversationId
       });
     } else {
-      console.warn('⚠️ [BackgroundCall] 导航引用不可用');
+      console.warn('⚠️ [BackgroundCall] 导航引用不可用或未就绪');
     }
   }
 

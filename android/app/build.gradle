@@ -51,8 +51,6 @@ react {
     //   The list of flags to pass to the Hermes compiler. By default is "-O", "-output-source-map"
     // hermesFlags = ["-O", "-output-source-map"]
 
-    /* Autolinking */
-    autolinkLibrariesWithApp()
 }
 
 /**
@@ -165,15 +163,37 @@ dependencies {
     // 多DEX支持
     implementation 'androidx.multidex:multidex:2.0.1'
 
-    // 强制使用AndroidX版本，排除Support库冲突
-    implementation 'androidx.core:core:1.15.0'
+    // 强制使用兼容的AndroidX版本
+    implementation 'androidx.core:core:1.16.0'
+    implementation 'androidx.core:core-ktx:1.16.0'
     implementation 'androidx.appcompat:appcompat:1.7.0'
+
+    // Force Kotlin stdlib to match the Gradle plugin version to avoid metadata mismatch
+    configurations.all {
+        resolutionStrategy {
+            force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+            force 'org.jetbrains.kotlin:kotlin-stdlib-common:1.8.22'
+            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
+            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+            force 'org.jetbrains.kotlin:kotlin-reflect:1.8.22'
+        }
+    }
+    
+    // React Native 依赖由插件自动管理
     
     // 排除有问题的依赖
     configurations.all {
         exclude group: 'com.android.support'
+        // 强制使用特定版本的androidx.core
+        resolutionStrategy {
+            force 'androidx.core:core:1.16.0'
+            force 'androidx.core:core-ktx:1.16.0'
+        }
     }
 }
+
+// 应用自动链接
+apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
 
 // 添加Vector Icons配置
 project.ext.vectoricons = [

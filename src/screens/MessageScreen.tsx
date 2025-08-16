@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import { API_URL, API_ENDPOINTS, BASE_URL } from '../config/api';
-import { AuthContext } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -39,7 +39,7 @@ interface User {
 }
 
 const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
-  const { userInfo, userToken, isCustomerService } = useContext(AuthContext);
+  const { userInfo, userToken, isCustomerService } = useAuth();
   const { subscribeToMessages, unreadMessageCount, socket } = useSocket();
   const [contacts, setContacts] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
