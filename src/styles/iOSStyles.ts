@@ -14,7 +14,7 @@ const isIOSPlatform = Platform.OS === 'ios';
 const IOS_FONT_SCALE = 0.9;
 
 // iOS安全区域常量
-const IOS_SAFE_AREA_TOP = 44; // 状态栏高度
+export const IOS_SAFE_AREA_TOP = 44; // 状态栏高度
 const IOS_HEADER_HEIGHT = 50; // 减少页头高度
 const IOS_INPUT_HEIGHT = 44; // iOS标准输入框高度
 
@@ -23,7 +23,7 @@ const IOS_MAIN_HEADER_HEIGHT = 100; // 主页面页头高度 - 增加高度给�
 const IOS_MAIN_HEADER_PADDING_TOP = isIOSPlatform ? 55 : 30; // iOS增加paddingTop避免被灵动岛遮挡
 
 // 聊天页面页头配置 - 与消息页面保持一致
-const IOS_CHAT_HEADER_HEIGHT = 80; // 聊天页面页头高度 - 与消息页面一致
+export const IOS_CHAT_HEADER_HEIGHT = 80; // 聊天页面页头高度 - 与消息页面一致
 const IOS_CHAT_HEADER_PADDING_TOP = isIOSPlatform ? 37 : 30; // 减少15%的paddingTop（44 * 0.85 ≈ 37）往上移动页头
 
 /**

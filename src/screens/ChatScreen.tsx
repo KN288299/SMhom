@@ -23,7 +23,7 @@ import {
   Linking,
   ToastAndroid,
 } from 'react-native';
-import { iOSChatStyles, iOSMessageStyles, isIOS, getPlatformStyles, getIOSFontSize } from '../styles/iOSStyles';
+import { iOSChatStyles, iOSMessageStyles, isIOS, getPlatformStyles, getIOSFontSize, IOS_CHAT_HEADER_HEIGHT, IOS_SAFE_AREA_TOP } from '../styles/iOSStyles';
 import NetInfo from '@react-native-community/netinfo';
 import { getOptimizedConnectionStatus } from '../utils/iOSNetworkHelper';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
@@ -2001,7 +2001,7 @@ const ChatScreen: React.FC = () => {
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? IOS_CHAT_HEADER_HEIGHT + IOS_SAFE_AREA_TOP : 0}
         onStartShouldSetResponder={() => {
           if (showMoreOptions) {
             setShowMoreOptions(false);
