@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { getPageConfig, PageConfig } from '../services/pageConfigService';
+import { iOSTabBarStyles, isIOS } from '../styles/iOSStyles';
 
 // 导入页面
 import HomeScreen from '../screens/HomeScreen';
@@ -63,18 +64,19 @@ const MainTabNavigator = () => {
         headerShown: false,
         tabBarActiveTintColor: '#ff6b81',
         tabBarInactiveTintColor: '#999',
-        tabBarStyle: {
+        tabBarStyle: isIOS ? iOSTabBarStyles.tabBarStyle : {
           height: 60,
           borderTopWidth: 1,
           borderTopColor: '#eee',
           backgroundColor: '#fff',
         },
         tabBarShowLabel: true,
-        tabBarLabelStyle: {
+        tabBarLabelStyle: isIOS ? iOSTabBarStyles.tabBarLabelStyle : {
           fontSize: 12,
           marginTop: -5,
           marginBottom: 5,
         },
+        tabBarIconStyle: isIOS ? iOSTabBarStyles.tabBarIconStyle : {},
       }}
     >
       <Tab.Screen 
@@ -136,13 +138,13 @@ const MainTabNavigator = () => {
 };
 
 const styles = StyleSheet.create({
-  yuZuTangContainer: {
+  yuZuTangContainer: isIOS ? iOSTabBarStyles.yuZuTangContainer : {
     height: 60,
     width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  yuZuTangButton: {
+  yuZuTangButton: isIOS ? iOSTabBarStyles.yuZuTangButton : {
     width: 70,
     height: 70,
     borderRadius: 35,
@@ -155,7 +157,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 5,
   },
-  yuZuTangText: {
+  yuZuTangText: isIOS ? iOSTabBarStyles.yuZuTangText : {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
