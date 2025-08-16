@@ -22,6 +22,10 @@ const IOS_INPUT_HEIGHT = 44; // iOS标准输入框高度
 const IOS_MAIN_HEADER_HEIGHT = 100; // 主页面页头高度 - 增加高度给顶部更多空间
 const IOS_MAIN_HEADER_PADDING_TOP = isIOSPlatform ? 55 : 30; // iOS增加paddingTop避免被灵动岛遮挡
 
+// 聊天页面页头配置 - 与消息页面保持一致
+const IOS_CHAT_HEADER_HEIGHT = 80; // 聊天页面页头高度 - 与消息页面一致
+const IOS_CHAT_HEADER_PADDING_TOP = isIOSPlatform ? 44 : 30; // 与消息页面保持一致的paddingTop
+
 /**
  * 根据字体大小获取iOS适配的大小
  */
@@ -35,9 +39,9 @@ export const getIOSFontSize = (fontSize: number): number => {
 export const iOSChatStyles = StyleSheet.create({
   // 页头样式优化 - 与消息页面保持一致的高度
   headerContainer: {
-    height: IOS_MAIN_HEADER_HEIGHT,
+    height: IOS_CHAT_HEADER_HEIGHT, // 改为聊天页面专用高度
     backgroundColor: '#fff',
-    paddingTop: IOS_MAIN_HEADER_PADDING_TOP, // 与消息页面保持一致的paddingTop
+    paddingTop: IOS_CHAT_HEADER_PADDING_TOP, // 改为聊天页面专用paddingTop
     borderBottomWidth: 0.5, // 更细的分割线
     borderBottomColor: '#c6c6c8',
     shadowColor: '#000',
