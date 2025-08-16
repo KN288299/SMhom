@@ -166,16 +166,12 @@ export const useSocket = (userToken: string | null) => {
         token: userToken
       },
       transports: ['websocket', 'polling'],
-      timeout: 20000, // iOS需要更长的连接超时
+      timeout: 10000, // 减少连接超时时间
       reconnection: true,
       reconnectionAttempts: maxReconnectAttempts,
-      reconnectionDelay: 2000, // iOS网络切换需要更长延迟
-      reconnectionDelayMax: 8000,
-      randomizationFactor: 0.3, // 减少随机性，提高连接稳定性
-      forceNew: true, // 强制创建新连接
-      // iOS特殊配置
-      upgrade: true,
-      rememberUpgrade: true,
+      reconnectionDelay: 1000, // 减少重连延迟
+      reconnectionDelayMax: 5000, // 减少最大延迟
+      forceNew: false, // 不强制创建新连接，复用连接
     });
 
     socketRef.current = socket;
@@ -191,11 +187,11 @@ export const useSocket = (userToken: string | null) => {
       // 设置在线状态
       offlineMessageService.setOnlineStatus(true);
 
-      // 开始心跳检测
+      // 开始心跳检测（减少频率）
       if (pingIntervalRef.current) {
         clearInterval(pingIntervalRef.current);
       }
-      pingIntervalRef.current = setInterval(sendPing, 5000);
+      pingIntervalRef.current = setInterval(sendPing, 15000); // 增加到15秒
       
       // 连接成功后立即发送一个测试ping
       sendPing();

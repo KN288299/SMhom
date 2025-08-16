@@ -891,45 +891,42 @@ const ChatScreen: React.FC = () => {
     }
   }, [messages.length, loading, hasInitialScrolled]);
   
-  // 网络状态监听 - 使用优化的iOS网络检测
+  // 网络状态监听 - 轻量级版本
   useEffect(() => {
+    let lastConnectedState = isNetworkConnected;
+    
     const unsubscribe = NetInfo.addEventListener(state => {
-      // 使用优化的网络连接检测
-      const connected = getOptimizedConnectionStatus(state);
+      // 使用简化的网络连接检测
+      const connected = Platform.OS === 'ios' 
+        ? getOptimizedConnectionStatus(state)
+        : Boolean(state.isConnected && state.isInternetReachable !== false);
       
-      console.log(`📱 ${Platform.OS} 网络状态:`, {
-        isConnected: state.isConnected,
-        isInternetReachable: state.isInternetReachable,
-        type: state.type,
-        finalConnected: connected
-      });
-      
-      setIsNetworkConnected(connected);
-      
-      if (!connected && isNetworkConnected) {
-        // 网络断开
-        setShowNetworkBanner(true);
-        showToast('网络连接已断开');
-      } else if (connected && !isNetworkConnected) {
-        // 网络恢复
-        setShowNetworkBanner(false);
-        showToast('网络连接已恢复');
+      // 减少状态更新频率
+      if (connected !== lastConnectedState) {
+        setIsNetworkConnected(connected);
+        
+        if (!connected) {
+          setShowNetworkBanner(true);
+          showToast('网络连接已断开');
+        } else if (lastConnectedState === false) {
+          setShowNetworkBanner(false);
+          showToast('网络连接已恢复');
+        }
+        
+        lastConnectedState = connected;
       }
     });
 
     return () => unsubscribe();
-  }, [isNetworkConnected, showToast]);
+  }, [showToast]);
 
-  // 监听Socket连接状态 - iOS优化版本
+  // 监听Socket连接状态 - 轻量级版本
   useEffect(() => {
     if (socket) {
-      let wasDisconnected = false; // 跟踪是否之前断开过连接
+      let wasDisconnected = false;
       
       const handleConnect = () => {
-        console.log('📡 Socket连接成功');
         setConnecting(false);
-        
-        // 只有在之前断开过连接的情况下才显示"连接已恢复"
         if (wasDisconnected) {
           showToast('连接已恢复');
           wasDisconnected = false;
@@ -937,29 +934,20 @@ const ChatScreen: React.FC = () => {
       };
       
       const handleDisconnect = (reason: string) => {
-        console.log('📡 Socket连接断开:', reason);
         setConnecting(true);
         wasDisconnected = true;
-        
-        // 只对非预期的断开显示提示
-        if (reason !== 'io client disconnect' && reason !== 'transport close') {
-          console.log('🚫 Socket意外断开:', reason);
-        }
+        // 减少断开提示
       };
       
       const handleConnectError = (error: any) => {
-        console.error('📡 Socket连接错误:', error);
         setConnecting(false);
         wasDisconnected = true;
-        showToast('连接错误，请重试');
+        // 减少错误提示
       };
 
       // 初始连接状态
-      const initiallyConnected = socket.connected;
-      setConnecting(!initiallyConnected);
-      
-      // 如果初始化时就未连接，标记为已断开状态
-      if (!initiallyConnected) {
+      setConnecting(!socket.connected);
+      if (!socket.connected) {
         wasDisconnected = true;
       }
 
