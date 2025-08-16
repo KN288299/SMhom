@@ -288,7 +288,7 @@ export const iOSMainHeaderStyles = StyleSheet.create({
   
   // 页头标题样式
   headerTitle: {
-    fontSize: getIOSFontSize(18),
+    fontSize: getIOSFontSize(20),
     fontWeight: isIOSPlatform ? '600' : 'bold',
     color: '#333',
     textAlign: 'center',
