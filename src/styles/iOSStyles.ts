@@ -24,7 +24,7 @@ const IOS_MAIN_HEADER_PADDING_TOP = isIOSPlatform ? 55 : 30; // iOS增加padding
 
 // 聊天页面页头配置 - 与消息页面保持一致
 const IOS_CHAT_HEADER_HEIGHT = 80; // 聊天页面页头高度 - 与消息页面一致
-const IOS_CHAT_HEADER_PADDING_TOP = isIOSPlatform ? 44 : 30; // 与消息页面保持一致的paddingTop
+const IOS_CHAT_HEADER_PADDING_TOP = isIOSPlatform ? 37 : 30; // 减少15%的paddingTop（44 * 0.85 ≈ 37）往上移动页头
 
 /**
  * 根据字体大小获取iOS适配的大小
@@ -144,9 +144,9 @@ export const iOSChatStyles = StyleSheet.create({
   
   // 按钮样式
   sendButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#007AFF', // iOS蓝色
     justifyContent: 'center',
     alignItems: 'center',
@@ -154,9 +154,9 @@ export const iOSChatStyles = StyleSheet.create({
   },
   
   voiceButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#FF6B81',
     justifyContent: 'center',
     alignItems: 'center',
@@ -164,9 +164,9 @@ export const iOSChatStyles = StyleSheet.create({
   },
   
   moreButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#8E8E93',
     justifyContent: 'center',
     alignItems: 'center',
