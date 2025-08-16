@@ -22,9 +22,9 @@ const IOS_INPUT_HEIGHT = 44; // iOS标准输入框高度
 const IOS_MAIN_HEADER_HEIGHT = 100; // 主页面页头高度 - 增加高度给顶部更多空间
 const IOS_MAIN_HEADER_PADDING_TOP = isIOSPlatform ? 55 : 30; // iOS增加paddingTop避免被灵动岛遮挡
 
-// 聊天页面页头配置 - 与消息页面保持一致
+// 聊天页面页头配置 - 与SafeAreaView配合使用
 export const IOS_CHAT_HEADER_HEIGHT = 80; // 聊天页面页头高度 - 与消息页面一致
-const IOS_CHAT_HEADER_PADDING_TOP = isIOSPlatform ? 37 : 30; // 减少15%的paddingTop（44 * 0.85 ≈ 37）往上移动页头
+const IOS_CHAT_HEADER_PADDING_TOP = isIOSPlatform ? 10 : 30; // 配合SafeAreaView使用，只需少量paddingTop
 
 /**
  * 根据字体大小获取iOS适配的大小
