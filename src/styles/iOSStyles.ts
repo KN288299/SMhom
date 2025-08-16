@@ -111,7 +111,7 @@ export const iOSChatStyles = StyleSheet.create({
     backgroundColor: '#F2F2F7', // iOS系统背景色
     paddingHorizontal: 16,
     paddingVertical: 8,
-    paddingBottom: 34, // 增加底部padding适配iOS底部安全区域和Home指示器
+    paddingBottom: 8, // 配合SafeAreaView使用，仅保留少量底部间距
     borderTopWidth: 0.5,
     borderTopColor: '#c6c6c8',
   },
@@ -179,7 +179,7 @@ export const iOSChatStyles = StyleSheet.create({
     backgroundColor: '#F2F2F7',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingBottom: 34, // 增加底部padding适配iOS底部安全区域
+    paddingBottom: 12, // 配合SafeAreaView使用，减少底部间距
     borderTopWidth: 0.5,
     borderTopColor: '#c6c6c8',
     justifyContent: 'space-around', // 平均分布
