@@ -166,13 +166,16 @@ export const useSocket = (userToken: string | null) => {
         token: userToken
       },
       transports: ['websocket', 'polling'],
-      timeout: 15000, // 增加连接超时
+      timeout: 20000, // iOS需要更长的连接超时
       reconnection: true,
       reconnectionAttempts: maxReconnectAttempts,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      randomizationFactor: 0.5,
+      reconnectionDelay: 2000, // iOS网络切换需要更长延迟
+      reconnectionDelayMax: 8000,
+      randomizationFactor: 0.3, // 减少随机性，提高连接稳定性
       forceNew: true, // 强制创建新连接
+      // iOS特殊配置
+      upgrade: true,
+      rememberUpgrade: true,
     });
 
     socketRef.current = socket;

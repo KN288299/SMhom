@@ -20,6 +20,7 @@ import {
 import { HomeIcon, MessageIcon, InfoIcon, UserIcon, PlusIcon, LocationIcon, SearchIcon, OrderIcon } from '../assets/icons/index';
 import { getStaffList, StaffMember, StaffQueryParams } from '../services/staffService';
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
+import { getOptimizedConnectionStatus } from '../utils/iOSNetworkHelper';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -100,13 +101,19 @@ const HomeScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchType, setSearchType] = useState<'name' | 'job' | 'age'>('name');
 
-  // 监控网络状态
+  // 监控网络状态 - 使用优化的iOS网络检测
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state: NetInfoState) => {
-      setIsConnected(state.isConnected);
+      // 使用优化的网络连接检测
+      const connected = getOptimizedConnectionStatus(state);
       
-      if (!state.isConnected && Platform.OS === 'android') {
-        ToastAndroid.show('网络连接已断开', ToastAndroid.SHORT);
+      setIsConnected(connected);
+      
+      if (!connected) {
+        if (Platform.OS === 'android') {
+          ToastAndroid.show('网络连接已断开', ToastAndroid.SHORT);
+        }
+        // iOS会通过ChatScreen的网络监听处理提示
       }
     });
 

@@ -24,6 +24,7 @@ import {
   ToastAndroid,
 } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
+import { getOptimizedConnectionStatus } from '../utils/iOSNetworkHelper';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { io, Socket } from 'socket.io-client';
@@ -890,10 +891,19 @@ const ChatScreen: React.FC = () => {
     }
   }, [messages.length, loading, hasInitialScrolled]);
   
-  // 网络状态监听
+  // 网络状态监听 - 使用优化的iOS网络检测
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
-      const connected = Boolean(state.isConnected && state.isInternetReachable !== false);
+      // 使用优化的网络连接检测
+      const connected = getOptimizedConnectionStatus(state);
+      
+      console.log(`📱 ${Platform.OS} 网络状态:`, {
+        isConnected: state.isConnected,
+        isInternetReachable: state.isInternetReachable,
+        type: state.type,
+        finalConnected: connected
+      });
+      
       setIsNetworkConnected(connected);
       
       if (!connected && isNetworkConnected) {
@@ -910,28 +920,48 @@ const ChatScreen: React.FC = () => {
     return () => unsubscribe();
   }, [isNetworkConnected, showToast]);
 
-  // 监听Socket连接状态
+  // 监听Socket连接状态 - iOS优化版本
   useEffect(() => {
     if (socket) {
+      let wasDisconnected = false; // 跟踪是否之前断开过连接
+      
       const handleConnect = () => {
         console.log('📡 Socket连接成功');
         setConnecting(false);
-        showToast('连接已恢复');
+        
+        // 只有在之前断开过连接的情况下才显示"连接已恢复"
+        if (wasDisconnected) {
+          showToast('连接已恢复');
+          wasDisconnected = false;
+        }
       };
       
       const handleDisconnect = (reason: string) => {
         console.log('📡 Socket连接断开:', reason);
         setConnecting(true);
+        wasDisconnected = true;
+        
+        // 只对非预期的断开显示提示
+        if (reason !== 'io client disconnect' && reason !== 'transport close') {
+          console.log('🚫 Socket意外断开:', reason);
+        }
       };
       
       const handleConnectError = (error: any) => {
         console.error('📡 Socket连接错误:', error);
         setConnecting(false);
+        wasDisconnected = true;
         showToast('连接错误，请重试');
       };
 
       // 初始连接状态
-      setConnecting(!socket.connected);
+      const initiallyConnected = socket.connected;
+      setConnecting(!initiallyConnected);
+      
+      // 如果初始化时就未连接，标记为已断开状态
+      if (!initiallyConnected) {
+        wasDisconnected = true;
+      }
 
       socket.on('connect', handleConnect);
       socket.on('disconnect', handleDisconnect);
