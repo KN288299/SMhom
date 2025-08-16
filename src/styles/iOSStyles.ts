@@ -33,10 +33,11 @@ export const getIOSFontSize = (fontSize: number): number => {
  * iOS专用聊天界面样式
  */
 export const iOSChatStyles = StyleSheet.create({
-  // 页头样式优化
+  // 页头样式优化 - 与消息页面保持一致的高度
   headerContainer: {
+    height: IOS_MAIN_HEADER_HEIGHT,
     backgroundColor: '#fff',
-    paddingTop: 0, // iOS减少顶部padding
+    paddingTop: IOS_MAIN_HEADER_PADDING_TOP, // 与消息页面保持一致的paddingTop
     borderBottomWidth: 0.5, // 更细的分割线
     borderBottomColor: '#c6c6c8',
     shadowColor: '#000',
