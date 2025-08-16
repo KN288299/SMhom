@@ -1,4 +1,4 @@
-import { StyleSheet, Platform, Dimensions } from 'react-native';
+import { StyleSheet, Platform, Dimensions, StatusBar } from 'react-native';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -7,6 +7,9 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
  * 针对iOS设备的UI特性进行优化
  */
 
+// 检查是否为iOS平台
+const isIOSPlatform = Platform.OS === 'ios';
+
 // iOS字体缩放比例 - 比Android稍小以适应iOS UI规范
 const IOS_FONT_SCALE = 0.9;
 
@@ -14,6 +17,10 @@ const IOS_FONT_SCALE = 0.9;
 const IOS_SAFE_AREA_TOP = 44; // 状态栏高度
 const IOS_HEADER_HEIGHT = 50; // 减少页头高度
 const IOS_INPUT_HEIGHT = 44; // iOS标准输入框高度
+
+// 主页面页头统一配置
+const IOS_MAIN_HEADER_HEIGHT = 60; // 主页面页头高度（比原来80px减少25%）
+const IOS_MAIN_HEADER_PADDING_TOP = isIOSPlatform ? 35 : 25; // iOS向下移动10%（原30px + 10% = 33px，取35px）
 
 /**
  * 根据字体大小获取iOS适配的大小
@@ -244,6 +251,93 @@ export const iOSChatStyles = StyleSheet.create({
 });
 
 /**
+ * iOS专用主页面页头样式
+ * 统一首页、订单页、信息页的页头高度和位置
+ */
+export const iOSMainHeaderStyles = StyleSheet.create({
+  // 统一的页头容器样式
+  headerContainer: {
+    height: IOS_MAIN_HEADER_HEIGHT,
+    backgroundColor: '#fff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: IOS_MAIN_HEADER_PADDING_TOP,
+    paddingHorizontal: 15,
+    borderBottomWidth: isIOSPlatform ? 0.5 : 1,
+    borderBottomColor: isIOSPlatform ? '#c6c6c8' : '#eee',
+    shadowColor: isIOSPlatform ? '#000' : undefined,
+    shadowOffset: isIOSPlatform ? { width: 0, height: 0.5 } : undefined,
+    shadowOpacity: isIOSPlatform ? 0.1 : undefined,
+    shadowRadius: isIOSPlatform ? 0 : undefined,
+    elevation: isIOSPlatform ? 0 : 2,
+  },
+  
+  // 页头标题样式
+  headerTitle: {
+    fontSize: getIOSFontSize(18),
+    fontWeight: isIOSPlatform ? '600' : 'bold',
+    color: '#333',
+    textAlign: 'center',
+  },
+  
+  // 左右按钮区域样式
+  headerLeft: {
+    position: 'absolute',
+    left: 15,
+    top: IOS_MAIN_HEADER_PADDING_TOP,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  headerRight: {
+    position: 'absolute',
+    right: 15,
+    top: IOS_MAIN_HEADER_PADDING_TOP,
+    bottom: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  
+  // 通用按钮样式
+  headerButton: {
+    width: 32,
+    height: 32,
+    borderRadius: isIOSPlatform ? 16 : 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: isIOSPlatform ? '#F2F2F7' : '#f0f0f0',
+    marginLeft: 8,
+  },
+  
+  // 位置按钮样式（首页专用）
+  locationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: isIOSPlatform ? '#F2F2F7' : '#f2f2f2',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 15,
+    marginRight: 10,
+  },
+  
+  locationText: {
+    fontSize: getIOSFontSize(12),
+    color: '#666',
+    marginLeft: 3,
+  },
+  
+  // 搜索按钮样式
+  searchButton: {
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
+
+/**
  * iOS专用消息气泡样式
  */
 export const iOSMessageStyles = StyleSheet.create({
@@ -413,6 +507,7 @@ export const iOSColors = {
 
 export default {
   iOSChatStyles,
+  iOSMainHeaderStyles,
   iOSMessageStyles,
   iOSModalStyles,
   getIOSFontSize,

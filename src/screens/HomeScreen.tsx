@@ -28,6 +28,7 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { TabParamList } from '../navigation/TabNavigator';
 import { PROVINCES } from '../constants/provinces';
 import { useAuth } from '../context/AuthContext';
+import { iOSMainHeaderStyles, getPlatformStyles } from '../styles/iOSStyles';
 
 // 组合导航类型
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'StaffDetail'> & 
@@ -347,18 +348,18 @@ const HomeScreen: React.FC = () => {
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
       
       {/* 顶部导航栏 */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>推荐</Text>
-        <View style={styles.headerRight}>
+      <View style={getPlatformStyles(iOSMainHeaderStyles.headerContainer, styles.header)}>
+        <Text style={getPlatformStyles(iOSMainHeaderStyles.headerTitle, styles.headerTitle)}>推荐</Text>
+        <View style={getPlatformStyles(iOSMainHeaderStyles.headerRight, styles.headerRight)}>
           <TouchableOpacity 
-            style={styles.locationButton}
+            style={getPlatformStyles(iOSMainHeaderStyles.locationButton, styles.locationButton)}
             onPress={() => setProvinceModalVisible(true)}
           >
             <LocationIcon size={14} />
-            <Text style={styles.locationText}>{selectedProvince}</Text>
+            <Text style={getPlatformStyles(iOSMainHeaderStyles.locationText, styles.locationText)}>{selectedProvince}</Text>
           </TouchableOpacity>
           <TouchableOpacity 
-            style={styles.searchButton}
+            style={getPlatformStyles(iOSMainHeaderStyles.searchButton, styles.searchButton)}
             onPress={() => setSearchModalVisible(true)}
           >
             <SearchIcon size={20} />

@@ -21,6 +21,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { TabParamList } from '../navigation/TabNavigator';
 import { getUserOrders, cancelOrder, Order as OrderType, getOrderDetail } from '../services/orderService';
+import { iOSMainHeaderStyles, getPlatformStyles } from '../styles/iOSStyles';
 
 // 组合导航类型
 type OrderScreenNavigationProp = NativeStackNavigationProp<RootStackParamList> & 
@@ -403,8 +404,8 @@ const OrderScreen: React.FC = () => {
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
       
       {/* 顶部标题 */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>我的订单</Text>
+      <View style={getPlatformStyles(iOSMainHeaderStyles.headerContainer, styles.header)}>
+        <Text style={getPlatformStyles(iOSMainHeaderStyles.headerTitle, styles.headerTitle)}>我的订单</Text>
       </View>
       
       {/* 订单列表 */}

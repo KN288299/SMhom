@@ -18,6 +18,7 @@ import { API_URL, API_ENDPOINTS, BASE_URL } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { iOSMainHeaderStyles, getPlatformStyles } from '../styles/iOSStyles';
 
 interface MessageScreenProps {
   navigation: any;
@@ -632,8 +633,8 @@ const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
       
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>
+      <View style={getPlatformStyles(iOSMainHeaderStyles.headerContainer, styles.header)}>
+        <Text style={getPlatformStyles(iOSMainHeaderStyles.headerTitle, styles.headerTitle)}>
           {isCustomerService() ? '用户列表' : '客服列表'}
         </Text>
       </View>
