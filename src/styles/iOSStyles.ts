@@ -19,8 +19,8 @@ const IOS_HEADER_HEIGHT = 50; // 减少页头高度
 const IOS_INPUT_HEIGHT = 44; // iOS标准输入框高度
 
 // 主页面页头统一配置
-const IOS_MAIN_HEADER_HEIGHT = 60; // 主页面页头高度（比原来80px减少25%）
-const IOS_MAIN_HEADER_PADDING_TOP = isIOSPlatform ? 35 : 25; // iOS向下移动10%（原30px + 10% = 33px，取35px）
+const IOS_MAIN_HEADER_HEIGHT = 100; // 主页面页头高度 - 增加高度给顶部更多空间
+const IOS_MAIN_HEADER_PADDING_TOP = isIOSPlatform ? 55 : 30; // iOS增加paddingTop避免被灵动岛遮挡
 
 /**
  * 根据字体大小获取iOS适配的大小
