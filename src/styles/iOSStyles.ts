@@ -540,7 +540,7 @@ export const iOSTabBarStyles = {
     fontSize: getIOSFontSize(11),
     marginTop: isIOS ? 4 : -5, // iOS增加图标和文字间距
     marginBottom: isIOS ? 8 : 5,
-    fontWeight: isIOS ? '500' : 'normal',
+    fontWeight: isIOS ? ('500' as any) : 'normal',
   },
   
   // 图标样式优化
@@ -549,36 +549,7 @@ export const iOSTabBarStyles = {
     marginBottom: isIOS ? 2 : 0,
   },
   
-  // 中间按钮容器优化
-  yuZuTangContainer: {
-    height: isIOS ? 75 : 60,
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingBottom: isIOS ? 15 : 5, // iOS适配安全区域
-  },
-  
-  // 中间按钮样式
-  yuZuTangButton: {
-    width: isIOS ? 65 : 70, // iOS稍微缩小以适应间距
-    height: isIOS ? 65 : 70,
-    borderRadius: isIOS ? 32.5 : 35,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: isIOS ? 15 : 10, // iOS增加底部边距
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: isIOS ? 3 : 2 },
-    shadowOpacity: isIOS ? 0.25 : 0.2,
-    shadowRadius: isIOS ? 4 : 3,
-    elevation: 5,
-  },
-  
-  // 中间按钮文字
-  yuZuTangText: {
-    color: '#fff',
-    fontSize: getIOSFontSize(15),
-    fontWeight: isIOS ? '600' : 'bold',
-  },
+
 };
 
 export default {

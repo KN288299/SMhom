@@ -75,6 +75,7 @@ const MainTabNavigator = () => {
           fontSize: 12,
           marginTop: -5,
           marginBottom: 5,
+          fontWeight: 'normal',
         },
         tabBarIconStyle: isIOS ? iOSTabBarStyles.tabBarIconStyle : {},
       }}
@@ -138,13 +139,13 @@ const MainTabNavigator = () => {
 };
 
 const styles = StyleSheet.create({
-  yuZuTangContainer: isIOS ? iOSTabBarStyles.yuZuTangContainer : {
+  yuZuTangContainer: {
     height: 60,
     width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  yuZuTangButton: isIOS ? iOSTabBarStyles.yuZuTangButton : {
+  yuZuTangButton: {
     width: 70,
     height: 70,
     borderRadius: 35,
@@ -157,7 +158,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 5,
   },
-  yuZuTangText: isIOS ? iOSTabBarStyles.yuZuTangText : {
+  yuZuTangText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
