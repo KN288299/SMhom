@@ -311,29 +311,42 @@ export const iOSMainHeaderStyles = StyleSheet.create({
     marginLeft: 8,
   },
   
-  // 位置按钮样式（首页专用）
+  // 位置按钮样式（首页专用） - 优化iOS触摸体验
   locationButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: isIOSPlatform ? '#F2F2F7' : '#f2f2f2',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 15,
+    paddingHorizontal: isIOSPlatform ? 12 : 10, // iOS增加水平padding
+    paddingVertical: isIOSPlatform ? 8 : 5,     // iOS增加垂直padding，达到44pt最小触摸目标
+    borderRadius: isIOSPlatform ? 18 : 15,      // iOS调整圆角以适应更大尺寸
     marginRight: 10,
+    minHeight: isIOSPlatform ? 36 : 25,         // iOS确保最小高度
+    minWidth: isIOSPlatform ? 80 : 70,          // iOS确保最小宽度便于点击
   },
   
   locationText: {
-    fontSize: getIOSFontSize(12),
-    color: '#666',
-    marginLeft: 3,
+    fontSize: getIOSFontSize(13),   // iOS稍微增大字体
+    color: isIOSPlatform ? '#333' : '#666',  // iOS使用更深的颜色增强可读性
+    marginLeft: 4,                  // iOS稍微增加间距
+    fontWeight: isIOSPlatform ? '500' : 'normal', // iOS增加字体权重
   },
   
-  // 搜索按钮样式
+  // 搜索按钮样式 - 优化iOS触摸体验
   searchButton: {
-    width: 30,
-    height: 30,
+    width: isIOSPlatform ? 44 : 30,     // iOS符合44pt最小触摸目标
+    height: isIOSPlatform ? 44 : 30,    // iOS符合44pt最小触摸目标
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: isIOSPlatform ? 22 : 15,     // iOS圆形按钮设计
+    backgroundColor: isIOSPlatform ? '#F2F2F7' : 'transparent', // iOS添加背景色增强视觉反馈
+    // iOS添加轻微阴影增强按钮感知
+    ...(isIOSPlatform && {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 1,
+    }),
   },
 });
 

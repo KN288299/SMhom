@@ -354,15 +354,17 @@ const HomeScreen: React.FC = () => {
           <TouchableOpacity 
             style={getPlatformStyles(iOSMainHeaderStyles.locationButton, styles.locationButton)}
             onPress={() => setProvinceModalVisible(true)}
+            activeOpacity={0.6}
           >
-            <LocationIcon size={14} />
+            <LocationIcon size={Platform.OS === 'ios' ? 16 : 14} />
             <Text style={getPlatformStyles(iOSMainHeaderStyles.locationText, styles.locationText)}>{selectedProvince}</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={getPlatformStyles(iOSMainHeaderStyles.searchButton, styles.searchButton)}
             onPress={() => setSearchModalVisible(true)}
+            activeOpacity={0.6}
           >
-            <SearchIcon size={20} />
+            <SearchIcon size={Platform.OS === 'ios' ? 24 : 20} />
           </TouchableOpacity>
         </View>
       </View>
