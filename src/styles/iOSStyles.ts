@@ -373,13 +373,14 @@ export const iOSMainHeaderStyles = StyleSheet.create({
 export const iOSMessageStyles = StyleSheet.create({
   messageContainer: {
     marginVertical: 3, // 减少消息间距
-    maxWidth: '75%', // 减少最大宽度
+    width: '100%', // 允许容器全宽
   },
   
   messageBubble: {
     borderRadius: 18,
     padding: 10, // 减少内边距
     minHeight: 32,
+    maxWidth: '75%', // 气泡本身的最大宽度
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 0.5 },
     shadowOpacity: 0.1,
