@@ -46,6 +46,13 @@ const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // 🚀 性能优化：分页状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [newOnlineUsers, setNewOnlineUsers] = useState<Set<string>>(new Set()); // 记录新上线的用户ID
 
@@ -109,8 +116,8 @@ const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
     });
   }, [isRecentlyRegistered]);
 
-  // 根据用户类型获取不同的列表
-  const fetchContacts = useCallback(async () => {
+  // 🚀 性能优化：分页获取联系人列表
+  const fetchContacts = useCallback(async (page = 1) => {
     try {
       setLoading(true);
       setError(null);
@@ -120,19 +127,62 @@ const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
         ? API_ENDPOINTS.USER_LIST // 客服查看用户列表
         : API_ENDPOINTS.ACTIVE_CUSTOMER_SERVICE_LIST; // 用户查看活跃客服列表
       
-      console.log('正在获取联系人列表，端点:', endpoint);
+      // 🚀 性能优化：添加分页参数（首次加载第一页）
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: isCustomerService() ? '20' : '50' // 客服看用户分页更小，用户看客服可以多一些
+      });
+      
+      console.log(`📄 正在获取联系人列表 - 端点: ${endpoint}, 第${page}页`);
       
       // 确保使用正确的令牌
-      const response = await axios.get(`${API_URL}${endpoint}`, {
+      const response = await axios.get(`${API_URL}${endpoint}?${params}`, {
         headers: { Authorization: `Bearer ${userToken}` }
       });
       
-      // 处理响应数据
+      // 🚀 性能优化：处理分页响应数据
       if (response.data) {
-        console.log('获取联系人成功:', response.data.length, '条记录');
+        let contactList = [];
+        let pagination = null;
+        
+        // 根据API返回的数据结构处理
+        if (Array.isArray(response.data)) {
+          // 旧格式兼容：直接数组（在线客服列表）
+          contactList = response.data;
+          console.log(`📱 获取到在线客服: ${contactList.length}个`);
+        } else {
+          // 新格式：分页数据
+          if (response.data.users && Array.isArray(response.data.users)) {
+            contactList = response.data.users;
+            pagination = response.data.pagination;
+          } else if (response.data.customerServices && Array.isArray(response.data.customerServices)) {
+            contactList = response.data.customerServices;
+            pagination = response.data.pagination;
+          } else {
+            console.warn('⚠️ 响应数据格式异常:', response.data);
+            contactList = [];
+          }
+        }
+        
+        // 🚀 性能优化：更新分页状态
+        if (pagination) {
+          setCurrentPage(pagination.currentPage);
+          setTotalPages(pagination.totalPages);
+          setTotalCount(pagination.totalCount);
+          setHasNextPage(pagination.hasNext);
+          console.log(`📊 分页信息: 第${pagination.currentPage}页/${pagination.totalPages}页, 共${pagination.totalCount}条记录`);
+        } else {
+          // 非分页数据（如在线客服列表）
+          setCurrentPage(1);
+          setTotalPages(1);
+          setTotalCount(contactList.length);
+          setHasNextPage(false);
+        }
+        
+        console.log(`✅ 获取到 ${contactList.length} 个联系人`);
         
         // 获取现有会话信息，增强联系人数据
-        const enhancedContacts = await enhanceContactsWithConversations(response.data);
+        const enhancedContacts = await enhanceContactsWithConversations(contactList);
         
         // 标记新上线的用户并按优先级排序
         const contactsWithNewStatus = enhancedContacts.map(contact => ({
@@ -152,7 +202,8 @@ const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
             `contacts_${userInfo._id}`,
             JSON.stringify({
               data: enhancedContacts,
-              timestamp: Date.now()
+              timestamp: Date.now(),
+              pagination: pagination
             })
           );
           console.log('联系人列表已缓存');
@@ -170,6 +221,82 @@ const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
       setRefreshing(false);
     }
   }, [userInfo, userToken, isCustomerService, sortContacts]);
+
+  // 🚀 性能优化：加载更多联系人
+  const loadMoreContacts = useCallback(async () => {
+    if (!hasNextPage || loadingMore || loading) {
+      console.log('📄 无法加载更多:', { hasNextPage, loadingMore, loading });
+      return;
+    }
+
+    const nextPage = currentPage + 1;
+    console.log(`📄 加载第${nextPage}页联系人...`);
+    
+    try {
+      setLoadingMore(true);
+      
+      const endpoint = isCustomerService() 
+        ? API_ENDPOINTS.USER_LIST 
+        : API_ENDPOINTS.ACTIVE_CUSTOMER_SERVICE_LIST;
+      
+      const params = new URLSearchParams({
+        page: nextPage.toString(),
+        limit: isCustomerService() ? '20' : '50'
+      });
+      
+      const response = await axios.get(`${API_URL}${endpoint}?${params}`, {
+        headers: { Authorization: `Bearer ${userToken}` }
+      });
+      
+      if (response.data) {
+        let newContacts = [];
+        let pagination = null;
+        
+        if (Array.isArray(response.data)) {
+          newContacts = response.data;
+        } else if (response.data.users && Array.isArray(response.data.users)) {
+          newContacts = response.data.users;
+          pagination = response.data.pagination;
+        } else if (response.data.customerServices && Array.isArray(response.data.customerServices)) {
+          newContacts = response.data.customerServices;
+          pagination = response.data.pagination;
+        }
+        
+        if (newContacts.length > 0) {
+          // 增强新联系人数据
+          const enhancedNewContacts = await enhanceContactsWithConversations(newContacts);
+          
+          // 合并到现有联系人列表
+          const allContacts = [...contacts, ...enhancedNewContacts];
+          const sortedContacts = sortContacts(allContacts);
+          setContacts(sortedContacts);
+          
+          // 更新分页状态
+          if (pagination) {
+            setCurrentPage(pagination.currentPage);
+            setTotalPages(pagination.totalPages);
+            setHasNextPage(pagination.hasNext);
+            console.log(`📊 加载第${pagination.currentPage}页/${pagination.totalPages}页成功`);
+          }
+          
+          // 更新缓存
+          if (userInfo && userInfo._id) {
+            await AsyncStorage.setItem(
+              `contacts_${userInfo._id}`,
+              JSON.stringify({
+                data: allContacts,
+                timestamp: Date.now()
+              })
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ 加载更多联系人失败:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [currentPage, hasNextPage, loadingMore, loading, contacts, isCustomerService, userToken, userInfo, enhanceContactsWithConversations, sortContacts]);
 
   // 从缓存加载联系人列表
   const loadContactsFromCache = async () => {
@@ -670,6 +797,32 @@ const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
               </Text>
             </View>
           }
+          // 🚀 性能优化：分页加载更多
+          onEndReached={loadMoreContacts}
+          onEndReachedThreshold={0.1}
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={styles.loadMoreContainer}>
+                <ActivityIndicator size="small" color="#ff6b81" />
+                <Text style={styles.loadMoreText}>加载更多...</Text>
+              </View>
+            ) : hasNextPage ? (
+              <TouchableOpacity 
+                style={styles.loadMoreButton} 
+                onPress={loadMoreContacts}
+              >
+                <Text style={styles.loadMoreButtonText}>
+                  点击加载更多 ({totalCount - contacts.length}条)
+                </Text>
+              </TouchableOpacity>
+            ) : totalCount > 0 ? (
+              <View style={styles.endContainer}>
+                <Text style={styles.endText}>
+                  已显示全部 {totalCount} 条记录
+                </Text>
+              </View>
+            ) : null
+          }
         />
       )}
     </View>
@@ -849,6 +1002,42 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  // 🚀 性能优化：分页加载样式
+  loadMoreContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 16,
+    backgroundColor: '#f5f5f5',
+  },
+  loadMoreText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#666',
+  },
+  loadMoreButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginVertical: 8,
+    marginHorizontal: 16,
+    backgroundColor: '#ff6b81',
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  loadMoreButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  endContainer: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  endText: {
+    fontSize: 12,
+    color: '#999',
   },
 });
 

@@ -82,35 +82,89 @@ const loginCustomerService = asyncHandler(async (req, res) => {
 });
 
 // @desc    获取所有客服
-// @route   GET /api/customer-service
+// @route   GET /api/customer-service?page=1&limit=20&search=xxx
 // @access  Private/Admin
 const getAllCustomerServices = asyncHandler(async (req, res) => {
-  // 检查是否是管理员请求（通过路由中间件区分）
-  const isAdmin = req.admin;
-  
-  // 构建查询条件
-  let query = {};
-  
-  // 如果不是管理员（普通用户），则只返回活跃且在线的客服
-  if (!isAdmin) {
-    query = { isActive: true, status: 'online' };
-  }
-  
-  // 查询客服列表
-  const customerServices = await CustomerService.find(query).select('-password');
-  
-  // 记录客服数据以便调试
-  console.log(`获取到 ${customerServices.length} 个客服，用户类型: ${isAdmin ? '管理员' : '普通用户'}`);
-  
-  // 记录每个客服的头像路径
-  customerServices.forEach(cs => {
-    if (cs.avatar) {
-      console.log(`客服 ${cs.name} (${cs._id}) 的头像路径: ${cs.avatar}`);
+  try {
+    // 检查是否是管理员请求（通过路由中间件区分）
+    const isAdmin = req.admin;
+    
+    // 🚀 性能优化：分页参数（管理员可分页，普通用户通常客服数量较少）
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || (isAdmin ? 20 : 50); // 管理员20个，用户50个
+    const search = req.query.search || '';
+    const skip = (page - 1) * limit;
+
+    // 🚀 性能优化：构建查询条件
+    let query = {};
+    
+    // 如果不是管理员（普通用户），则只返回活跃且在线的客服
+    if (!isAdmin) {
+      query = { isActive: true, status: 'online' };
+    } else {
+      // 管理员可以看到所有客服，但可以选择过滤
+      if (req.query.status) {
+        query.status = req.query.status;
+      }
+      if (req.query.isActive !== undefined) {
+        query.isActive = req.query.isActive === 'true';
+      }
     }
-  });
-  
-  // 返回结果
-  res.json(customerServices);
+
+    // 搜索功能
+    if (search.trim()) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { phoneNumber: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // 🚀 性能优化：对于普通用户，直接返回在线客服（通常数量少）
+    if (!isAdmin && !search) {
+      const customerServices = await CustomerService.find(query)
+        .select('-password')
+        .sort({ lastActiveTime: -1 }) // 按最后活跃时间排序
+        .lean();
+        
+      console.log(`📱 用户查询在线客服: ${customerServices.length}个`);
+      return res.json(customerServices);
+    }
+
+    // 🚀 性能优化：管理员或搜索时使用分页
+    const [customerServices, totalCount] = await Promise.all([
+      CustomerService.find(query)
+        .select('-password')
+        .sort({ createdAt: -1 }) // 利用索引排序
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      CustomerService.countDocuments(query)
+    ]);
+
+    // 🚀 性能优化：计算分页信息
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasNext = page < totalPages;
+    const hasPrev = page > 1;
+
+    console.log(`📊 客服列表查询: 第${page}页/${totalPages}页, ${customerServices.length}/${totalCount}条记录, 用户类型: ${isAdmin ? '管理员' : '普通用户'}`);
+
+    // 返回分页结果
+    res.json({
+      customerServices,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalCount,
+        limit,
+        hasNext,
+        hasPrev
+      }
+    });
+  } catch (error) {
+    console.error('❌ 获取客服列表失败:', error);
+    res.status(500);
+    throw new Error('获取客服列表失败');
+  }
 });
 
 // @desc    获取单个客服信息

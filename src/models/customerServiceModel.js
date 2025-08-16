@@ -72,6 +72,13 @@ customerServiceSchema.pre('save', async function(next) {
   this.password = await bcrypt.hash(this.password, salt);
 });
 
+// 🚀 性能优化：添加关键索引
+customerServiceSchema.index({ status: 1 }); // 按状态过滤（online/offline/busy）
+customerServiceSchema.index({ isActive: 1 }); // 按活跃状态过滤
+customerServiceSchema.index({ lastActiveTime: -1 }); // 按最后活跃时间排序
+customerServiceSchema.index({ isActive: 1, status: 1 }); // 复合索引：常用查询组合
+customerServiceSchema.index({ createdAt: -1 }); // 按创建时间排序
+
 const CustomerService = mongoose.model('CustomerService', customerServiceSchema);
 
 module.exports = CustomerService; 

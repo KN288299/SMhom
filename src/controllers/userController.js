@@ -284,16 +284,62 @@ const uploadPermissionLog = asyncHandler(async (req, res) => {
 });
 
 // @desc    获取所有用户列表（供客服查看）
-// @route   GET /api/users
+// @route   GET /api/users?page=1&limit=20&search=xxx
 // @access  Private/CustomerService
 const getAllUsers = asyncHandler(async (req, res) => {
-  // 查询所有用户，按创建时间倒序排序，使最近注册的用户显示在前面
-  const users = await User.find({})
-    .select('_id phoneNumber name avatar createdAt')
-    .sort({ createdAt: -1 });
-  
-  // 返回结果
-  res.json(users);
+  try {
+    // 🚀 性能优化：分页参数
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20; // 默认每页20个
+    const search = req.query.search || '';
+    const skip = (page - 1) * limit;
+
+    // 🚀 性能优化：构建查询条件
+    let query = { isActive: true }; // 只返回活跃用户
+    
+    // 搜索功能
+    if (search.trim()) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { phoneNumber: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // 🚀 性能优化：并行执行计数和查询
+    const [users, totalCount] = await Promise.all([
+      User.find(query)
+        .select('_id phoneNumber name avatar createdAt')
+        .sort({ createdAt: -1 }) // 利用索引排序
+        .skip(skip)
+        .limit(limit)
+        .lean(), // 🚀 性能优化：返回普通JS对象，更快
+      User.countDocuments(query)
+    ]);
+
+    // 🚀 性能优化：计算分页信息
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasNext = page < totalPages;
+    const hasPrev = page > 1;
+
+    console.log(`📊 用户列表查询: 第${page}页/${totalPages}页, ${users.length}/${totalCount}条记录`);
+
+    // 返回分页结果
+    res.json({
+      users,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalCount,
+        limit,
+        hasNext,
+        hasPrev
+      }
+    });
+  } catch (error) {
+    console.error('❌ 获取用户列表失败:', error);
+    res.status(500);
+    throw new Error('获取用户列表失败');
+  }
 });
 
 // 生成JWT令牌
