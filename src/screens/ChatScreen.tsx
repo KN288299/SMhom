@@ -128,6 +128,7 @@ const calculateImageSize = (width: number, height: number) => {
 
 interface Message {
   _id: string;
+  conversationId?: string; // 关键字段：消息所属的对话ID
   senderId: string;
   senderRole?: 'user' | 'customer_service';
   content: string;
@@ -353,11 +354,34 @@ const ChatScreen: React.FC = () => {
         content: message.content,
         senderId: message.senderId,
         senderRole: message.senderRole,
+        conversationId: message.conversationId,
+        currentConversationId: conversationId,
         isCallRecord: message.isCallRecord,
         callerId: message.callerId,
         messageType: message.messageType,
         timestamp: message.timestamp
       });
+      
+      // 🔥 关键修复：只处理属于当前对话的消息
+      const isMessageForCurrentConversation = message.conversationId === conversationId;
+      
+      // 通话记录需要特殊处理：只要涉及当前用户就显示
+      const isCallRecordForCurrentUser = message.isCallRecord && (
+        message.callerId === userInfo?._id || 
+        message.senderId === userInfo?._id ||
+        message.conversationId === conversationId
+      );
+      
+      if (!isMessageForCurrentConversation && !isCallRecordForCurrentUser) {
+        console.log('📨 [ChatScreen] 消息不属于当前对话，跳过处理:', {
+          messageConversationId: message.conversationId,
+          currentConversationId: conversationId,
+          isCallRecord: message.isCallRecord
+        });
+        return;
+      }
+      
+      console.log('✅ [ChatScreen] 消息属于当前对话，处理中');
       
       // 通话记录消息对所有参与者都可见，但显示逻辑不同
       if (message.isCallRecord) {
@@ -381,7 +405,7 @@ const ChatScreen: React.FC = () => {
           rejected: message.rejected
         });
       } else {
-        // 正常消息，直接添加
+        // 正常消息，添加到当前对话
         addMessage({ 
           ...message,
           _id: generateUniqueId() // 使用兼容的ID生成函数

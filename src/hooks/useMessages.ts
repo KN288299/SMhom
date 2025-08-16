@@ -4,6 +4,7 @@ import { BASE_URL } from '../config/api';
 
 interface Message {
   _id: string;
+  conversationId?: string; // 关键字段：消息所属的对话ID
   senderId: string;
   senderRole?: 'user' | 'customer_service';
   content: string;
