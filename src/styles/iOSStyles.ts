@@ -45,12 +45,13 @@ export const iOSChatStyles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 0,
     elevation: 0,
+    justifyContent: 'flex-end', // 确保chatHeader位于底部正确位置
   },
   
   chatHeader: {
     backgroundColor: '#fff',
     paddingHorizontal: 16,
-    paddingVertical: 8, // 减少垂直padding
+    paddingVertical: 12, // 增加垂直padding确保内容居中
     height: IOS_HEADER_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
@@ -59,11 +60,19 @@ export const iOSChatStyles = StyleSheet.create({
   
   // 返回按钮优化
   backButton: {
-    width: 32,
-    height: 32,
+    width: 44, // 增加触摸区域
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: -4, // iOS风格的边距调整
+    marginLeft: -8, // iOS风格的边距调整
+  },
+  
+  // 页头中心区域
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 16, // 确保左右对称
   },
   
   // 页头文字样式
@@ -72,7 +81,7 @@ export const iOSChatStyles = StyleSheet.create({
     fontWeight: '600',
     color: '#000',
     textAlign: 'center',
-    marginHorizontal: 8,
+    marginHorizontal: 0, // 移除水平边距，依赖父容器居中
   },
   
   onlineStatusText: {
@@ -98,7 +107,9 @@ export const iOSChatStyles = StyleSheet.create({
     backgroundColor: '#F2F2F7', // iOS系统背景色
     paddingHorizontal: 16,
     paddingVertical: 8,
-    paddingBottom: 8, // 减少底部padding，避免与SafeAreaView冲突
+    paddingBottom: 34, // 增加底部padding适配iOS底部安全区域和Home指示器
+    borderTopWidth: 0.5,
+    borderTopColor: '#c6c6c8',
   },
   
   inputWrapper: {
@@ -163,6 +174,7 @@ export const iOSChatStyles = StyleSheet.create({
     backgroundColor: '#F2F2F7',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    paddingBottom: 34, // 增加底部padding适配iOS底部安全区域
     borderTopWidth: 0.5,
     borderTopColor: '#c6c6c8',
   },

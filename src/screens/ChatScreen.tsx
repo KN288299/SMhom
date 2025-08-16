@@ -1986,7 +1986,7 @@ const ChatScreen: React.FC = () => {
           >
             <Icon name="chevron-back" size={isIOS ? 24 : 28} color="#007AFF" />
           </TouchableOpacity>
-          <View style={styles.headerCenter}>
+          <View style={getPlatformStyles(iOSChatStyles.headerCenter, styles.headerCenter)}>
             <Text style={getPlatformStyles(iOSChatStyles.chatHeaderName, styles.chatHeaderName)} numberOfLines={1}>{contactName}</Text>
             <View style={styles.onlineStatusContainer}>
               <View style={styles.onlineIndicator} />
