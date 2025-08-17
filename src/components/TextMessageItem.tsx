@@ -64,8 +64,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   messageBubble: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 16, // 增加水平内边距
+    paddingVertical: 12,   // 增加垂直内边距
     borderRadius: 18,
     maxWidth: '75%',
     minWidth: 60,
@@ -77,8 +77,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
   },
   messageText: {
-    fontSize: 16,
-    lineHeight: 20,
+    fontSize: 18, // 增大消息文字字体
+    lineHeight: 22,
   },
   myMessageText: {
     color: '#fff',

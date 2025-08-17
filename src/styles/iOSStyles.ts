@@ -95,8 +95,8 @@ export const iOSChatStyles = StyleSheet.create({
   
   // 消息气泡样式
   messageText: {
-    fontSize: getIOSFontSize(16),
-    lineHeight: getIOSFontSize(20),
+    fontSize: getIOSFontSize(18), // 增大消息文字字体
+    lineHeight: getIOSFontSize(22),
   },
   
   // 消息时间样式
@@ -133,8 +133,8 @@ export const iOSChatStyles = StyleSheet.create({
   
   textInput: {
     flex: 1,
-    fontSize: getIOSFontSize(16),
-    lineHeight: getIOSFontSize(20),
+    fontSize: getIOSFontSize(18), // 增大输入框字体
+    lineHeight: getIOSFontSize(22),
     maxHeight: 100,
     paddingHorizontal: 8,
     paddingVertical: 8,
@@ -380,8 +380,8 @@ export const iOSMessageStyles = StyleSheet.create({
   
   messageBubble: {
     borderRadius: 18,
-    padding: 10, // 减少内边距
-    minHeight: 32,
+    padding: 14, // 增加内边距让气泡更大
+    minHeight: 38, // 增加最小高度
     maxWidth: '75%', // 气泡本身的最大宽度
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 0.5 },
@@ -402,14 +402,14 @@ export const iOSMessageStyles = StyleSheet.create({
   
   myMessageText: {
     color: '#fff',
-    fontSize: getIOSFontSize(16),
-    lineHeight: getIOSFontSize(20),
+    fontSize: getIOSFontSize(18), // 增大我的消息字体
+    lineHeight: getIOSFontSize(22),
   },
   
   otherMessageText: {
     color: '#000',
-    fontSize: getIOSFontSize(16),
-    lineHeight: getIOSFontSize(20),
+    fontSize: getIOSFontSize(18), // 增大对方消息字体
+    lineHeight: getIOSFontSize(22),
   },
   
   myMessageTime: {

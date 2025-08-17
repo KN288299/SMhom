@@ -2292,8 +2292,8 @@ const styles = StyleSheet.create({
   },
   messageBubble: {
     borderRadius: 18,
-    padding: 12,
-    minHeight: 36,
+    padding: 14, // 增加内边距让气泡更大
+    minHeight: 40, // 增加最小高度
     elevation: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -2309,8 +2309,8 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 4,
   },
   messageText: {
-    fontSize: 16,
-    lineHeight: 20,
+    fontSize: 18, // 增大消息文字字体
+    lineHeight: 22,
   },
   myMessageText: {
     color: '#fff',

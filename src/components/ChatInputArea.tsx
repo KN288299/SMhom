@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginRight: 8,
     maxHeight: 100,
-    fontSize: 16,
+    fontSize: 18, // 增大输入框字体
     backgroundColor: '#f8f8f8',
   },
   voiceInput: {
@@ -310,12 +310,12 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   voiceInputText: {
-    fontSize: 16,
+    fontSize: 18, // 增大语音输入提示文字
     color: '#333',
   },
   permissionNeededText: {
     color: '#e17055',
-    fontSize: 14,
+    fontSize: 16, // 增大权限提示文字
   },
   moreButton: {
     width: 44,
