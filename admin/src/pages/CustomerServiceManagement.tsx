@@ -39,7 +39,12 @@ const CustomerServiceManagement: React.FC = () => {
     setLoading(true);
     try {
       const data = await customerServiceAPI.getCustomerServices();
-      setCustomerServices(data);
+      const list = Array.isArray(data)
+        ? data
+        : (data && Array.isArray((data as any).customerServices)
+            ? (data as any).customerServices
+            : []);
+      setCustomerServices(list as CustomerService[]);
     } catch (error) {
       message.error('获取客服列表失败');
       console.error('获取客服列表失败:', error);
@@ -360,7 +365,7 @@ const CustomerServiceManagement: React.FC = () => {
 
         <Table
           columns={columns}
-          dataSource={customerServices}
+          dataSource={Array.isArray(customerServices) ? customerServices : []}
           rowKey="_id"
           loading={loading}
           pagination={{ pageSize: 10 }}
