@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// 服务器基础URL - 修改为服务器IP地址
-export const SERVER_BASE_URL = 'http://38.207.178.173:3000';
+// 服务器基础URL - 使用相对路径通过Nginx代理
+export const SERVER_BASE_URL = '';
 
 // 创建 axios 实例
 const api = axios.create({
