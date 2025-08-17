@@ -13,7 +13,10 @@ const {
   exportStaff,
   importStaff,
   getStaffDeletePreview,
-  batchDeleteStaff
+  batchDeleteStaff,
+  prepareBatchImport,
+  executeBatchImport,
+  cleanupBatchImport
 } = require('../controllers/adminController');
 const { protectAdmin, superAdminOnly } = require('../middleware/adminMiddleware');
 const { checkIPBlocked, loginRateLimit } = require('../middleware/ipBlockMiddleware');
@@ -37,5 +40,10 @@ router.get('/staff/export', protectAdmin, exportStaff);
 router.post('/staff/import', protectAdmin, upload.single('file'), importStaff);
 router.get('/staff/delete-preview', protectAdmin, getStaffDeletePreview);
 router.delete('/staff/batch-delete', protectAdmin, superAdminOnly, batchDeleteStaff);
+
+// 分批导入路由
+router.post('/staff/batch-import/prepare', protectAdmin, upload.single('file'), prepareBatchImport);
+router.post('/staff/batch-import/execute', protectAdmin, executeBatchImport);
+router.delete('/staff/batch-import/cleanup', protectAdmin, cleanupBatchImport);
 
 module.exports = router; 

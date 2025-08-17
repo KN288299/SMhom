@@ -62,6 +62,21 @@ const StaffManagement: React.FC = () => {
   const [importProgress, setImportProgress] = useState(0);
   const [importResults, setImportResults] = useState<any>(null);
 
+  // 分批导入相关状态
+  const [batchImportMode, setBatchImportMode] = useState(false);
+  const [batchInfo, setBatchInfo] = useState<any>(null);
+  const [batchProgress, setBatchProgress] = useState<{
+    completed: number;
+    total: number;
+    currentBatch: number;
+    results: Array<{
+      batchNumber: number;
+      success: number;
+      failed: number;
+      errors: string[];
+    }>;
+  } | null>(null);
+
   // 批量删除相关状态
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
@@ -401,15 +416,41 @@ const StaffManagement: React.FC = () => {
     }
   };
 
-  // 处理导入员工数据
+  // 处理导入员工数据（智能检测是否需要分批）
   const handleImportStaff = async (file: File) => {
     try {
       setImportLoading(true);
       setImportProgress(20);
       
       const response = await staffAPI.importStaff(file);
-      setImportProgress(100);
       
+      // 检查是否建议分批导入
+      if (response.suggestBatchImport) {
+        setImportProgress(0);
+        setImportLoading(false);
+        
+        // 显示分批导入选项
+        Modal.confirm({
+          title: '检测到大量数据',
+          content: (
+            <div>
+              <p>您的文件包含 <strong>{response.totalCount}</strong> 个员工数据</p>
+              <p>为确保导入成功，建议使用分批导入功能：</p>
+              <ul>
+                <li>每批处理 {response.batchRecommendation?.recommendedBatchSize} 个员工</li>
+                <li>总共需要 {response.batchRecommendation?.estimatedBatches} 个批次</li>
+                <li>支持断点续传，失败批次可重试</li>
+              </ul>
+            </div>
+          ),
+          okText: '使用分批导入',
+          cancelText: '取消',
+          onOk: () => handleStartBatchImport(file),
+        });
+        return;
+      }
+      
+      setImportProgress(100);
       setImportResults(response.results);
       
       if (response.results.success > 0) {
@@ -436,6 +477,132 @@ const StaffManagement: React.FC = () => {
     } finally {
       setImportLoading(false);
     }
+  };
+
+  // 开始分批导入
+  const handleStartBatchImport = async (file: File) => {
+    try {
+      setImportLoading(true);
+      setBatchImportMode(true);
+      setImportProgress(10);
+      
+      // 准备分批导入
+      const response = await staffAPI.prepareBatchImport(file);
+      setBatchInfo(response.batchInfo);
+      
+      // 初始化批次进度
+      setBatchProgress({
+        completed: 0,
+        total: response.batchInfo.totalBatches,
+        currentBatch: 1,
+        results: []
+      });
+      
+      setImportProgress(20);
+      message.success(`文件准备完成，开始分批导入 ${response.batchInfo.totalStaff} 个员工`);
+      
+      // 开始执行批次导入
+      await executeBatchImport(response.batchInfo);
+      
+    } catch (error: any) {
+      console.error('准备分批导入失败:', error);
+      message.error('准备分批导入失败：' + (error.response?.data?.message || error.message));
+      setBatchImportMode(false);
+      setImportLoading(false);
+    }
+  };
+
+  // 执行分批导入
+  const executeBatchImport = async (batchInfo: any) => {
+    const { batchId, totalBatches } = batchInfo;
+    
+    for (let batchNumber = 1; batchNumber <= totalBatches; batchNumber++) {
+      try {
+        // 更新当前批次
+        setBatchProgress(prev => ({
+          ...prev!,
+          currentBatch: batchNumber
+        }));
+        
+        setImportProgress(20 + (batchNumber - 1) / totalBatches * 70);
+        
+        // 执行当前批次
+        const result = await staffAPI.executeBatchImport(batchId, batchNumber);
+        
+        // 更新批次结果
+        setBatchProgress(prev => ({
+          ...prev!,
+          completed: batchNumber,
+          results: [...prev!.results, {
+            batchNumber,
+            success: result.results.success,
+            failed: result.results.failed,
+            errors: result.results.errors
+          }]
+        }));
+        
+        console.log(`批次 ${batchNumber}/${totalBatches} 完成:`, result);
+        
+      } catch (error: any) {
+        console.error(`批次 ${batchNumber} 失败:`, error);
+        
+        // 记录失败的批次
+        setBatchProgress(prev => ({
+          ...prev!,
+          results: [...prev!.results, {
+            batchNumber,
+            success: 0,
+            failed: 0,
+            errors: [`批次 ${batchNumber} 执行失败: ${error.message}`]
+          }]
+        }));
+        
+        // 询问是否继续
+        const shouldContinue = await new Promise<boolean>((resolve) => {
+          Modal.confirm({
+            title: `批次 ${batchNumber} 导入失败`,
+            content: `错误：${error.response?.data?.message || error.message}\n\n是否继续导入剩余批次？`,
+            okText: '继续导入',
+            cancelText: '停止导入',
+            onOk: () => resolve(true),
+            onCancel: () => resolve(false),
+          });
+        });
+        
+        if (!shouldContinue) {
+          break;
+        }
+      }
+    }
+    
+    // 导入完成
+    setImportProgress(100);
+    setImportLoading(false);
+    
+    // 计算总结果
+    const allResults = batchProgress?.results || [];
+    const totalSuccess = allResults.reduce((sum, r) => sum + r.success, 0);
+    const totalFailed = allResults.reduce((sum, r) => sum + r.failed, 0);
+    const allErrors = allResults.flatMap(r => r.errors);
+    
+    setImportResults({
+      success: totalSuccess,
+      failed: totalFailed,
+      errors: allErrors,
+      batchSummary: allResults
+    });
+    
+    message.success(`分批导入完成！总计成功 ${totalSuccess} 条，失败 ${totalFailed} 条`);
+    
+    // 清理临时文件
+    try {
+      await staffAPI.cleanupBatchImport(batchId);
+    } catch (error) {
+      console.warn('清理临时文件失败:', error);
+    }
+    
+    // 刷新员工列表
+    fetchStaffList(1);
   };
 
   // 处理导入文件选择
@@ -855,24 +1022,91 @@ const StaffManagement: React.FC = () => {
 
         {/* 导入进度Modal */}
         <Modal
-          title="导入员工数据"
+          title={batchImportMode ? "分批导入员工数据" : "导入员工数据"}
           open={importLoading}
           footer={null}
           closable={false}
           centered
+          width={batchImportMode ? 600 : 400}
         >
-          <div style={{ textAlign: 'center', padding: '20px 0' }}>
-            <Progress 
-              percent={importProgress} 
-              status={importProgress === 100 ? 'success' : 'active'}
-              strokeColor={{
-                '0%': '#108ee9',
-                '100%': '#87d068',
-              }}
-            />
-            <p style={{ marginTop: '16px', color: '#666' }}>
-              正在导入员工数据，请稍候...
-            </p>
+          <div style={{ padding: '20px 0' }}>
+            {/* 总体进度 */}
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <Progress 
+                percent={importProgress} 
+                status={importProgress === 100 ? 'success' : 'active'}
+                strokeColor={{
+                  '0%': '#108ee9',
+                  '100%': '#87d068',
+                }}
+              />
+              <p style={{ marginTop: '16px', color: '#666' }}>
+                {batchImportMode ? '正在分批导入员工数据，请稍候...' : '正在导入员工数据，请稍候...'}
+              </p>
+            </div>
+
+            {/* 分批导入详细进度 */}
+            {batchImportMode && batchProgress && (
+              <div>
+                <Divider>批次进度详情</Divider>
+                
+                {/* 当前批次信息 */}
+                <Row gutter={16} style={{ marginBottom: '16px' }}>
+                  <Col span={8}>
+                    <Card size="small">
+                      <Statistic 
+                        title="当前批次" 
+                        value={batchProgress.currentBatch} 
+                        suffix={`/ ${batchProgress.total}`}
+                      />
+                    </Card>
+                  </Col>
+                  <Col span={8}>
+                    <Card size="small">
+                      <Statistic 
+                        title="已完成" 
+                        value={batchProgress.completed}
+                        suffix={`批次`}
+                      />
+                    </Card>
+                  </Col>
+                  <Col span={8}>
+                    <Card size="small">
+                      <Statistic 
+                        title="总员工数" 
+                        value={batchInfo?.totalStaff || 0}
+                      />
+                    </Card>
+                  </Col>
+                </Row>
+
+                {/* 批次详细结果 */}
+                {batchProgress.results.length > 0 && (
+                  <div>
+                    <h4>批次结果：</h4>
+                    <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                      {batchProgress.results.map((result, index) => (
+                        <div key={index} style={{ 
+                          marginBottom: '8px', 
+                          padding: '8px', 
+                          backgroundColor: result.failed > 0 ? '#fff2f0' : '#f6ffed',
+                          border: `1px solid ${result.failed > 0 ? '#ffccc7' : '#d9f7be'}`,
+                          borderRadius: '4px'
+                        }}>
+                          <span>
+                            批次 {result.batchNumber}: 
+                            成功 <strong style={{ color: '#52c41a' }}>{result.success}</strong> 条
+                            {result.failed > 0 && (
+                              <span>, 失败 <strong style={{ color: '#ff4d4f' }}>{result.failed}</strong> 条</span>
+                            )}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </Modal>
 
@@ -881,8 +1115,18 @@ const StaffManagement: React.FC = () => {
           <Modal
             title="导入结果"
             open={!!importResults}
-            onOk={() => setImportResults(null)}
-            onCancel={() => setImportResults(null)}
+            onOk={() => {
+              setImportResults(null);
+              setBatchImportMode(false);
+              setBatchInfo(null);
+              setBatchProgress(null);
+            }}
+            onCancel={() => {
+              setImportResults(null);
+              setBatchImportMode(false);
+              setBatchInfo(null);
+              setBatchProgress(null);
+            }}
             width={600}
           >
             <div style={{ padding: '16px 0' }}>

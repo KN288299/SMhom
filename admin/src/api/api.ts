@@ -213,6 +213,44 @@ export const staffAPI = {
     return response.data;
   },
 
+  // 分批导入 - 准备阶段
+  prepareBatchImport: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await uploadApi.post('/admin/staff/batch-import/prepare', formData, {
+      timeout: 600000, // 10分钟超时
+      maxContentLength: 500 * 1024 * 1024, // 500MB
+      maxBodyLength: 500 * 1024 * 1024, // 500MB
+    });
+    return response.data;
+  },
+
+  // 分批导入 - 执行单批次
+  executeBatchImport: async (batchId: string, batchNumber: number) => {
+    const response = await axios.post(`${SERVER_BASE_URL}/api/admin/staff/batch-import/execute`, {
+      batchId,
+      batchNumber
+    }, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('adminToken')}`
+      },
+      timeout: 300000, // 5分钟超时
+    });
+    return response.data;
+  },
+
+  // 分批导入 - 清理临时文件
+  cleanupBatchImport: async (batchId: string) => {
+    const response = await axios.delete(`${SERVER_BASE_URL}/api/admin/staff/batch-import/cleanup`, {
+      data: { batchId },
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('adminToken')}`
+      }
+    });
+    return response.data;
+  },
+
   // 获取批量删除预览
   getDeletePreview: async (batchSize: number, filters?: { search?: string; province?: string }) => {
     const queryParams = new URLSearchParams();

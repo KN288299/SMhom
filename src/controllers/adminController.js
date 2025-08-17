@@ -485,57 +485,25 @@ const importStaff = asyncHandler(async (req, res) => {
       throw new Error('不支持的文件格式，只支持JSON和ZIP文件');
     }
 
-    // 导入员工数据
-    const results = {
-      success: 0,
-      failed: 0,
-      errors: []
-    };
+    // 检查数据量，如果超过20个员工，建议使用分批导入
+    if (staffData.length > 20) {
+      // 清理上传的文件
+      fs.unlinkSync(filePath);
 
-    for (const staffInfo of staffData) {
-      try {
-        // 检查必需字段
-        if (!staffInfo.name || !staffInfo.age || !staffInfo.job) {
-          results.failed++;
-          results.errors.push(`员工 ${staffInfo.name || '未知'}: 缺少必需字段（姓名、年龄、职业）`);
-          continue;
+      return res.json({
+        message: '检测到大量数据，建议使用分批导入功能',
+        totalCount: staffData.length,
+        suggestBatchImport: true,
+        batchRecommendation: {
+          totalStaff: staffData.length,
+          recommendedBatchSize: 10,
+          estimatedBatches: Math.ceil(staffData.length / 10)
         }
-
-        // 检查是否已存在同名员工
-        const existingStaff = await Staff.findOne({ 
-          name: staffInfo.name,
-          isActive: true 
-        });
-
-        if (existingStaff) {
-          results.failed++;
-          results.errors.push(`员工 ${staffInfo.name}: 已存在同名员工`);
-          continue;
-        }
-
-        // 创建新员工
-        const newStaff = new Staff({
-          name: staffInfo.name,
-          age: parseInt(staffInfo.age),
-          job: staffInfo.job,
-          province: staffInfo.province || '北京市',
-          height: parseFloat(staffInfo.height) || 165,
-          weight: parseFloat(staffInfo.weight) || 50,
-          description: staffInfo.description || '',
-          image: staffInfo.image || 'https://via.placeholder.com/150',
-          photos: staffInfo.photos || [],
-          tag: staffInfo.tag || '可预约',
-          isActive: true
-        });
-
-        await newStaff.save();
-        results.success++;
-
-      } catch (error) {
-        results.failed++;
-        results.errors.push(`员工 ${staffInfo.name || '未知'}: ${error.message}`);
-      }
+      });
     }
+
+    // 导入员工数据（小批量直接处理）
+    const results = await processStaffBatch(staffData);
 
     // 清理上传的文件
     fs.unlinkSync(filePath);
@@ -653,6 +621,264 @@ const batchDeleteStaff = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    分批导入员工数据 - 解析文件
+// @route   POST /api/admin/staff/batch-import/prepare
+// @access  Private/Admin
+const prepareBatchImport = asyncHandler(async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: '请选择要导入的文件' });
+    }
+
+    const filePath = req.file.path;
+    const fileExtension = path.extname(req.file.originalname).toLowerCase();
+    
+    let staffData = [];
+
+    if (fileExtension === '.json') {
+      // 处理JSON文件
+      const jsonContent = fs.readFileSync(filePath, 'utf8');
+      const importData = JSON.parse(jsonContent);
+      
+      if (Array.isArray(importData)) {
+        staffData = importData;
+      } else if (importData.data && Array.isArray(importData.data)) {
+        staffData = importData.data;
+      } else {
+        throw new Error('JSON文件格式错误：应包含员工数据数组');
+      }
+    } else if (fileExtension === '.zip') {
+      // 处理ZIP文件
+      const extractDir = path.join(path.dirname(filePath), `extract-${Date.now()}`);
+      fs.mkdirSync(extractDir, { recursive: true });
+
+      // 解压ZIP文件
+      await fs.createReadStream(filePath)
+        .pipe(unzipper.Extract({ path: extractDir }))
+        .promise();
+
+      // 查找JSON文件
+      const files = fs.readdirSync(extractDir);
+      const jsonFile = files.find(f => f.endsWith('.json'));
+      
+      if (!jsonFile) {
+        throw new Error('ZIP文件中没有找到JSON数据文件');
+      }
+
+      const jsonPath = path.join(extractDir, jsonFile);
+      const jsonContent = fs.readFileSync(jsonPath, 'utf8');
+      const importData = JSON.parse(jsonContent);
+      
+      if (Array.isArray(importData)) {
+        staffData = importData;
+      } else if (importData.data && Array.isArray(importData.data)) {
+        staffData = importData.data;
+      } else {
+        throw new Error('JSON文件格式错误：应包含员工数据数组');
+      }
+
+      // 清理解压目录
+      fs.rmSync(extractDir, { recursive: true, force: true });
+    } else {
+      throw new Error('不支持的文件格式，只支持JSON和ZIP文件');
+    }
+
+    // 生成批次ID
+    const batchId = `batch_${Date.now()}_${Math.round(Math.random() * 1000)}`;
+    const batchSize = 10; // 每批10个员工
+    const totalBatches = Math.ceil(staffData.length / batchSize);
+    
+    // 将数据分批并保存到临时存储
+    const tempDir = path.join(__dirname, '../../uploads/batch-temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    const batchInfo = {
+      batchId,
+      totalStaff: staffData.length,
+      totalBatches,
+      batchSize,
+      createdAt: new Date(),
+      status: 'prepared'
+    };
+
+    // 保存批次信息
+    fs.writeFileSync(
+      path.join(tempDir, `${batchId}_info.json`), 
+      JSON.stringify(batchInfo, null, 2)
+    );
+
+    // 分批保存数据
+    for (let i = 0; i < totalBatches; i++) {
+      const startIndex = i * batchSize;
+      const endIndex = Math.min(startIndex + batchSize, staffData.length);
+      const batchData = staffData.slice(startIndex, endIndex);
+      
+      fs.writeFileSync(
+        path.join(tempDir, `${batchId}_batch_${i + 1}.json`), 
+        JSON.stringify(batchData, null, 2)
+      );
+    }
+
+    // 清理上传的文件
+    fs.unlinkSync(filePath);
+
+    res.json({
+      message: '文件解析完成，准备分批导入',
+      batchInfo: {
+        batchId,
+        totalStaff: staffData.length,
+        totalBatches,
+        batchSize
+      }
+    });
+
+  } catch (error) {
+    console.error('准备分批导入失败:', error);
+    
+    // 清理上传的文件
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+
+    res.status(500).json({ 
+      message: '准备分批导入失败',
+      error: error.message 
+    });
+  }
+});
+
+// @desc    执行单个批次导入
+// @route   POST /api/admin/staff/batch-import/execute
+// @access  Private/Admin
+const executeBatchImport = asyncHandler(async (req, res) => {
+  try {
+    const { batchId, batchNumber } = req.body;
+
+    if (!batchId || !batchNumber) {
+      return res.status(400).json({ message: '缺少批次ID或批次号' });
+    }
+
+    const tempDir = path.join(__dirname, '../../uploads/batch-temp');
+    const batchFilePath = path.join(tempDir, `${batchId}_batch_${batchNumber}.json`);
+
+    if (!fs.existsSync(batchFilePath)) {
+      return res.status(404).json({ message: '批次数据不存在' });
+    }
+
+    // 读取批次数据
+    const batchData = JSON.parse(fs.readFileSync(batchFilePath, 'utf8'));
+    
+    // 处理这一批员工数据
+    const results = await processStaffBatch(batchData);
+
+    res.json({
+      message: `批次 ${batchNumber} 导入完成`,
+      batchNumber,
+      results
+    });
+
+  } catch (error) {
+    console.error('执行批次导入失败:', error);
+    res.status(500).json({ 
+      message: '执行批次导入失败',
+      error: error.message 
+    });
+  }
+});
+
+// @desc    清理批次临时文件
+// @route   DELETE /api/admin/staff/batch-import/cleanup
+// @access  Private/Admin
+const cleanupBatchImport = asyncHandler(async (req, res) => {
+  try {
+    const { batchId } = req.body;
+
+    if (!batchId) {
+      return res.status(400).json({ message: '缺少批次ID' });
+    }
+
+    const tempDir = path.join(__dirname, '../../uploads/batch-temp');
+    
+    // 清理所有相关文件
+    const files = fs.readdirSync(tempDir);
+    const batchFiles = files.filter(file => file.startsWith(batchId));
+    
+    batchFiles.forEach(file => {
+      fs.unlinkSync(path.join(tempDir, file));
+    });
+
+    res.json({
+      message: '批次临时文件清理完成',
+      cleanedFiles: batchFiles.length
+    });
+
+  } catch (error) {
+    console.error('清理批次文件失败:', error);
+    res.status(500).json({ 
+      message: '清理批次文件失败',
+      error: error.message 
+    });
+  }
+});
+
+// 共用的员工批次处理函数
+const processStaffBatch = async (staffData) => {
+  const results = {
+    success: 0,
+    failed: 0,
+    errors: []
+  };
+
+  for (const staffInfo of staffData) {
+    try {
+      // 检查必需字段
+      if (!staffInfo.name || !staffInfo.age || !staffInfo.job) {
+        results.failed++;
+        results.errors.push(`员工 ${staffInfo.name || '未知'}: 缺少必需字段（姓名、年龄、职业）`);
+        continue;
+      }
+
+      // 检查是否已存在同名员工
+      const existingStaff = await Staff.findOne({ 
+        name: staffInfo.name,
+        isActive: true 
+      });
+
+      if (existingStaff) {
+        results.failed++;
+        results.errors.push(`员工 ${staffInfo.name}: 已存在同名员工`);
+        continue;
+      }
+
+      // 创建新员工
+      const newStaff = new Staff({
+        name: staffInfo.name,
+        age: parseInt(staffInfo.age),
+        job: staffInfo.job,
+        province: staffInfo.province || '北京市',
+        height: parseFloat(staffInfo.height) || 165,
+        weight: parseFloat(staffInfo.weight) || 50,
+        description: staffInfo.description || '',
+        image: staffInfo.image || 'https://via.placeholder.com/150',
+        photos: staffInfo.photos || [],
+        tag: staffInfo.tag || '可预约',
+        isActive: true
+      });
+
+      await newStaff.save();
+      results.success++;
+
+    } catch (error) {
+      results.failed++;
+      results.errors.push(`员工 ${staffInfo.name || '未知'}: ${error.message}`);
+    }
+  }
+
+  return results;
+};
+
 module.exports = {
   loginAdmin,
   getAdminProfile,
@@ -668,4 +894,7 @@ module.exports = {
   importStaff,
   getStaffDeletePreview,
   batchDeleteStaff,
+  prepareBatchImport,
+  executeBatchImport,
+  cleanupBatchImport
 }; 
