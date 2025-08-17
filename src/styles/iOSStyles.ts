@@ -24,7 +24,7 @@ const IOS_MAIN_HEADER_PADDING_TOP = isIOSPlatform ? 55 : 30; // iOS增加padding
 
 // 聊天页面页头配置 - 与SafeAreaView配合使用
 export const IOS_CHAT_HEADER_HEIGHT = 80; // 聊天页面页头高度 - 与消息页面一致
-const IOS_CHAT_HEADER_PADDING_TOP = isIOSPlatform ? 10 : 30; // 配合SafeAreaView使用，只需少量paddingTop
+const IOS_CHAT_HEADER_PADDING_TOP = isIOSPlatform ? 50 : 30; // iOS需要足够的paddingTop避免被刘海屏/灵动岛遮挡
 
 /**
  * 根据字体大小获取iOS适配的大小
@@ -111,7 +111,7 @@ export const iOSChatStyles = StyleSheet.create({
     backgroundColor: '#F2F2F7', // iOS系统背景色
     paddingHorizontal: 16,
     paddingVertical: 8,
-    paddingBottom: 8, // 配合SafeAreaView使用，仅保留少量底部间距
+    paddingBottom: 0, // 完全移除底部间距，让SafeAreaView处理
     borderTopWidth: 0.5,
     borderTopColor: '#c6c6c8',
   },
@@ -179,7 +179,7 @@ export const iOSChatStyles = StyleSheet.create({
     backgroundColor: '#F2F2F7',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingBottom: 12, // 配合SafeAreaView使用，减少底部间距
+    paddingBottom: 0, // 完全移除底部间距，让SafeAreaView处理
     borderTopWidth: 0.5,
     borderTopColor: '#c6c6c8',
     justifyContent: 'space-around', // 平均分布

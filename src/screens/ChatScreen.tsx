@@ -2025,7 +2025,7 @@ const ChatScreen: React.FC = () => {
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? IOS_CHAT_HEADER_HEIGHT + IOS_SAFE_AREA_TOP : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? IOS_CHAT_HEADER_HEIGHT : 0}
         onStartShouldSetResponder={() => {
           if (showMoreOptions) {
             setShowMoreOptions(false);
