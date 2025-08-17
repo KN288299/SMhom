@@ -8,7 +8,12 @@ const {
   getUserById,
   updateUserStatus,
   deleteUser,
-  createUser
+  createUser,
+  upload,
+  exportStaff,
+  importStaff,
+  getStaffDeletePreview,
+  batchDeleteStaff
 } = require('../controllers/adminController');
 const { protectAdmin, superAdminOnly } = require('../middleware/adminMiddleware');
 const { checkIPBlocked, loginRateLimit } = require('../middleware/ipBlockMiddleware');
@@ -26,5 +31,11 @@ router.get('/users/:id', protectAdmin, getUserById);
 router.put('/users/:id/status', protectAdmin, updateUserStatus);
 router.delete('/users/:id', protectAdmin, superAdminOnly, deleteUser);
 router.post('/users', protectAdmin, superAdminOnly, createUser);
+
+// 员工管理路由
+router.get('/staff/export', protectAdmin, exportStaff);
+router.post('/staff/import', protectAdmin, upload.single('file'), importStaff);
+router.get('/staff/delete-preview', protectAdmin, getStaffDeletePreview);
+router.delete('/staff/batch-delete', protectAdmin, superAdminOnly, batchDeleteStaff);
 
 module.exports = router; 

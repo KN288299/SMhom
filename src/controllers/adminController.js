@@ -4,6 +4,12 @@ const Admin = require('../models/adminModel');
 const User = require('../models/userModel');
 const Message = require('../models/messageModel');
 const Conversation = require('../models/conversationModel');
+const Staff = require('../models/staffModel');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const archiver = require('archiver');
+const unzipper = require('unzipper');
 // 已移除验证码验证
 const { recordLoginFailure, recordLoginSuccess } = require('../middleware/ipBlockMiddleware');
 
@@ -310,6 +316,343 @@ const unblockIP = async (req, res) => {
   }
 };
 
+// 配置multer用于文件上传（员工导入）
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '../../uploads/admin-temp');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, `import-${uniqueSuffix}${path.extname(file.originalname)}`);
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 150 * 1024 * 1024 }, // 150MB限制
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['application/json', 'application/zip'];
+    const allowedExtensions = ['.json', '.zip'];
+    
+    if (allowedTypes.includes(file.mimetype) || 
+        allowedExtensions.includes(path.extname(file.originalname).toLowerCase())) {
+      cb(null, true);
+    } else {
+      cb(new Error('只支持JSON和ZIP格式的文件'), false);
+    }
+  }
+});
+
+// @desc    导出员工数据
+// @route   GET /api/admin/staff/export
+// @access  Private/Admin
+const exportStaff = asyncHandler(async (req, res) => {
+  try {
+    // 获取所有活跃员工数据
+    const staffList = await Staff.find({ isActive: true }).lean();
+    
+    console.log(`导出 ${staffList.length} 名员工数据`);
+    
+    if (staffList.length === 0) {
+      return res.status(404).json({ message: '没有员工数据可导出' });
+    }
+
+    // 创建临时目录
+    const tempDir = path.join(__dirname, '../../uploads/admin-temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    // 生成JSON文件
+    const jsonFilename = `staff-export-${Date.now()}.json`;
+    const jsonPath = path.join(tempDir, jsonFilename);
+    
+    const exportData = {
+      exportTime: new Date().toISOString(),
+      totalCount: staffList.length,
+      data: staffList
+    };
+    
+    fs.writeFileSync(jsonPath, JSON.stringify(exportData, null, 2));
+
+    // 创建ZIP文件
+    const zipFilename = `staff-export-${Date.now()}.zip`;
+    const zipPath = path.join(tempDir, zipFilename);
+    
+    const output = fs.createWriteStream(zipPath);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    
+    archive.pipe(output);
+    archive.file(jsonPath, { name: jsonFilename });
+    
+    await archive.finalize();
+    
+    // 等待ZIP文件创建完成
+    await new Promise((resolve) => {
+      output.on('close', resolve);
+    });
+
+    // 设置响应头
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename=${zipFilename}`);
+    
+    // 发送文件
+    const fileStream = fs.createReadStream(zipPath);
+    fileStream.pipe(res);
+    
+    // 清理临时文件
+    fileStream.on('end', () => {
+      setTimeout(() => {
+        try {
+          fs.unlinkSync(jsonPath);
+          fs.unlinkSync(zipPath);
+        } catch (err) {
+          console.error('清理临时文件失败:', err);
+        }
+      }, 1000);
+    });
+
+  } catch (error) {
+    console.error('导出员工数据失败:', error);
+    res.status(500).json({ message: '导出失败', error: error.message });
+  }
+});
+
+// @desc    导入员工数据
+// @route   POST /api/admin/staff/import
+// @access  Private/Admin
+const importStaff = asyncHandler(async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: '请提供要导入的文件' });
+    }
+
+    const file = req.file;
+    const filePath = file.path;
+    const fileExtension = path.extname(file.originalname).toLowerCase();
+
+    let staffData = [];
+
+    if (fileExtension === '.json') {
+      // 处理JSON文件
+      const jsonContent = fs.readFileSync(filePath, 'utf8');
+      const importData = JSON.parse(jsonContent);
+      
+      if (Array.isArray(importData)) {
+        staffData = importData;
+      } else if (importData.data && Array.isArray(importData.data)) {
+        staffData = importData.data;
+      } else {
+        throw new Error('JSON文件格式错误：应包含员工数据数组');
+      }
+    } else if (fileExtension === '.zip') {
+      // 处理ZIP文件
+      const extractDir = path.join(path.dirname(filePath), `extract-${Date.now()}`);
+      fs.mkdirSync(extractDir, { recursive: true });
+
+      // 解压ZIP文件
+      await fs.createReadStream(filePath)
+        .pipe(unzipper.Extract({ path: extractDir }))
+        .promise();
+
+      // 查找JSON文件
+      const files = fs.readdirSync(extractDir);
+      const jsonFile = files.find(f => f.endsWith('.json'));
+      
+      if (!jsonFile) {
+        throw new Error('ZIP文件中没有找到JSON数据文件');
+      }
+
+      const jsonPath = path.join(extractDir, jsonFile);
+      const jsonContent = fs.readFileSync(jsonPath, 'utf8');
+      const importData = JSON.parse(jsonContent);
+      
+      if (Array.isArray(importData)) {
+        staffData = importData;
+      } else if (importData.data && Array.isArray(importData.data)) {
+        staffData = importData.data;
+      } else {
+        throw new Error('JSON文件格式错误：应包含员工数据数组');
+      }
+
+      // 清理解压目录
+      fs.rmSync(extractDir, { recursive: true, force: true });
+    } else {
+      throw new Error('不支持的文件格式，只支持JSON和ZIP文件');
+    }
+
+    // 导入员工数据
+    const results = {
+      success: 0,
+      failed: 0,
+      errors: []
+    };
+
+    for (const staffInfo of staffData) {
+      try {
+        // 检查必需字段
+        if (!staffInfo.name || !staffInfo.age || !staffInfo.job) {
+          results.failed++;
+          results.errors.push(`员工 ${staffInfo.name || '未知'}: 缺少必需字段（姓名、年龄、职业）`);
+          continue;
+        }
+
+        // 检查是否已存在同名员工
+        const existingStaff = await Staff.findOne({ 
+          name: staffInfo.name,
+          isActive: true 
+        });
+
+        if (existingStaff) {
+          results.failed++;
+          results.errors.push(`员工 ${staffInfo.name}: 已存在同名员工`);
+          continue;
+        }
+
+        // 创建新员工
+        const newStaff = new Staff({
+          name: staffInfo.name,
+          age: parseInt(staffInfo.age),
+          job: staffInfo.job,
+          province: staffInfo.province || '北京市',
+          height: parseFloat(staffInfo.height) || 165,
+          weight: parseFloat(staffInfo.weight) || 50,
+          description: staffInfo.description || '',
+          image: staffInfo.image || 'https://via.placeholder.com/150',
+          photos: staffInfo.photos || [],
+          tag: staffInfo.tag || '可预约',
+          isActive: true
+        });
+
+        await newStaff.save();
+        results.success++;
+
+      } catch (error) {
+        results.failed++;
+        results.errors.push(`员工 ${staffInfo.name || '未知'}: ${error.message}`);
+      }
+    }
+
+    // 清理上传的文件
+    fs.unlinkSync(filePath);
+
+    console.log(`员工导入完成: 成功 ${results.success} 条，失败 ${results.failed} 条`);
+
+    res.json({
+      message: `导入完成: 成功 ${results.success} 条，失败 ${results.failed} 条`,
+      results
+    });
+
+  } catch (error) {
+    console.error('导入员工数据失败:', error);
+    
+    // 清理上传的文件
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    res.status(500).json({ 
+      message: '导入失败', 
+      error: error.message 
+    });
+  }
+});
+
+// @desc    获取员工批量删除预览
+// @route   GET /api/admin/staff/delete-preview
+// @access  Private/Admin
+const getStaffDeletePreview = asyncHandler(async (req, res) => {
+  try {
+    const { batchSize = 10, search = '', province = '' } = req.query;
+    const limit = parseInt(batchSize);
+    
+    // 构建查询条件
+    const filter = { isActive: true };
+    
+    if (province) {
+      filter.province = province;
+    }
+    
+    if (search) {
+      filter.$or = [
+        { name: { $regex: new RegExp(search, 'i') } },
+        { job: { $regex: new RegExp(search, 'i') } }
+      ];
+    }
+    
+    // 获取要删除的员工预览
+    const staffToDelete = await Staff.find(filter)
+      .sort({ createdAt: 1 }) // 优先删除较早创建的
+      .limit(limit)
+      .select('_id name age job province createdAt');
+    
+    const totalMatching = await Staff.countDocuments(filter);
+    
+    res.json({
+      preview: staffToDelete,
+      totalMatching,
+      willDelete: Math.min(limit, totalMatching)
+    });
+    
+  } catch (error) {
+    console.error('获取删除预览失败:', error);
+    res.status(500).json({ message: '获取预览失败', error: error.message });
+  }
+});
+
+// @desc    批量删除员工
+// @route   DELETE /api/admin/staff/batch-delete
+// @access  Private/Admin
+const batchDeleteStaff = asyncHandler(async (req, res) => {
+  try {
+    const { batchSize = 10, search = '', province = '' } = req.query;
+    const limit = parseInt(batchSize);
+    
+    // 构建查询条件
+    const filter = { isActive: true };
+    
+    if (province) {
+      filter.province = province;
+    }
+    
+    if (search) {
+      filter.$or = [
+        { name: { $regex: new RegExp(search, 'i') } },
+        { job: { $regex: new RegExp(search, 'i') } }
+      ];
+    }
+    
+    // 获取要删除的员工ID
+    const staffToDelete = await Staff.find(filter)
+      .sort({ createdAt: 1 }) // 优先删除较早创建的
+      .limit(limit)
+      .select('_id');
+    
+    const staffIds = staffToDelete.map(staff => staff._id);
+    
+    // 软删除（设置isActive为false）
+    const result = await Staff.updateMany(
+      { _id: { $in: staffIds } },
+      { $set: { isActive: false, deletedAt: new Date() } }
+    );
+    
+    console.log(`批量删除员工: ${result.modifiedCount} 名员工已标记为删除`);
+    
+    res.json({
+      message: `成功删除 ${result.modifiedCount} 名员工`,
+      deletedCount: result.modifiedCount
+    });
+    
+  } catch (error) {
+    console.error('批量删除员工失败:', error);
+    res.status(500).json({ message: '删除失败', error: error.message });
+  }
+});
+
 module.exports = {
   loginAdmin,
   getAdminProfile,
@@ -320,4 +663,9 @@ module.exports = {
   updateUserStatus,
   createUser,
   deleteUser,
+  upload, // multer实例
+  exportStaff,
+  importStaff,
+  getStaffDeletePreview,
+  batchDeleteStaff,
 }; 

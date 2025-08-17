@@ -422,7 +422,17 @@ const StaffManagement: React.FC = () => {
     } catch (error: any) {
       console.error('导入员工数据失败:', error);
       setImportProgress(0);
-      message.error('导入失败：' + (error.response?.data?.message || error.message));
+      
+      // 针对413错误提供具体的解决方案
+      if (error.response?.status === 413) {
+        message.error('文件过大！请确保文件小于150MB，或考虑分批导入员工数据。');
+      } else if (error.response?.status === 400) {
+        message.error('文件格式错误：' + (error.response?.data?.message || '请检查文件格式'));
+      } else if (error.response?.status === 500) {
+        message.error('服务器处理文件时出错，请稍后重试或联系管理员');
+      } else {
+        message.error('导入失败：' + (error.response?.data?.message || error.message));
+      }
     } finally {
       setImportLoading(false);
     }
@@ -451,12 +461,13 @@ const StaffManagement: React.FC = () => {
       return false;
     }
     
-    // 移除文件大小限制，支持大型员工数据导入
-    // const isLt50M = file.size / 1024 / 1024 < 50;
-    // if (!isLt50M) {
-    //   message.error('文件大小不能超过 50MB！');
-    //   return false;
-    // }
+    // 添加文件大小限制，防止413错误
+    const maxSize = 150; // 150MB
+    const isLtMaxSize = file.size / 1024 / 1024 < maxSize;
+    if (!isLtMaxSize) {
+      message.error(`文件大小不能超过 ${maxSize}MB！请压缩文件或分批导入。`);
+      return false;
+    }
     
     return true;
   };
@@ -739,6 +750,7 @@ const StaffManagement: React.FC = () => {
                 icon={<UploadOutlined />} 
                 loading={importLoading}
                 disabled={exportLoading || deleteLoading}
+                title="支持JSON/ZIP格式，文件大小限制150MB"
               >
                 导入员工
               </Button>
@@ -768,6 +780,16 @@ const StaffManagement: React.FC = () => {
             </Button>
           </Space>
         </div>
+
+        {/* 添加文件上传提示 */}
+        <Alert
+          message="文件上传要求"
+          description="导入支持JSON或ZIP格式文件，单个文件大小不超过150MB。支持大型压缩包包含大量员工数据。"
+          type="info"
+          showIcon
+          style={{ marginBottom: '16px' }}
+          closable
+        />
 
         {/* 添加筛选区域 */}
         <Card style={{ marginBottom: 16 }}>

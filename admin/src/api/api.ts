@@ -201,7 +201,15 @@ export const staffAPI = {
     const formData = new FormData();
     formData.append('file', file);
     
-    const response = await uploadApi.post('/admin/staff/import', formData);
+    const response = await uploadApi.post('/admin/staff/import', formData, {
+      timeout: 600000, // 10分钟超时
+      maxContentLength: 150 * 1024 * 1024, // 150MB
+      maxBodyLength: 150 * 1024 * 1024, // 150MB
+      onUploadProgress: (progressEvent) => {
+        // 可以用于显示上传进度
+        console.log('Upload progress:', progressEvent);
+      }
+    });
     return response.data;
   },
 
