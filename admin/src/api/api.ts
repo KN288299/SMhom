@@ -493,16 +493,16 @@ export const customerServiceAPI = {
         }
       });
       console.log('获取到的客服列表数据:', response.data);
-      // 检查每个客服的头像路径
-      if (Array.isArray(response.data)) {
-        response.data.forEach(cs => {
-          console.log(`客服 ${cs.name} 的头像路径: ${cs.avatar}`);
-          if (cs.avatar) {
-            console.log(`完整URL: ${SERVER_BASE_URL}${cs.avatar}`);
-          }
-        });
-      }
-      return response.data;
+      // 兼容两种返回格式：数组 或 { customerServices, pagination }
+      const data = response.data;
+      const list = Array.isArray(data) ? data : (data && Array.isArray(data.customerServices) ? data.customerServices : []);
+      // 可选：调试每个头像路径
+      list.forEach((cs: { avatar?: string; name?: string }) => {
+        if (cs && cs.avatar) {
+          console.log(`客服 ${cs.name} 的头像路径: ${cs.avatar} -> 完整URL: ${SERVER_BASE_URL}${cs.avatar}`);
+        }
+      });
+      return list;
     } catch (error) {
       console.error('获取客服列表失败:', error);
       throw error;
