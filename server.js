@@ -60,8 +60,8 @@ app.use(cors({
 }));
 
 // 增加请求体大小限制
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: false, limit: '50mb' }));
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ extended: false, limit: '500mb' }));
 
 // 静态文件服务 - 提供图片访问
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
