@@ -27,6 +27,8 @@ interface Message {
   videoHeight?: number;
   aspectRatio?: number;
   fileUrl?: string;
+  // 仅本地使用：iOS 自发视频的本地路径，用于预览/播放回退
+  localFileUri?: string;
   isCallRecord?: boolean;
   callerId?: string;
   callDuration?: string;
@@ -139,6 +141,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
           onPress={() => {}}
           isUploading={true}
           uploadProgress={item.uploadProgress || 0}
+          localFileUri={item.localFileUri}
         />
       );
     }
@@ -159,6 +162,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
             // 使用应用内视频播放器
             onOpenFullscreenVideo(url);
           }}
+          localFileUri={item.localFileUri}
         />
       );
     }

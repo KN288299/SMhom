@@ -147,6 +147,8 @@ interface Message {
   videoHeight?: number;
   aspectRatio?: number;
   fileUrl?: string;  // 添加通用文件URL字段
+  // 仅本地使用：iOS 自发视频的本地路径，用于预览/播放回退
+  localFileUri?: string;
   isCallRecord?: boolean;  // 是否是通话记录
   callerId?: string;  // 通话发起者ID
   callDuration?: string;  // 通话时长
@@ -1401,6 +1403,8 @@ const ChatScreen: React.FC = () => {
         timestamp: new Date(),
         messageType: 'video',
         videoUrl: selectedVideoUri,
+        // iOS 自发视频保留本地路径，供预览/播放回退
+        localFileUri: Platform.OS === 'ios' ? selectedVideoUri : undefined,
         isUploading: true,
         uploadProgress: 0
       };
