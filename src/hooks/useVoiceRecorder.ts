@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Platform, Alert, PermissionsAndroid, Animated } from 'react-native';
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs';
@@ -54,6 +54,30 @@ export const useVoiceRecorder = ({
   const audioRecorderPlayerRef = useRef(new AudioRecorderPlayer());
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const isRequestingPermission = useRef(false);
+
+  // 初始化时检查权限状态
+  useEffect(() => {
+    const checkInitialPermission = async () => {
+      try {
+        if (Platform.OS === 'ios') {
+          const result = await check(PERMISSIONS.IOS.MICROPHONE);
+          console.log('初始化检查iOS麦克风权限:', result);
+          setHasRecordingPermission(result === RESULTS.GRANTED);
+        } else {
+          const granted = await PermissionsAndroid.check(
+            PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
+          );
+          console.log('初始化检查Android录音权限:', granted);
+          setHasRecordingPermission(granted);
+        }
+      } catch (error) {
+        console.warn('初始化权限检查失败:', error);
+        setHasRecordingPermission(false);
+      }
+    };
+
+    checkInitialPermission();
+  }, []);
 
   // 权限检查 - 修改为不自动触发录音
   const requestRecordingPermission = useCallback(async (): Promise<boolean> => {
@@ -114,17 +138,57 @@ export const useVoiceRecorder = ({
       } else {
         // iOS权限检查
         const result = await check(PERMISSIONS.IOS.MICROPHONE);
+        console.log('iOS麦克风权限检查结果:', result);
         
         if (result === RESULTS.GRANTED) {
+          console.log('iOS麦克风权限已授予');
           setHasRecordingPermission(true);
           return true;
         } else if (result === RESULTS.DENIED) {
+          console.log('iOS麦克风权限被拒绝，请求权限...');
           const requestResult = await request(PERMISSIONS.IOS.MICROPHONE);
+          console.log('iOS权限请求结果:', requestResult);
           const hasPermission = requestResult === RESULTS.GRANTED;
           setHasRecordingPermission(hasPermission);
+          
+          if (!hasPermission) {
+            Alert.alert(
+              '麦克风权限被拒绝',
+              '录制语音消息需要麦克风权限。请前往 设置 > 隐私与安全性 > 麦克风 中开启权限。',
+              [
+                { text: '取消', style: 'cancel' },
+                { 
+                  text: '去设置',
+                  onPress: () => {
+                    // iOS设置页面
+                    require('react-native').Linking.openURL('app-settings:');
+                  }
+                }
+              ]
+            );
+          }
+          
           return hasPermission;
+        } else if (result === RESULTS.BLOCKED) {
+          console.log('iOS麦克风权限被永久拒绝');
+          Alert.alert(
+            '麦克风权限被禁用',
+            '录制语音消息需要麦克风权限。权限已被永久拒绝，请前往 设置 > 隐私与安全性 > 麦克风 中手动开启。',
+            [
+              { text: '取消', style: 'cancel' },
+              { 
+                text: '去设置',
+                onPress: () => {
+                  require('react-native').Linking.openURL('app-settings:');
+                }
+              }
+            ]
+          );
+          setHasRecordingPermission(false);
+          return false;
         } else {
-          Alert.alert('权限被拒绝', '录音权限被拒绝，请在设置中手动开启权限');
+          console.log('iOS麦克风权限状态未知:', result);
+          Alert.alert('权限错误', '无法获取麦克风权限状态，请重启应用后重试');
           setHasRecordingPermission(false);
           return false;
         }
@@ -166,25 +230,25 @@ export const useVoiceRecorder = ({
     }).stop();
   }, [pulseAnim]);
 
-  // 开始录音 - 修改逻辑，权限请求不会自动开始录音
+  // 开始录音 - 优化权限检查逻辑
   const startRecording = useCallback(async () => {
     try {
+      // 如果已经在录音，不允许重复开始
+      if (isRecording) {
+        console.log('已在录音中，忽略重复请求');
+        return;
+      }
+
       // 检查权限
       if (!hasRecordingPermission) {
+        console.log('正在请求录音权限...');
         const hasPermission = await requestRecordingPermission();
         if (!hasPermission) {
           console.log('没有获得录音权限，取消录音');
           return;
         }
-        // 权限获取成功后，不自动开始录音，需要用户再次按住
-        console.log('权限已获取，请再次按住开始录音');
-        return;
-      }
-
-      // 如果已经在录音，不允许重复开始
-      if (isRecording) {
-        console.log('已在录音中，忽略重复请求');
-        return;
+        // 权限获取成功，继续录音流程
+        console.log('权限已获取，开始录音');
       }
 
       // 强制清理之前的状态
@@ -203,7 +267,15 @@ export const useVoiceRecorder = ({
       const fileName = `voice_message_${timestamp}${Platform.OS === 'ios' ? '.m4a' : '.mp3'}`;
       
       if (Platform.OS === 'ios') {
+        // iOS使用DocumentDirectory，确保目录存在
         audioPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+        
+        // 确保DocumentDirectory存在（通常存在，但为了安全起见）
+        const dirExists = await RNFS.exists(RNFS.DocumentDirectoryPath);
+        if (!dirExists) {
+          console.warn('DocumentDirectoryPath不存在，创建目录');
+          await RNFS.mkdir(RNFS.DocumentDirectoryPath);
+        }
       } else {
         // 在Android上使用正确的缓存目录
         audioPath = `${RNFS.CachesDirectoryPath}/${fileName}`;
@@ -217,16 +289,36 @@ export const useVoiceRecorder = ({
       
       console.log('开始录音，路径:', audioPath);
       
+      // iOS特定：设置音频会话
+      if (Platform.OS === 'ios') {
+        try {
+          // 可以添加音频会话配置，但react-native-audio-recorder-player通常会自动处理
+          console.log('iOS录音环境准备...');
+        } catch (audioSessionError) {
+          console.warn('iOS音频会话设置警告:', audioSessionError);
+        }
+      }
+      
       const result = await audioRecorderPlayerRef.current.startRecorder(audioPath);
       
       // 检查是否返回了无效状态
       if (typeof result === 'string' && (
         result.includes('Already recording') || 
         result.includes('Already stopped') ||
-        result === 'Already recording'
+        result === 'Already recording' ||
+        result.includes('error') ||
+        result.includes('Error') ||
+        result.includes('failed') ||
+        result.includes('Failed')
       )) {
         console.log('检测到录音器状态异常:', result);
-        throw new Error('录音器状态异常，请稍后重试');
+        throw new Error(`录音器状态异常: ${result}`);
+      }
+      
+      // iOS特定：验证结果
+      if (Platform.OS === 'ios' && (!result || result.length < 10)) {
+        console.error('iOS录音启动返回异常结果:', result);
+        throw new Error('iOS录音启动失败，请检查麦克风权限和音频设置');
       }
       
       setRecordingUri(result);
@@ -247,7 +339,22 @@ export const useVoiceRecorder = ({
       console.log('录音已开始:', result);
     } catch (error: any) {
       console.error('录音启动失败:', error);
-      onError(error, '无法启动录音，请重试');
+      
+      // iOS特定错误处理
+      let errorMessage = '无法启动录音，请重试';
+      if (Platform.OS === 'ios') {
+        if (error.message?.includes('permission') || error.message?.includes('Permission')) {
+          errorMessage = 'iOS麦克风权限异常，请到设置中重新授权';
+        } else if (error.message?.includes('audio session') || error.message?.includes('Audio')) {
+          errorMessage = 'iOS音频会话异常，请关闭其他音频应用';
+        } else if (error.message?.includes('file') || error.message?.includes('path')) {
+          errorMessage = 'iOS文件系统错误，请重启应用';
+        } else {
+          errorMessage = `iOS录音启动失败: ${error.message || '未知错误'}`;
+        }
+      }
+      
+      onError(error, errorMessage);
       setIsRecording(false);
       setRecordTime('00:00');
       stopPulseAnimation();
