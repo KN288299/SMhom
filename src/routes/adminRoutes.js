@@ -11,11 +11,7 @@ const {
   createUser
 } = require('../controllers/adminController');
 const { protectAdmin, superAdminOnly } = require('../middleware/adminMiddleware');
-const { generateCaptcha } = require('../middleware/captchaMiddleware');
 const { checkIPBlocked, loginRateLimit } = require('../middleware/ipBlockMiddleware');
-
-// 验证码生成接口
-router.get('/captcha', generateCaptcha);
 
 // 管理员登录（添加IP封锁检查和速率限制）
 router.post('/login', checkIPBlocked, loginRateLimit, loginAdmin);

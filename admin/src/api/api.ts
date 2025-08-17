@@ -75,16 +75,10 @@ uploadApi.interceptors.response.use(
 
 // 管理员认证 API
 export const authAPI = {
-  getCaptcha: async () => {
-    const response = await api.get('/captcha');
-    return response.data;
-  },
-  login: async (username: string, password: string, captcha: string, captchaSessionId: string) => {
+  login: async (username: string, password: string) => {
     const response = await api.post('/login', { 
       username, 
-      password, 
-      captcha, 
-      captchaSessionId 
+      password
     });
     return response.data;
   },

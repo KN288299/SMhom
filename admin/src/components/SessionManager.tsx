@@ -10,7 +10,7 @@ interface SessionInfo {
 }
 
 const SessionManager: React.FC = () => {
-  const { isAuthenticated, logout, forceLogout } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
   const [showExpiryModal, setShowExpiryModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -69,7 +69,7 @@ const SessionManager: React.FC = () => {
         if (info && info.remainingTime <= 0) {
           message.warning('会话已过期，即将自动登出');
           setTimeout(() => {
-            forceLogout();
+            logout();
           }, 3000);
         }
       };
@@ -81,7 +81,7 @@ const SessionManager: React.FC = () => {
     } else {
       setSessionInfo(null);
     }
-  }, [isAuthenticated, showExpiryModal, forceLogout]);
+  }, [isAuthenticated, showExpiryModal, logout]);
 
   // 处理登出
   const handleLogout = () => {

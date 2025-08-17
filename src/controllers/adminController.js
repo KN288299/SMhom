@@ -4,18 +4,18 @@ const Admin = require('../models/adminModel');
 const User = require('../models/userModel');
 const Message = require('../models/messageModel');
 const Conversation = require('../models/conversationModel');
-const { verifyCaptcha } = require('../middleware/captchaMiddleware');
+// 已移除验证码验证
 const { recordLoginFailure, recordLoginSuccess } = require('../middleware/ipBlockMiddleware');
 
 // @desc    管理员登录
 // @route   POST /api/admin/login
 // @access  Public
 const loginAdmin = asyncHandler(async (req, res) => {
-  const { username, password, captcha, captchaSessionId } = req.body;
+  const { username, password } = req.body;
 
   try {
     // 1. 验证必填字段
-    if (!username || !password || !captcha || !captchaSessionId) {
+    if (!username || !password) {
       const result = recordLoginFailure(req);
       return res.status(400).json({
         message: '请填写完整的登录信息',
@@ -23,26 +23,7 @@ const loginAdmin = asyncHandler(async (req, res) => {
       });
     }
 
-    // 2. 验证验证码
-    const isCaptchaValid = verifyCaptcha(captchaSessionId, captcha);
-    if (!isCaptchaValid) {
-      const result = recordLoginFailure(req);
-      
-      if (result.isBlocked) {
-        return res.status(429).json({
-          message: result.message,
-          isBlocked: true,
-          remainingMinutes: result.remainingMinutes
-        });
-      }
-      
-      return res.status(400).json({
-        message: '验证码错误',
-        remainingAttempts: result.remainingAttempts
-      });
-    }
-
-    // 3. 查找管理员
+    // 2. 查找管理员
     const admin = await Admin.findOne({ username });
     if (!admin) {
       const result = recordLoginFailure(req);
@@ -61,7 +42,7 @@ const loginAdmin = asyncHandler(async (req, res) => {
       });
     }
 
-    // 4. 验证密码和状态
+    // 3. 验证密码和状态
     const isPasswordMatch = await admin.matchPassword(password);
     if (!isPasswordMatch || admin.status !== 'active') {
       const result = recordLoginFailure(req);
@@ -80,7 +61,7 @@ const loginAdmin = asyncHandler(async (req, res) => {
       });
     }
 
-    // 5. 登录成功
+    // 4. 登录成功
     recordLoginSuccess(req);
     
     const token = generateToken(admin._id);
@@ -298,9 +279,41 @@ const generateToken = (id) => {
   return `A_${token}`;
 };
 
+// 解除IP封锁（紧急情况使用）
+const unblockIP = async (req, res) => {
+  try {
+    const { ip } = req.body;
+    
+    if (!ip) {
+      return res.status(400).json({ message: '请提供要解除封锁的IP地址' });
+    }
+
+    // 导入IP封锁中间件
+    const { clearIPBlock } = require('../middleware/ipBlockMiddleware');
+    
+    // 解除指定IP的封锁
+    const result = clearIPBlock(ip);
+    
+    console.log(`管理员手动解除IP封锁: ${ip}`);
+    
+    res.json({
+      message: `IP地址 ${ip} 的封锁已解除`,
+      success: true,
+      result
+    });
+  } catch (error) {
+    console.error('解除IP封锁失败:', error);
+    res.status(500).json({ 
+      message: '解除IP封锁失败', 
+      error: error.message 
+    });
+  }
+};
+
 module.exports = {
   loginAdmin,
   getAdminProfile,
+  unblockIP,
   getStats,
   getUsers,
   getUserById,

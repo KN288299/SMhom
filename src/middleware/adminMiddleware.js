@@ -36,9 +36,7 @@ const protectAdmin = asyncHandler(async (req, res, next) => {
       res.status(401);
       throw new Error('未授权，token无效');
     }
-  }
-
-  if (!token) {
+  } else {
     res.status(401);
     throw new Error('未授权，没有token');
   }
