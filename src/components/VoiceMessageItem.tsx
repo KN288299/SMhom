@@ -4,6 +4,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import { BASE_URL } from '../config/api';
 import IOSAudioSession from '../utils/IOSAudioSession';
+import RNFS from 'react-native-fs';
 
 interface VoiceMessageItemProps {
   audioUrl: string;
@@ -21,6 +22,8 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPosition, setCurrentPosition] = useState('00:00');
   const audioPlayerRef = useRef<AudioRecorderPlayer>(new AudioRecorderPlayer());
+  const [localCachedPath, setLocalCachedPath] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
   
   // 获取完整的音频URL
   const getFullAudioUrl = () => {
@@ -111,14 +114,55 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
           });
         } catch (playError: any) {
           console.error('播放语音失败:', playError);
+
+          // iOS远程播放失败：尝试下载并从本地缓存播放
+          if (Platform.OS === 'ios' && fullAudioUrl.startsWith('http')) {
+            try {
+              const rawName = fullAudioUrl.split('?')[0].split('/').pop() || `voice_${Date.now()}.m4a`;
+              const cachePath = `${RNFS.CachesDirectoryPath}/${rawName}`;
+
+              if (!localCachedPath || localCachedPath !== cachePath || !(await RNFS.exists(cachePath))) {
+                console.log('iOS下载语音到本地缓存:', cachePath);
+                setIsDownloading(true);
+                await RNFS.downloadFile({ fromUrl: fullAudioUrl, toFile: cachePath }).promise;
+                setLocalCachedPath(cachePath);
+              }
+              setIsDownloading(false);
+
+              console.log('使用本地缓存文件播放语音:', cachePath);
+              await audioPlayerRef.current.startPlayer(`file://${cachePath}`);
+
+              audioPlayerRef.current.addPlayBackListener((e) => {
+                const seconds = Math.floor(e.currentPosition / 1000);
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = seconds % 60;
+                setCurrentPosition(
+                  `${minutes < 10 ? '0' + minutes : minutes}:${
+                    remainingSeconds < 10 ? '0' + remainingSeconds : remainingSeconds
+                  }`
+                );
+
+                if (e.currentPosition >= e.duration) {
+                  audioPlayerRef.current.stopPlayer();
+                  audioPlayerRef.current.removePlayBackListener();
+                  setIsPlaying(false);
+                  setCurrentPosition('00:00');
+                }
+              });
+              return;
+            } catch (iosFallbackErr) {
+              console.error('iOS缓存播放失败:', iosFallbackErr);
+            } finally {
+              setIsDownloading(false);
+            }
+          }
+
           let errorMessage = '无法播放语音消息';
-          
           if (playError.message?.includes('Prepare failed')) {
             errorMessage = '音频文件损坏或格式不支持';
           } else if (playError.message?.includes('Network')) {
             errorMessage = '网络连接失败，请检查网络设置';
           }
-          
           Alert.alert('播放失败', errorMessage);
           setIsPlaying(false);
         }
