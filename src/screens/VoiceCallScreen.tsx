@@ -724,8 +724,17 @@ const VoiceCallScreen: React.FC = () => {
     try {
       // 获取媒体流（仅音频）
       console.log('获取媒体流...');
+      const audioConstraints: any = Platform.OS === 'ios'
+        ? {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 44100,
+            channelCount: 1,
+          }
+        : true;
       const stream = await mediaDevices.getUserMedia({
-        audio: true,
+        audio: audioConstraints,
         video: false
       });
       
@@ -786,10 +795,11 @@ const VoiceCallScreen: React.FC = () => {
       // 确保音频输出到扬声器或听筒
       if (event.track.kind === 'audio') {
         console.log('收到远程音频轨道，设置音频输出...');
-        if (isSpeakerOn) {
+        if (Platform.OS === 'ios') {
+          // iOS默认走扬声器，避免“有连接无声”
           AudioManager.setSpeakerOn(true);
         } else {
-          AudioManager.setSpeakerOn(false);
+          AudioManager.setSpeakerOn(isSpeakerOn);
         }
       }
     };

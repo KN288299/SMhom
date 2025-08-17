@@ -261,45 +261,57 @@ export const useVoiceRecorder = ({
         console.log('清理录音器状态:', cleanupError);
       }
 
-      // 使用应用的缓存目录
-      let audioPath;
+      // 构建录音路径（Android使用自定义缓存目录；iOS优先用库默认路径，失败再回退自定义路径）
+      let audioPath: string | undefined;
       const timestamp = Date.now();
       const fileName = `voice_message_${timestamp}${Platform.OS === 'ios' ? '.m4a' : '.mp3'}`;
-      
-      if (Platform.OS === 'ios') {
-        // iOS使用DocumentDirectory，确保目录存在
-        audioPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
-        
-        // 确保DocumentDirectory存在（通常存在，但为了安全起见）
-        const dirExists = await RNFS.exists(RNFS.DocumentDirectoryPath);
-        if (!dirExists) {
-          console.warn('DocumentDirectoryPath不存在，创建目录');
-          await RNFS.mkdir(RNFS.DocumentDirectoryPath);
-        }
-      } else {
+
+      if (Platform.OS === 'android') {
         // 在Android上使用正确的缓存目录
         audioPath = `${RNFS.CachesDirectoryPath}/${fileName}`;
-        
         // 确保目录存在
         const dirExists = await RNFS.exists(RNFS.CachesDirectoryPath);
         if (!dirExists) {
           await RNFS.mkdir(RNFS.CachesDirectoryPath);
         }
+        console.log('开始录音，路径:', audioPath);
+      } else {
+        // iOS：先尝试不传路径，使用库默认安全路径
+        audioPath = undefined;
+        console.log('iOS优先使用库默认录音路径');
       }
-      
-      console.log('开始录音，路径:', audioPath);
-      
-      // iOS特定：设置音频会话
+
+      // iOS特定：可选的音频会话准备（库通常会自动处理）
       if (Platform.OS === 'ios') {
         try {
-          // 可以添加音频会话配置，但react-native-audio-recorder-player通常会自动处理
           console.log('iOS录音环境准备...');
         } catch (audioSessionError) {
           console.warn('iOS音频会话设置警告:', audioSessionError);
         }
       }
-      
-      const result = await audioRecorderPlayerRef.current.startRecorder(audioPath);
+
+      let result: string | undefined;
+      try {
+        result = await audioRecorderPlayerRef.current.startRecorder(audioPath);
+      } catch (startErr: any) {
+        console.warn('首次启动录音失败，尝试回退路径:', startErr?.message || startErr);
+        if (Platform.OS === 'ios') {
+          // 回退到Document目录的自定义m4a路径
+          const fallbackPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+          try {
+            const dirExists = await RNFS.exists(RNFS.DocumentDirectoryPath);
+            if (!dirExists) {
+              await RNFS.mkdir(RNFS.DocumentDirectoryPath);
+            }
+            console.log('使用iOS回退录音路径:', fallbackPath);
+            result = await audioRecorderPlayerRef.current.startRecorder(fallbackPath);
+          } catch (fallbackErr) {
+            throw fallbackErr;
+          }
+        } else {
+          throw startErr;
+        }
+      }
       
       // 检查是否返回了无效状态
       if (typeof result === 'string' && (
