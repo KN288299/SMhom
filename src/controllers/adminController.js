@@ -333,7 +333,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
   storage: storage,
-  limits: { fileSize: 150 * 1024 * 1024 }, // 150MB限制
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500MB限制
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['application/json', 'application/zip'];
     const allowedExtensions = ['.json', '.zip'];

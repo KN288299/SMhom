@@ -425,7 +425,7 @@ const StaffManagement: React.FC = () => {
       
       // 针对413错误提供具体的解决方案
       if (error.response?.status === 413) {
-        message.error('文件过大！请确保文件小于150MB，或考虑分批导入员工数据。');
+        message.error('文件过大！请确保文件小于500MB，或考虑分批导入员工数据。');
       } else if (error.response?.status === 400) {
         message.error('文件格式错误：' + (error.response?.data?.message || '请检查文件格式'));
       } else if (error.response?.status === 500) {
@@ -462,7 +462,7 @@ const StaffManagement: React.FC = () => {
     }
     
     // 添加文件大小限制，防止413错误
-    const maxSize = 150; // 150MB
+    const maxSize = 500; // 500MB
     const isLtMaxSize = file.size / 1024 / 1024 < maxSize;
     if (!isLtMaxSize) {
       message.error(`文件大小不能超过 ${maxSize}MB！请压缩文件或分批导入。`);
@@ -750,7 +750,7 @@ const StaffManagement: React.FC = () => {
                 icon={<UploadOutlined />} 
                 loading={importLoading}
                 disabled={exportLoading || deleteLoading}
-                title="支持JSON/ZIP格式，文件大小限制150MB"
+                title="支持JSON/ZIP格式，文件大小限制500MB"
               >
                 导入员工
               </Button>
@@ -784,7 +784,7 @@ const StaffManagement: React.FC = () => {
         {/* 添加文件上传提示 */}
         <Alert
           message="文件上传要求"
-          description="导入支持JSON或ZIP格式文件，单个文件大小不超过150MB。支持大型压缩包包含大量员工数据。"
+          description="导入支持JSON或ZIP格式文件，单个文件大小不超过500MB。支持大型压缩包包含大量员工数据。"
           type="info"
           showIcon
           style={{ marginBottom: '16px' }}
