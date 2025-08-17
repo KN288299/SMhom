@@ -1,12 +1,12 @@
 @echo off
 echo ==========================================
-echo 同步文件到服务器 45.144.136.37
+echo 同步文件到服务器 38.207.178.173
 echo ==========================================
 echo.
 
 echo 服务器信息:
-echo IP: 45.144.136.37
-echo 端口: 33181
+echo IP: 38.207.178.173
+echo 端口: 55122
 echo 用户名: root
 echo 密码: NkGKaEDJmF0t
 echo 服务器路径: /var/www/HomeServiceChat
@@ -30,8 +30,8 @@ echo.
 echo 方法1: WinSCP
 echo 1. 下载并安装 WinSCP: https://winscp.net/
 echo 2. 连接信息:
-echo    - 主机名: 45.144.136.37
-echo    - 端口: 33181
+echo    - 主机名: 38.207.178.173
+echo    - 端口: 55122
 echo    - 用户名: root
 echo    - 密码: NkGKaEDJmF0t
 echo 3. 上传以下文件到 /var/www/HomeServiceChat/
@@ -39,12 +39,12 @@ echo.
 
 echo 方法2: PowerShell SSH
 echo 如果您有OpenSSH，可以使用以下命令:
-echo pscp -P 33181 server.js root@45.144.136.37:/var/www/HomeServiceChat/
-echo pscp -P 33181 src/services/AndroidPushService.ts root@45.144.136.37:/var/www/HomeServiceChat/src/services/
-echo pscp -P 33181 src/context/AuthContext.tsx root@45.144.136.37:/var/www/HomeServiceChat/src/context/
-echo pscp -P 33181 test-push-integration.js root@45.144.136.37:/var/www/HomeServiceChat/
-echo pscp -P 33181 check-push-integration.js root@45.144.136.37:/var/www/HomeServiceChat/
-echo pscp -P 33181 simple-check.js root@45.144.136.37:/var/www/HomeServiceChat/
+echo pscp -P 55122 server.js root@38.207.178.173:/var/www/HomeServiceChat/
+echo pscp -P 55122 src/services/AndroidPushService.ts root@38.207.178.173:/var/www/HomeServiceChat/src/services/
+echo pscp -P 55122 src/context/AuthContext.tsx root@38.207.178.173:/var/www/HomeServiceChat/src/context/
+echo pscp -P 55122 test-push-integration.js root@38.207.178.173:/var/www/HomeServiceChat/
+echo pscp -P 55122 check-push-integration.js root@38.207.178.173:/var/www/HomeServiceChat/
+echo pscp -P 55122 simple-check.js root@38.207.178.173:/var/www/HomeServiceChat/
 echo.
 
 echo 同步完成后，请在服务器上运行:

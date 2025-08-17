@@ -5,8 +5,8 @@ echo ==========================================
 echo.
 
 echo 服务器信息:
-echo IP: 45.144.136.37
-echo 端口: 33181
+echo IP: 38.207.178.173
+echo 端口: 55122
 echo 用户名: root
 echo 密码: NkGKaEDJmF0t
 echo 服务器路径: /var/www/HomeServiceChat/admin/dist
@@ -24,8 +24,8 @@ echo 推荐使用 WinSCP:
 echo 1. 下载 WinSCP: https://winscp.net/
 echo 2. 连接信息:
 echo    - 文件协议: SFTP
-echo    - 主机名: 45.144.136.37
-echo    - 端口号: 33181
+echo    - 主机名: 38.207.178.173
+echo    - 端口号: 55122
 echo    - 用户名: root
 echo    - 密码: NkGKaEDJmF0t
 echo.
@@ -35,7 +35,7 @@ echo cd /var/www/HomeServiceChat
 echo sudo systemctl restart nginx
 echo.
 
-echo 测试地址: http://45.144.136.37/admin
+echo 测试地址: http://38.207.178.173/admin
 echo.
 
 pause 

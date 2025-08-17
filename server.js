@@ -41,7 +41,7 @@ const server = http.createServer(app);
 // 创建Socket.io实例
 const io = socketIO(server, {
   cors: {
-    origin: ['http://45.144.136.37:3000', 'http://45.144.136.37:8080', 'http://10.0.2.2:3000', 'http://10.0.2.2:8081'],
+    origin: ['http://38.207.178.173:3000', 'http://38.207.178.173:8080', 'http://10.0.2.2:3000', 'http://10.0.2.2:8081'],
     methods: ['GET', 'POST'],
     credentials: true
   }
@@ -53,7 +53,7 @@ connectDB();
 // 中间件
 app.set('trust proxy', 1);
 app.use(cors({
-  origin: ['http://45.144.136.37:3000', 'http://45.144.136.37:8080', 'http://10.0.2.2:3000', 'http://10.0.2.2:8081'],
+  origin: ['http://38.207.178.173:3000', 'http://38.207.178.173:8080', 'http://10.0.2.2:3000', 'http://10.0.2.2:8081'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
@@ -806,7 +806,7 @@ io.on('connection', (socket) => {
           let avatarUrl = null;
           if (callerInfo && callerInfo.avatar) {
             // 获取服务器基础URL
-            const serverBaseUrl = `http://45.144.136.37:3000`;
+            const serverBaseUrl = `http://38.207.178.173:3000`;
             
             // 如果头像路径以/开头，说明是服务器上的相对路径，需要转换为完整URL
             if (callerInfo.avatar.startsWith('/')) {

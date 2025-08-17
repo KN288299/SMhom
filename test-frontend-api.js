@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-const SERVER_BASE_URL = 'http://45.144.136.37:3000';
+const SERVER_BASE_URL = 'http://38.207.178.173:3000';
 
 async function testFrontendAPI() {
   console.log('🧪 测试前端API调用...\n');

@@ -5,12 +5,12 @@ const getApiUrl = () => {
   if (__DEV__) {
     // 开发环境
     // 使用服务器IP地址
-    const devUrl = 'http://45.144.136.37:3000';
+    const devUrl = 'http://38.207.178.173:3000';
     console.log('使用开发环境API地址:', devUrl);
     return devUrl;
   }
   // 生产环境 - 使用服务器IP地址
-  return 'http://45.144.136.37:3000';
+  return 'http://38.207.178.173:3000';
 };
 
 // 获取基础URL（不包含/api路径）

@@ -118,7 +118,7 @@ console.log('内存使用:', Math.round(process.memoryUsage().heapUsed / 1024 / 
 // 6. 检查网络配置
 console.log('\n📋 6. 网络配置检查:');
 console.log('当前工作目录:', process.cwd());
-console.log('服务器IP: 45.144.136.37');
+console.log('服务器IP: 38.207.178.173');
 console.log('API端口: 3000');
 
 // 7. 提供修复建议

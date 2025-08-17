@@ -1,11 +1,11 @@
 Write-Host "==========================================" -ForegroundColor Green
-Write-Host "同步文件到服务器 45.144.136.37" -ForegroundColor Green
+Write-Host "同步文件到服务器 38.207.178.173" -ForegroundColor Green
 Write-Host "==========================================" -ForegroundColor Green
 Write-Host ""
 
 Write-Host "服务器信息:" -ForegroundColor Yellow
-Write-Host "IP: 45.144.136.37"
-Write-Host "端口: 33181"
+Write-Host "IP: 38.207.178.173"
+Write-Host "端口: 55122"
 Write-Host "用户名: root"
 Write-Host "密码: NkGKaEDJmF0t"
 Write-Host "服务器路径: /var/www/HomeServiceChat"
@@ -28,8 +28,8 @@ Write-Host "1. 下载 WinSCP: https://winscp.net/"
 Write-Host "2. 安装并打开 WinSCP"
 Write-Host "3. 新建会话，填入连接信息:"
 Write-Host "   - 文件协议: SFTP"
-Write-Host "   - 主机名: 45.144.136.37"
-Write-Host "   - 端口号: 33181"
+Write-Host "   - 主机名: 38.207.178.173"
+Write-Host "   - 端口号: 55122"
 Write-Host "   - 用户名: root"
 Write-Host "   - 密码: NkGKaEDJmF0t"
 Write-Host "4. 连接到服务器"
@@ -39,7 +39,7 @@ Write-Host ""
 
 Write-Host "方法2: 使用 SSH + 手动编辑" -ForegroundColor Green
 Write-Host "1. 使用 PuTTY 或其他SSH客户端连接服务器"
-Write-Host "2. 连接信息: root@45.144.136.37:33181"
+Write-Host "2. 连接信息: root@38.207.178.173:55122"
 Write-Host "3. 在服务器上编辑文件:"
 Write-Host "   sudo nano /var/www/HomeServiceChat/server.js"
 Write-Host "   sudo nano /var/www/HomeServiceChat/src/services/AndroidPushService.ts"
