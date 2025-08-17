@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, memo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import { BASE_URL } from '../config/api';
+import IOSAudioSession from '../utils/IOSAudioSession';
 
 interface VoiceMessageItemProps {
   audioUrl: string;
@@ -79,6 +80,13 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
         setIsPlaying(true);
         
         try {
+          // iOS特定：准备音频播放会话
+          if (Platform.OS === 'ios') {
+            const audioSession = IOSAudioSession.getInstance();
+            await audioSession.prepareForPlayback();
+            console.log('iOS音频会话已准备完毕');
+          }
+          
           await audioPlayerRef.current.startPlayer(fullAudioUrl);
           console.log('播放开始');
           

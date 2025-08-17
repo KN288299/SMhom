@@ -1529,7 +1529,7 @@ const ChatScreen: React.FC = () => {
         receiverId: contactId,
         content: '视频消息',
         messageType: 'video',
-        videoUrl: videoUrl,
+        videoUrl: fullVideoUrl, // 使用完整URL确保接收方能正确生成预览图
         videoDuration,
         videoWidth,
         videoHeight,
@@ -1561,7 +1561,7 @@ const ChatScreen: React.FC = () => {
           conversationId,
           content: '视频消息',
           contentType: 'video',
-          fileUrl: videoUrl,  // 修改这里，使用fileUrl而不是videoUrl，与后端模型保持一致
+          fileUrl: videoUrl,  // 使用相对路径保存到数据库
           videoDuration,
           videoWidth,
           videoHeight,

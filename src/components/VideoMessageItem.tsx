@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Animated,
   StyleSheet,
+  Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { createThumbnail } from 'react-native-create-thumbnail';
@@ -65,11 +66,47 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
         return;
       }
 
-      // 如果是上传中的视频，使用默认尺寸
+      // 如果是上传中的视频，尝试生成缩略图（特别是iOS本地视频）
       if (isUploading) {
+        // 对于iOS本地视频，也尝试生成缩略图
+        if (Platform.OS === 'ios' && videoUrl && videoUrl.startsWith('file://')) {
+          console.log('尝试为iOS上传中的本地视频生成缩略图:', videoUrl);
+          
+          try {
+            const result = await createThumbnail({
+              url: videoUrl,
+              timeStamp: 1000,
+              cacheName: `upload_${Date.now()}`,
+            });
+
+            if (isMounted && result.path) {
+              console.log('iOS上传中视频缩略图生成成功:', result.path);
+              setThumbnailUrl(result.path);
+              
+              // 设置视频尺寸
+              const aspectRatio = result.width / result.height;
+              let newWidth = CONSTANTS.DEFAULT_VIDEO_WIDTH;
+              let newHeight = newWidth / aspectRatio;
+              
+              if (newHeight > CONSTANTS.DEFAULT_VIDEO_HEIGHT) {
+                newHeight = CONSTANTS.DEFAULT_VIDEO_HEIGHT;
+                newWidth = newHeight * aspectRatio;
+              }
+              
+              setVideoWidth(newWidth);
+              setVideoHeight(newHeight);
+            }
+          } catch (thumbError) {
+            console.log('iOS上传中视频缩略图生成失败:', thumbError);
+          }
+        }
+        
         if (isMounted) {
-          setVideoWidth(CONSTANTS.DEFAULT_VIDEO_WIDTH);
-          setVideoHeight(CONSTANTS.DEFAULT_VIDEO_HEIGHT);
+          // 如果没有生成缩略图，使用默认尺寸
+          if (!thumbnailUrl) {
+            setVideoWidth(CONSTANTS.DEFAULT_VIDEO_WIDTH);
+            setVideoHeight(CONSTANTS.DEFAULT_VIDEO_HEIGHT);
+          }
           setLoading(false);
         }
         return;
