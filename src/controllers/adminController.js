@@ -335,11 +335,18 @@ const upload = multer({
   storage: storage,
   limits: { fileSize: 500 * 1024 * 1024 }, // 500MB限制
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ['application/json', 'application/zip'];
+    // 放宽MIME以匹配常见浏览器/系统对ZIP/JSON的标识
+    const allowedTypes = [
+      'application/json',
+      'text/json',
+      'application/zip',
+      'application/x-zip-compressed',
+      'application/octet-stream' // 某些环境上传ZIP/JSON会识别为octet-stream
+    ];
     const allowedExtensions = ['.json', '.zip'];
-    
-    if (allowedTypes.includes(file.mimetype) || 
-        allowedExtensions.includes(path.extname(file.originalname).toLowerCase())) {
+
+    const fileExt = path.extname(file.originalname).toLowerCase();
+    if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(fileExt)) {
       cb(null, true);
     } else {
       cb(new Error('只支持JSON和ZIP格式的文件'), false);

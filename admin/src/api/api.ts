@@ -14,10 +14,20 @@ const api = axios.create({
 // 创建上传文件的axios实例
 export const uploadApi = axios.create({
   baseURL: `${SERVER_BASE_URL}/api`,
-  headers: {
-    'Content-Type': 'multipart/form-data',
-  },
 });
+
+// 为上传实例添加请求拦截器，自动附带管理员 Token
+uploadApi.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('adminToken');
+    if (token) {
+      config.headers = config.headers || {};
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 // 请求拦截器 - 添加 token 到请求头
 api.interceptors.request.use(
