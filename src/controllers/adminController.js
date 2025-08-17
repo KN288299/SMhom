@@ -122,10 +122,9 @@ const loginAdmin = asyncHandler(async (req, res) => {
 // @route   GET /api/admin/profile
 // @access  Private/Admin
 const getAdminProfile = asyncHandler(async (req, res) => {
-  const admin = await Admin.findById(req.admin._id).select('-password');
-  
-  if (admin) {
-    res.json({ admin });
+  // req.admin已经是完整的管理员对象（不包含密码）
+  if (req.admin) {
+    res.json({ admin: req.admin });
   } else {
     res.status(404);
     throw new Error('管理员不存在');
