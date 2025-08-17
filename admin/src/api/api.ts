@@ -183,6 +183,65 @@ export const staffAPI = {
     
     const response = await uploadApi.post('/staff/upload-image', formData);
     return response.data.imageUrl;
+  },
+
+  // 导出所有员工数据
+  exportAllStaff: async () => {
+    const response = await axios.get(`${SERVER_BASE_URL}/api/admin/staff/export`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('adminToken')}`
+      },
+      responseType: 'blob' // 重要：设置响应类型为blob以处理ZIP文件
+    });
+    return response;
+  },
+
+  // 导入员工数据
+  importStaff: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await uploadApi.post('/admin/staff/import', formData);
+    return response.data;
+  },
+
+  // 获取批量删除预览
+  getDeletePreview: async (batchSize: number, filters?: { search?: string; province?: string }) => {
+    const queryParams = new URLSearchParams();
+    queryParams.append('batchSize', batchSize.toString());
+    
+    if (filters?.search) queryParams.append('search', filters.search);
+    if (filters?.province) queryParams.append('province', filters.province);
+    
+    const queryString = queryParams.toString();
+    const url = `${SERVER_BASE_URL}/api/admin/staff/delete-preview?${queryString}`;
+    
+    const response = await axios.get(url, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('adminToken')}`
+      }
+    });
+    return response.data;
+  },
+
+  // 批量删除员工
+  batchDeleteStaff: async (batchSize: number, confirm: boolean = false, filters?: { search?: string; province?: string }) => {
+    const queryParams = new URLSearchParams();
+    queryParams.append('batchSize', batchSize.toString());
+    queryParams.append('confirm', confirm.toString());
+    
+    if (filters?.search) queryParams.append('search', filters.search);
+    if (filters?.province) queryParams.append('province', filters.province);
+    
+    const queryString = queryParams.toString();
+    const url = `${SERVER_BASE_URL}/api/admin/staff/batch-delete?${queryString}`;
+    
+    const response = await axios.delete(url, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('adminToken')}`
+      }
+    });
+    return response.data;
   }
 };
 

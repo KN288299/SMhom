@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, Upload, InputNumber, message, Space, Image, Tabs, Select, Card, Row, Col } from 'antd';
-import { PlusOutlined, UploadOutlined, FilterOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, Upload, InputNumber, message, Space, Image, Tabs, Select, Card, Row, Col, Progress, Divider, Alert, Statistic } from 'antd';
+import { PlusOutlined, UploadOutlined, FilterOutlined, ReloadOutlined, DownloadOutlined, ImportOutlined, DeleteOutlined } from '@ant-design/icons';
 import Layout from '../components/Layout';
 import type { RcFile, UploadProps } from 'antd/es/upload';
 import type { UploadFile } from 'antd/es/upload/interface';
@@ -44,14 +44,38 @@ const StaffManagement: React.FC = () => {
   // 添加筛选状态
   const [filterProvince, setFilterProvince] = useState<string | undefined>(undefined);
   const [searchText, setSearchText] = useState<string>('');
+  
+  // 添加分页状态
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+    showSizeChanger: true,
+    showQuickJumper: true,
+    showTotal: (total: number, range: [number, number]) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`,
+  });
+  
+  // 导入导出相关状态
+  const [exportLoading, setExportLoading] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importModalVisible, setImportModalVisible] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importResults, setImportResults] = useState<any>(null);
 
-  // 修改获取员工数据的函数，添加省份筛选参数
-  const fetchStaffList = async (filters?: { province?: string; search?: string }) => {
+  // 批量删除相关状态
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deletePreview, setDeletePreview] = useState<any>(null);
+  const [batchSize, setBatchSize] = useState(10);
+
+  // 修改获取员工数据的函数，支持真正的分页
+  const fetchStaffList = async (page?: number, filters?: { province?: string; search?: string }) => {
     try {
       setLoading(true);
+      const currentPage = page || pagination.current;
       const params = {
-        page: 1,
-        limit: 100,
+        page: currentPage,
+        limit: pagination.pageSize,
         search: filters?.search,
         province: filters?.province
       };
@@ -60,14 +84,23 @@ const StaffManagement: React.FC = () => {
       console.log('📋 获取到的员工数据:', response);
       
       // 判断响应是否包含数据字段（适配新的API响应格式）
-      if (response.data) {
+      if (response.data && response.meta) {
         setStaffList(response.data);
-        console.log('✅ 设置员工列表，数量:', response.data.length);
+        setPagination(prev => ({
+          ...prev,
+          current: response.meta.page,
+          total: response.meta.total,
+        }));
+        console.log('✅ 设置员工列表，数量:', response.data.length, '总数:', response.meta.total);
+      } else if (response.data) {
+        // 兼容只有data字段的情况
+        setStaffList(response.data);
+        console.log('✅ 设置员工列表（兼容格式），数量:', response.data.length);
       } else {
         // 兼容旧格式，假设响应直接是数组
         const staffArray = Array.isArray(response) ? response : [];
         setStaffList(staffArray);
-        console.log('✅ 设置员工列表（兼容格式），数量:', staffArray.length);
+        console.log('✅ 设置员工列表（旧格式），数量:', staffArray.length);
       }
     } catch (error) {
       message.error('获取员工数据失败');
@@ -79,26 +112,40 @@ const StaffManagement: React.FC = () => {
 
   // 组件挂载时获取数据
   useEffect(() => {
-    fetchStaffList();
+    fetchStaffList(1);
   }, []);
 
   // 处理省份筛选变化
   const handleProvinceChange = (value: string) => {
     setFilterProvince(value);
-    fetchStaffList({ province: value, search: searchText });
+    setPagination(prev => ({ ...prev, current: 1 })); // 重置到第一页
+    fetchStaffList(1, { province: value, search: searchText });
   };
 
   // 处理搜索
   const handleSearch = (value: string) => {
     setSearchText(value);
-    fetchStaffList({ province: filterProvince, search: value });
+    setPagination(prev => ({ ...prev, current: 1 })); // 重置到第一页
+    fetchStaffList(1, { province: filterProvince, search: value });
   };
 
   // 重置筛选
   const handleReset = () => {
     setFilterProvince(undefined);
     setSearchText('');
-    fetchStaffList();
+    setPagination(prev => ({ ...prev, current: 1 })); // 重置到第一页
+    fetchStaffList(1);
+  };
+
+  // 处理分页变化
+  const handleTableChange = (paginationConfig: any) => {
+    const { current, pageSize } = paginationConfig;
+    setPagination(prev => ({
+      ...prev,
+      current,
+      pageSize
+    }));
+    fetchStaffList(current, { province: filterProvince, search: searchText });
   };
 
   // 打开添加员工的模态框
@@ -305,6 +352,189 @@ const StaffManagement: React.FC = () => {
     setPhotoList([...fileList]);
   };
 
+  // 处理导出员工数据
+  const handleExportStaff = async () => {
+    try {
+      setExportLoading(true);
+      message.loading('正在导出员工数据...', 0);
+      
+      const response = await staffAPI.exportAllStaff();
+      
+      // 创建下载链接
+      const blob = new Blob([response.data], { type: 'application/zip' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `员工数据导出-${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      message.destroy();
+      message.success('员工数据导出成功！');
+    } catch (error: any) {
+      console.error('导出员工数据失败:', error);
+      console.error('错误详情:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      
+      message.destroy();
+      
+      let errorMessage = '导出失败';
+      if (error.response?.status === 400) {
+        errorMessage = '请求错误：' + (error.response?.data?.message || '无效的请求参数');
+      } else if (error.response?.status === 404) {
+        errorMessage = '没有找到员工数据';
+      } else if (error.response?.status === 500) {
+        errorMessage = '服务器错误：' + (error.response?.data?.message || '内部服务器错误');
+      } else if (error.message) {
+        errorMessage = '网络错误：' + error.message;
+      }
+      
+      message.error(errorMessage);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  // 处理导入员工数据
+  const handleImportStaff = async (file: File) => {
+    try {
+      setImportLoading(true);
+      setImportProgress(20);
+      
+      const response = await staffAPI.importStaff(file);
+      setImportProgress(100);
+      
+      setImportResults(response.results);
+      
+      if (response.results.success > 0) {
+        message.success(`导入完成！成功 ${response.results.success} 条，失败 ${response.results.failed} 条`);
+        fetchStaffList(1); // 刷新员工列表
+      } else {
+        message.warning('没有成功导入任何员工数据');
+      }
+      
+    } catch (error: any) {
+      console.error('导入员工数据失败:', error);
+      setImportProgress(0);
+      message.error('导入失败：' + (error.response?.data?.message || error.message));
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  // 处理导入文件选择
+  const handleImportFileChange = (info: any) => {
+    const { status } = info.file;
+    
+    if (status === 'done') {
+      handleImportStaff(info.file.originFileObj);
+    } else if (status === 'error') {
+      message.error(`${info.file.name} 文件上传失败`);
+    }
+  };
+
+  // 导入文件验证
+  const beforeImportUpload = (file: File) => {
+    const isValidFormat = file.type === 'application/json' || 
+                         file.type === 'application/zip' || 
+                         file.name.endsWith('.json') || 
+                         file.name.endsWith('.zip');
+    
+    if (!isValidFormat) {
+      message.error('只支持 JSON 或 ZIP 格式的文件！');
+      return false;
+    }
+    
+    // 移除文件大小限制，支持大型员工数据导入
+    // const isLt50M = file.size / 1024 / 1024 < 50;
+    // if (!isLt50M) {
+    //   message.error('文件大小不能超过 50MB！');
+    //   return false;
+    // }
+    
+    return true;
+  };
+
+  // 获取批量删除预览
+  const handleGetDeletePreview = async () => {
+    try {
+      setDeleteLoading(true);
+      
+      // 构建当前页面的筛选条件
+      const currentFilters = {
+        search: searchText || undefined,
+        province: filterProvince || undefined
+      };
+      
+      console.log('📋 获取删除预览，当前筛选条件:', currentFilters);
+      
+      const response = await staffAPI.getDeletePreview(batchSize, currentFilters);
+      setDeletePreview(response);
+      setDeleteModalVisible(true);
+    } catch (error: any) {
+      console.error('获取删除预览失败:', error);
+      message.error('获取删除预览失败：' + (error.response?.data?.message || error.message));
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  // 执行批量删除
+  const handleBatchDelete = async () => {
+    try {
+      setDeleteLoading(true);
+      message.loading('正在删除当前页面的员工数据...', 0);
+      
+      // 使用与预览相同的筛选条件
+      const currentFilters = {
+        search: searchText || undefined,
+        province: filterProvince || undefined
+      };
+      
+      console.log('🗑️ 执行批量删除，当前筛选条件:', currentFilters);
+      
+      const response = await staffAPI.batchDeleteStaff(batchSize, true, currentFilters);
+      
+      message.destroy();
+      message.success(`${response.message}！当前筛选页剩余：${response.filteredRemainingCount} 名，总剩余：${response.remainingCount} 名`);
+      
+      // 刷新员工列表（使用当前筛选条件）
+      fetchStaffList(pagination.current, { province: filterProvince, search: searchText });
+      
+      // 如果还有可删除的员工，更新预览
+      if (response.nextBatchAvailable) {
+        const newPreview = await staffAPI.getDeletePreview(batchSize, currentFilters);
+        setDeletePreview(newPreview);
+      } else {
+        setDeleteModalVisible(false);
+        setDeletePreview(null);
+        message.info('当前筛选条件下已无更多员工可删除');
+      }
+      
+    } catch (error: any) {
+      console.error('批量删除失败:', error);
+      message.destroy();
+      
+      let errorMessage = '批量删除失败';
+      if (error.response?.status === 404) {
+        errorMessage = '没有找到符合条件的可删除员工';
+        setDeleteModalVisible(false);
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
+      message.error(errorMessage);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   // 将File对象转换为base64
   const getBase64 = (img: RcFile, callback: (url: string) => void) => {
     const reader = new FileReader();
@@ -493,9 +723,50 @@ const StaffManagement: React.FC = () => {
   return (
     <Layout>
       <div style={{ padding: '20px' }}>
-        <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between' }}>
+        <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>员工管理</h2>
-          <Button type="primary" onClick={showModal}>添加员工</Button>
+          <Space>
+            <Upload
+              accept=".json,.zip"
+              beforeUpload={beforeImportUpload}
+              onChange={handleImportFileChange}
+              showUploadList={false}
+              customRequest={({ onSuccess }) => {
+                onSuccess && onSuccess('ok');
+              }}
+            >
+              <Button 
+                icon={<UploadOutlined />} 
+                loading={importLoading}
+                disabled={exportLoading || deleteLoading}
+              >
+                导入员工
+              </Button>
+            </Upload>
+            
+            <Button 
+              icon={<DownloadOutlined />} 
+              onClick={handleExportStaff}
+              loading={exportLoading}
+              disabled={importLoading || deleteLoading}
+            >
+              导出员工
+            </Button>
+            
+            <Button 
+              danger
+              icon={<DeleteOutlined />}
+              onClick={handleGetDeletePreview}
+              loading={deleteLoading}
+              disabled={importLoading || exportLoading || !staffList.length}
+            >
+              批量删除
+            </Button>
+            
+            <Button type="primary" onClick={showModal}>
+              添加员工
+            </Button>
+          </Space>
         </div>
 
         {/* 添加筛选区域 */}
@@ -538,12 +809,13 @@ const StaffManagement: React.FC = () => {
           loading={loading}
           rowKey={(record) => record.id || (record as any)._id}
           pagination={{
-            total: staffList.length,
-            pageSize: 10,
+            ...pagination,
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`,
+            showTotal: (total, range) => `第 ${range?.[0] || 0}-${range?.[1] || 0} 条/共 ${total} 条`,
+            pageSizeOptions: ['10', '20', '50', '100'],
           }}
+          onChange={handleTableChange}
         />
 
         <Modal
@@ -557,6 +829,165 @@ const StaffManagement: React.FC = () => {
           cancelText="取消"
         >
           {modalContent}
+        </Modal>
+
+        {/* 导入进度Modal */}
+        <Modal
+          title="导入员工数据"
+          open={importLoading}
+          footer={null}
+          closable={false}
+          centered
+        >
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <Progress 
+              percent={importProgress} 
+              status={importProgress === 100 ? 'success' : 'active'}
+              strokeColor={{
+                '0%': '#108ee9',
+                '100%': '#87d068',
+              }}
+            />
+            <p style={{ marginTop: '16px', color: '#666' }}>
+              正在导入员工数据，请稍候...
+            </p>
+          </div>
+        </Modal>
+
+        {/* 导入结果Modal */}
+        {importResults && (
+          <Modal
+            title="导入结果"
+            open={!!importResults}
+            onOk={() => setImportResults(null)}
+            onCancel={() => setImportResults(null)}
+            width={600}
+          >
+            <div style={{ padding: '16px 0' }}>
+              <Row gutter={16}>
+                <Col span={8}>
+                  <Statistic 
+                    title="成功导入" 
+                    value={importResults.success} 
+                    valueStyle={{ color: '#3f8600' }}
+                    suffix="条"
+                  />
+                </Col>
+                <Col span={8}>
+                  <Statistic 
+                    title="导入失败" 
+                    value={importResults.failed} 
+                    valueStyle={{ color: '#cf1322' }}
+                    suffix="条"
+                  />
+                </Col>
+                <Col span={8}>
+                  <Statistic 
+                    title="跳过重复" 
+                    value={importResults.skipped || 0} 
+                    valueStyle={{ color: '#fa8c16' }}
+                    suffix="条"
+                  />
+                </Col>
+              </Row>
+              
+              {importResults.errors && importResults.errors.length > 0 && (
+                <div style={{ marginTop: '20px' }}>
+                  <h4>错误详情：</h4>
+                  <div style={{ maxHeight: '200px', overflow: 'auto', backgroundColor: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
+                    {importResults.errors.map((error: string, index: number) => (
+                      <div key={index} style={{ marginBottom: '4px', fontSize: '12px' }}>
+                        {error}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </Modal>
+        )}
+
+        {/* 批量删除确认Modal */}
+        <Modal
+          title="批量删除确认"
+          open={deleteModalVisible}
+          onOk={handleBatchDelete}
+          onCancel={() => {
+            setDeleteModalVisible(false);
+            setDeletePreview(null);
+          }}
+          confirmLoading={deleteLoading}
+          okText="确认删除"
+          cancelText="取消"
+          okButtonProps={{ danger: true }}
+          width={700}
+        >
+          {deletePreview && (
+            <div>
+              <Alert
+                message="批量删除警告"
+                description={`您即将删除当前筛选条件下的前 ${batchSize} 名员工。此操作不可恢复，请谨慎操作！`}
+                type="warning"
+                showIcon
+                style={{ marginBottom: '16px' }}
+              />
+              
+              <div style={{ marginBottom: '16px' }}>
+                <Row gutter={16}>
+                  <Col span={8}>
+                    <Statistic 
+                      title="当前页待删除" 
+                      value={deletePreview.currentBatchCount} 
+                      valueStyle={{ color: '#cf1322' }}
+                      suffix="名"
+                    />
+                  </Col>
+                  <Col span={8}>
+                    <Statistic 
+                      title="筛选结果总数" 
+                      value={deletePreview.filteredTotalCount} 
+                      valueStyle={{ color: '#1890ff' }}
+                      suffix="名"
+                    />
+                  </Col>
+                  <Col span={8}>
+                    <Statistic 
+                      title="数据库总数" 
+                      value={deletePreview.totalCount} 
+                      valueStyle={{ color: '#666' }}
+                      suffix="名"
+                    />
+                  </Col>
+                </Row>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <h4>即将删除的员工：</h4>
+                <div style={{ maxHeight: '200px', overflow: 'auto', border: '1px solid #d9d9d9', borderRadius: '4px' }}>
+                  <Table
+                    dataSource={deletePreview.previewStaff}
+                    columns={[
+                      { title: '姓名', dataIndex: 'name', width: 100 },
+                      { title: '职业', dataIndex: 'occupation', width: 120 },
+                      { title: '省份', dataIndex: 'province', width: 80 },
+                      { title: '城市', dataIndex: 'city', width: 80 },
+                      { title: '标签', dataIndex: 'tag', width: 80 },
+                    ]}
+                    pagination={false}
+                    size="small"
+                    rowKey={(record: any) => record.id || record._id}
+                  />
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: '#f0f0f0', padding: '8px', borderRadius: '4px', fontSize: '12px' }}>
+                <strong>当前筛选条件：</strong>
+                {filterProvince && <span>省份：{filterProvince} </span>}
+                {searchText && <span>搜索：{searchText} </span>}
+                {!filterProvince && !searchText && <span>无筛选条件（所有员工）</span>}
+              </div>
+            </div>
+          )}
         </Modal>
       </div>
     </Layout>
