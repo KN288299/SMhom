@@ -11,6 +11,7 @@ import {
   StatusBar,
 } from 'react-native';
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
+import IOSAudioSession from '../utils/IOSAudioSession';
 import RNFS from 'react-native-fs';
 import Icon from 'react-native-vector-icons/Ionicons';
 
@@ -152,8 +153,29 @@ const AudioTestScreen: React.FC = () => {
       }
       
       console.log('开始录音，路径:', audioPath);
-      
-      const result = await audioRecorderPlayerRef.current.startRecorder(audioPath);
+
+      // iOS：准备录音会话，避免“initiate recorder”失败
+      if (Platform.OS === 'ios') {
+        try {
+          await IOSAudioSession.getInstance().reset();
+          await IOSAudioSession.getInstance().prepareForRecording();
+        } catch (iosSessionErr) {
+          console.warn('iOS录音会话准备失败，继续尝试:', iosSessionErr);
+        }
+      }
+
+      // 防御：开始录音前停止任何播放/录音
+      try { await audioRecorderPlayerRef.current.stopPlayer(); } catch {}
+      try { await audioRecorderPlayerRef.current.stopRecorder(); } catch {}
+
+      const result = Platform.OS === 'ios'
+        ? await audioRecorderPlayerRef.current.startRecorder(audioPath, {
+            AVEncoderAudioQualityKey: 'high',
+            AVNumberOfChannelsKey: 1,
+            AVFormatIDKey: 'aac',
+            AVSampleRateKey: 44100,
+          } as any)
+        : await audioRecorderPlayerRef.current.startRecorder(audioPath);
       audioRecorderPlayerRef.current.addRecordBackListener((e) => {
         const seconds = Math.floor(e.currentPosition / 1000);
         const minutes = Math.floor(seconds / 60);
@@ -213,7 +235,25 @@ const AudioTestScreen: React.FC = () => {
     try {
       console.log('开始播放录音:', audioPath);
       setIsPlaying(true);
-      
+
+      // iOS：准备播放会话并默认外放
+      if (Platform.OS === 'ios') {
+        try {
+          const session = IOSAudioSession.getInstance();
+          if (session.getCurrentMode() !== 'playback') {
+            await session.reset();
+          }
+          await session.prepareForPlayback();
+          try { await audioRecorderPlayerRef.current.setSubscriptionDuration(0.1); } catch {}
+        } catch (iosPlayErr) {
+          console.warn('iOS播放会话准备失败，继续尝试:', iosPlayErr);
+        }
+      }
+
+      // 防御：先停止占用
+      try { await audioRecorderPlayerRef.current.stopRecorder(); } catch {}
+      try { await audioRecorderPlayerRef.current.stopPlayer(); } catch {}
+
       await audioRecorderPlayerRef.current.startPlayer(audioPath);
       console.log('播放开始');
       

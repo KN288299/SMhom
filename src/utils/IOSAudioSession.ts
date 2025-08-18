@@ -105,7 +105,8 @@ class IOSAudioSession {
             allowBluetooth: true,
             allowBluetoothA2DP: true,
             allowAirPlay: true,
-            defaultToSpeaker: false // 播放时使用听筒，除非用户切换
+            // 确保语音消息默认走外放，避免“能播放但听不到”的问题
+            defaultToSpeaker: true
           });
           console.log('✅ iOS音频会话类别已设置为播放模式');
         }

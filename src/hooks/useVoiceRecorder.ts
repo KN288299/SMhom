@@ -333,9 +333,27 @@ export const useVoiceRecorder = ({
         }
       }
 
+      // iOS/Android：开始录音前确保没有残留的播放/录音占用音频会话
+      try {
+        await audioRecorderPlayerRef.current.stopPlayer();
+      } catch {}
+      try {
+        await audioRecorderPlayerRef.current.stopRecorder();
+      } catch {}
+      
       let result: string | undefined;
       try {
-        result = await audioRecorderPlayerRef.current.startRecorder(audioPath);
+        if (Platform.OS === 'ios') {
+          // 显式指定iOS录音参数（AAC/m4a，防止初始化失败）
+          result = await audioRecorderPlayerRef.current.startRecorder(audioPath, {
+            AVEncoderAudioQualityKey:  'high',
+            AVNumberOfChannelsKey:    1,
+            AVFormatIDKey:            'aac',
+            AVSampleRateKey:          44100,
+          } as any);
+        } else {
+          result = await audioRecorderPlayerRef.current.startRecorder(audioPath);
+        }
       } catch (startErr: any) {
         console.warn('首次启动录音失败，尝试回退路径:', startErr?.message || startErr);
         if (Platform.OS === 'ios') {
@@ -347,7 +365,12 @@ export const useVoiceRecorder = ({
               await RNFS.mkdir(RNFS.DocumentDirectoryPath);
             }
             console.log('使用iOS回退录音路径:', fallbackPath);
-            result = await audioRecorderPlayerRef.current.startRecorder(fallbackPath);
+            result = await audioRecorderPlayerRef.current.startRecorder(fallbackPath, {
+              AVEncoderAudioQualityKey:  'high',
+              AVNumberOfChannelsKey:    1,
+              AVFormatIDKey:            'aac',
+              AVSampleRateKey:          44100,
+            } as any);
           } catch (fallbackErr) {
             throw fallbackErr;
           }
@@ -533,7 +556,28 @@ export const useVoiceRecorder = ({
       } else {
         // 开始播放
         console.log('开始播放录音预览:', recordingUri);
-        
+        // iOS：准备播放会话并走外放
+        if (Platform.OS === 'ios') {
+          try {
+            const IOSAudioSession = require('../utils/IOSAudioSession').default;
+            const audioSession = IOSAudioSession.getInstance();
+            // 如果不是播放模式，重置后进入播放模式
+            if (audioSession.getCurrentMode() !== 'playback') {
+              await audioSession.reset();
+            }
+            await audioSession.prepareForPlayback();
+            try {
+              await audioRecorderPlayerRef.current.setSubscriptionDuration(0.1);
+            } catch {}
+          } catch (iosSessionErr) {
+            console.warn('iOS预览播放会话准备失败，继续尝试播放:', iosSessionErr);
+          }
+        }
+
+        // 防御：确保没有残留的录音器占用
+        try { await audioRecorderPlayerRef.current.stopRecorder(); } catch {}
+        try { await audioRecorderPlayerRef.current.stopPlayer(); } catch {}
+
         await audioRecorderPlayerRef.current.startPlayer(recordingUri);
         setIsPlaying(true);
         
