@@ -110,6 +110,9 @@ target 'HomeServiceChat' do
   # pod 'FirebaseMessaging', :modular_headers => true, :inhibit_warnings => true
   # pod 'GoogleUtilities', :modular_headers => true, :inhibit_warnings => true
 
+  # Vector Icons 配置 - 使用自动链接
+  # pod 'RNVectorIcons', :path => '../node_modules/react-native-vector-icons'
+
   post_install do |installer|
     # 修复重复头文件
     fix_duplicate_headers(installer)
