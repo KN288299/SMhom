@@ -105,16 +105,13 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
           if (Platform.OS === 'ios') {
             console.log('🎵 iOS语音播放：初始化音频会话...');
             const audioSession = IOSAudioSession.getInstance();
-            
             // 重置并准备播放会话
             console.log('🔄 重置iOS播放音频会话...');
             await audioSession.reset();
             await new Promise(resolve => setTimeout(resolve, 100));
-            
             console.log('🔊 配置iOS播放音频会话...');
             await audioSession.prepareForPlayback();
             await new Promise(resolve => setTimeout(resolve, 200));
-            
             // 配置播放器订阅
             try {
               await audioPlayerRef.current.setSubscriptionDuration(0.1);
@@ -122,12 +119,37 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
             } catch (subscriptionError) {
               console.warn('⚠️ iOS播放器订阅配置警告:', subscriptionError);
             }
-            
             console.log('✅ iOS音频播放环境准备完成');
           }
-          
-          console.log('开始播放音频文件:', fullAudioUrl);
-          await audioPlayerRef.current.startPlayer(fullAudioUrl);
+
+          // iOS 优化：远程URL优先走本地缓存 + file:// 播放，避免“播放成功但无声”
+          let playTarget = fullAudioUrl;
+          if (Platform.OS === 'ios' && fullAudioUrl.startsWith('http')) {
+            try {
+              const rawName = fullAudioUrl.split('?')[0].split('/').pop() || `voice_${Date.now()}.m4a`;
+              const cachePath = `${RNFS.DocumentDirectoryPath}/${rawName}`;
+              const exists = await RNFS.exists(cachePath);
+              if (!exists) {
+                console.log('📥 iOS缓存远程语音到本地:', cachePath);
+                await RNFS.downloadFile({ fromUrl: fullAudioUrl, toFile: cachePath, discretionary: true, cacheable: true }).promise;
+              }
+              setLocalCachedPath(cachePath);
+              // iOS 本地文件使用 file:// 前缀
+              playTarget = `file://${cachePath}`;
+              console.log('🎵 使用本地缓存播放(iOS):', playTarget);
+            } catch (cacheErr) {
+              console.warn('⚠️ iOS缓存远程语音失败，改用直连播放:', cacheErr);
+              playTarget = fullAudioUrl;
+            }
+          }
+
+          // 防御：播放前清理可能的占用与残留监听
+          try { await audioPlayerRef.current.stopRecorder(); } catch {}
+          try { await audioPlayerRef.current.stopPlayer(); } catch {}
+          try { audioPlayerRef.current.removePlayBackListener(); } catch {}
+
+          console.log('开始播放音频文件:', playTarget);
+          await audioPlayerRef.current.startPlayer(playTarget);
           console.log('✅ 播放开始成功');
           
           audioPlayerRef.current.addPlayBackListener((e) => {
@@ -192,8 +214,9 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
                 await audioSession.prepareForPlayback();
               }
 
-              console.log('🎵 使用本地缓存文件播放语音:', cachePath);
-              await audioPlayerRef.current.startPlayer(cachePath); // 不需要file://前缀
+              const iosLocalTarget = Platform.OS === 'ios' ? `file://${cachePath}` : cachePath;
+              console.log('🎵 使用本地缓存文件播放语音:', iosLocalTarget);
+              await audioPlayerRef.current.startPlayer(iosLocalTarget);
 
               audioPlayerRef.current.addPlayBackListener((e) => {
                 const seconds = Math.floor(e.currentPosition / 1000);
