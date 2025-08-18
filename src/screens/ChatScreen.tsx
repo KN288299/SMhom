@@ -23,6 +23,7 @@ import {
   Linking,
   ToastAndroid,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { iOSChatStyles, iOSMessageStyles, isIOS, getPlatformStyles, getIOSFontSize, IOS_CHAT_HEADER_HEIGHT, IOS_SAFE_AREA_TOP } from '../styles/iOSStyles';
 import NetInfo from '@react-native-community/netinfo';
 import { getOptimizedConnectionStatus } from '../utils/iOSNetworkHelper';
@@ -178,6 +179,7 @@ const ChatScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'Chat'>>();
   const { contactId, contactName, conversationId: routeConversationId } = route.params;
+  const insets = useSafeAreaInsets();
   
   // 上下文和状态
   const { userToken, userInfo, isCustomerService, logout } = useAuth();
@@ -2112,6 +2114,9 @@ const ChatScreen: React.FC = () => {
           onShowToast={showToast}
           onSendLocation={handleSendLocation}
         />
+        {Platform.OS === 'ios' && (
+          <View style={{ height: insets.bottom, backgroundColor: '#F2F2F7' }} />
+        )}
       </KeyboardAvoidingView>
       
       {/* 网络状态横幅 */}
