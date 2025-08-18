@@ -605,7 +605,7 @@ const ChatScreen: React.FC = () => {
     }
     
     if (!socket || !socket.connected) {
-      showToast('连接中断，正在重新连接...');
+      // 移除重连提示，避免影响用户体验，静默重连
       // 尝试重新连接
       if (socket && !socket.connected) {
         socket.connect();
@@ -937,7 +937,7 @@ const ChatScreen: React.FC = () => {
           showToast('网络连接已断开');
         } else if (lastConnectedState === false) {
           setShowNetworkBanner(false);
-          showToast('网络连接已恢复');
+          // 移除网络恢复提示，避免影响用户体验
         }
         
         lastConnectedState = connected;
@@ -955,7 +955,7 @@ const ChatScreen: React.FC = () => {
       const handleConnect = () => {
         setConnecting(false);
         if (wasDisconnected) {
-          showToast('连接已恢复');
+          // 移除重连成功提示，避免影响用户体验
           wasDisconnected = false;
         }
       };

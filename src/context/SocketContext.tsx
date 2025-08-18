@@ -104,18 +104,19 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       processedToken.startsWith('CS_') ? '客服令牌' : 
       processedToken.startsWith('U_') ? '用户令牌' : '普通令牌');
     
-    // 创建Socket连接 - iOS通话延迟优化
+    // 创建Socket连接 - iOS通话延迟优化 v2
     const socket = io(BASE_URL, {
       auth: {
         token: processedToken  // 使用处理后的token
       },
       transports: ['websocket', 'polling'],
-      timeout: 5000,           // 减少超时时间，快速失败重试
+      timeout: 3000,           // 进一步减少超时时间，更快失败重试
       reconnection: true,
-      reconnectionAttempts: 20, // 大幅增加重连次数
-      reconnectionDelay: 200,   // 大幅减少重连延迟
-      reconnectionDelayMax: 1000, // 减少最大重连延迟
-      randomizationFactor: 0.2, // 减少随机化因子，更快重连
+      reconnectionAttempts: 30, // 进一步增加重连次数，iOS需要更多尝试
+      reconnectionDelay: 100,   // 进一步减少重连延迟到100ms
+      reconnectionDelayMax: 800, // 减少最大重连延迟到800ms
+      randomizationFactor: 0.1, // 减少随机化因子到0.1，最快重连
+      forceNew: false,         // 不强制创建新连接，复用连接
     });
 
     socketRef.current = socket;
@@ -177,7 +178,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       console.log('📞 [GlobalSocket] 收到来电:', callData);
       console.log(`📞 [GlobalSocket] 当前通话订阅者数量: ${callSubscribersRef.current.size}`);
       
-      // iOS特殊处理：优化来电响应速度
+      // iOS特殊处理：优化来电响应速度 v2
       if (Platform.OS === 'ios') {
         console.log('🍎 [GlobalSocket] iOS设备收到来电');
         const appState = AppState.currentState;
@@ -185,18 +186,22 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         
         if (appState === 'active') {
           console.log('⚡ [GlobalSocket] iOS前台：快速路径，直接通知订阅者');
-          // 前台时直接通知，确保最快响应
+          // 前台时立即预热连接，确保后续操作流畅
+          if (socketRef.current?.disconnected) {
+            console.log('🔄 [GlobalSocket] 前台预热Socket连接');
+            socketRef.current.connect();
+          }
         } else {
           console.log('🍎 [GlobalSocket] iOS后台：使用iOS通话服务推送通知');
           IOSCallService.showIncomingCallNotification(callData);
           
-          // 同时尝试预热连接，为应用唤醒做准备
+          // 立即尝试预热连接，减少延迟
           setTimeout(() => {
             if (socketRef.current?.disconnected) {
-              console.log('🔄 [GlobalSocket] 预热Socket连接');
+              console.log('🔄 [GlobalSocket] 后台预热Socket连接');
               socketRef.current.connect();
             }
-          }, 100);
+          }, 50); // 减少到50ms，更快响应
         }
       }
       

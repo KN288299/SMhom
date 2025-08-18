@@ -166,12 +166,13 @@ export const useSocket = (userToken: string | null) => {
         token: userToken
       },
       transports: ['websocket', 'polling'],
-      timeout: 10000, // 减少连接超时时间
+      timeout: 3000,           // 统一使用3秒超时，与SocketContext保持一致
       reconnection: true,
-      reconnectionAttempts: maxReconnectAttempts,
-      reconnectionDelay: 1000, // 减少重连延迟
-      reconnectionDelayMax: 5000, // 减少最大延迟
-      forceNew: false, // 不强制创建新连接，复用连接
+      reconnectionAttempts: 30, // 统一使用30次重连，与SocketContext保持一致
+      reconnectionDelay: 100,   // 统一使用100ms重连延迟
+      reconnectionDelayMax: 800, // 统一使用800ms最大延迟
+      randomizationFactor: 0.1, // 统一使用0.1随机化因子
+      forceNew: false,         // 不强制创建新连接，复用连接
     });
 
     socketRef.current = socket;
@@ -191,7 +192,7 @@ export const useSocket = (userToken: string | null) => {
       if (pingIntervalRef.current) {
         clearInterval(pingIntervalRef.current);
       }
-      pingIntervalRef.current = setInterval(sendPing, 15000); // 增加到15秒
+      pingIntervalRef.current = setInterval(sendPing, 10000); // 减少到10秒，提高iOS连接监控频率
       
       // 连接成功后立即发送一个测试ping
       sendPing();
@@ -234,6 +235,7 @@ export const useSocket = (userToken: string | null) => {
     };
 
     const handleReconnect = (attemptNumber: number) => {
+      // 静默处理重连成功，减少日志噪音
       console.log(`🔄 Socket重连成功，第${attemptNumber}次尝试`);
       setIsConnecting(false);
       

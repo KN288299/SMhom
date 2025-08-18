@@ -91,16 +91,16 @@ class IOSCallService {
       if (nextAppState === 'active') {
         console.log('🔄 [IOSCallService] 应用激活，执行快速恢复流程');
         
-        // 立即检查并强制重连Socket
-        setTimeout(() => this.forceSocketReconnect(), 100);
+        // 立即检查并强制重连Socket - 加速版
+        setTimeout(() => this.forceSocketReconnect(), 50);  // 减少到50ms
         
         // 应用回到前台，检查是否有待处理的来电
-        setTimeout(() => this.checkPendingCalls(), 200);
+        setTimeout(() => this.checkPendingCalls(), 100);     // 减少到100ms
       }
     });
   }
 
-  // 强制Socket重连
+  // 强制Socket重连 - 优化版
   private forceSocketReconnect(): void {
     try {
       const socketRef = (global as any).socketRef;
@@ -108,12 +108,26 @@ class IOSCallService {
         if (socketRef.current.disconnected) {
           console.log('🔄 [IOSCallService] 强制重连断开的Socket');
           socketRef.current.connect();
+          
+          // 短暂延迟后再次检查连接状态
+          setTimeout(() => {
+            if (socketRef.current?.disconnected) {
+              console.log('🔄 [IOSCallService] 第二次尝试强制重连');
+              socketRef.current.connect();
+            }
+          }, 200);
         } else if (!socketRef.current.connected) {
           console.log('🔄 [IOSCallService] Socket未连接，尝试重新连接');
           socketRef.current.connect();
         } else {
           console.log('✅ [IOSCallService] Socket已连接，无需重连');
+          // 即使已连接，也发送一个ping确保连接质量
+          if (socketRef.current.emit) {
+            socketRef.current.emit('ping', { timestamp: Date.now() });
+          }
         }
+      } else {
+        console.warn('⚠️ [IOSCallService] Socket引用不存在，无法重连');
       }
     } catch (error) {
       console.error('❌ [IOSCallService] 强制重连失败:', error);
