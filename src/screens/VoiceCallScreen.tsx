@@ -772,21 +772,21 @@ const VoiceCallScreen: React.FC = () => {
         throw new Error('mediaDevices未定义');
       }
 
-      // iOS专用 ICE 服务器配置：仅使用自建 TURN（UDP + TCP + 443/tcp 兜底）
+      // iOS蜂窝网络优化：仅使用TCP TURN（优先443），移除UDP，避免蜂窝网络下UDP受限导致长时间连接中
     const iceServers = Platform.OS === 'ios'
       ? [
           {
             urls: [
-              'turn:38.207.178.173:3478?transport=udp',
-              'turn:38.207.178.173:3478?transport=tcp',
-              'turn:38.207.178.173:443?transport=tcp'
+              'turn:38.207.178.173:443?transport=tcp',
+              'turn:38.207.178.173:3478?transport=tcp'
+              // 若有域名与有效TLS，可替换为：'turns:turn.your-domain.com:443?transport=tcp'
             ],
             username: 'webrtcuser',
             credential: 'webrtcpass',
           }
         ]
       : [
-          // 其他平台按原策略（如后续需要可再调整）
+          // 其他平台保留原策略（UDP + TCP）
           {
             urls: [
               'turn:38.207.178.173:3478?transport=udp',
@@ -798,10 +798,10 @@ const VoiceCallScreen: React.FC = () => {
           }
         ];
 
-    // 最简化的RTC配置
+    // iOS下强制走TURN中继，避免蜂窝网络直连失败阻塞
     const rtcConfig = {
       iceServers,
-      iceTransportPolicy: 'all' as const,
+      iceTransportPolicy: (Platform.OS === 'ios' ? 'relay' : 'all') as 'relay' | 'all',
     };
 
     console.log('创建RTCPeerConnection...');
@@ -916,6 +916,14 @@ const VoiceCallScreen: React.FC = () => {
       } else if (event && event.candidate === null) {
         console.log('ICE候选收集完成');
       }
+    };
+    // 额外的ICE调试日志
+    (peerConnectionRef.current as any).onicegatheringstatechange = () => {
+      const gatheringState = (peerConnectionRef.current as any)?.iceGatheringState;
+      console.log('ICE候选收集状态:', gatheringState);
+    };
+    (peerConnectionRef.current as any).onicecandidateerror = (e: any) => {
+      console.warn('ICE候选错误:', e?.errorText || e?.message || e);
     };
     
     // 监听连接状态变化
