@@ -2207,7 +2207,7 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     backgroundColor: '#fff',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0, // iOS由SafeAreaView处理，不再额外添加
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
