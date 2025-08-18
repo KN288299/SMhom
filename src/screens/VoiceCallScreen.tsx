@@ -129,6 +129,32 @@ const VoiceCallScreen: React.FC = () => {
   // iOS关键：在设置远端SDP之前缓冲远端ICE候选，避免addIceCandidate报错导致一直连接中
   const remoteDescriptionSetRef = useRef(false);
   const pendingRemoteIceCandidatesRef = useRef<any[]>([]);
+  // 本地ICE候选在callId未就绪前先缓存，避免发送时丢失callId
+  const localPendingIceCandidatesRef = useRef<any[]>([]);
+  const isCallIdReadyRef = useRef(false);
+
+  // 冲刷本地待发送ICE候选
+  const flushLocalIceCandidates = (callIdOverride?: string) => {
+    try {
+      const callIdToUse = callIdOverride || activeCallId || routeCallId;
+      if (!socketRef.current || !callIdToUse) {
+        return;
+      }
+      if (localPendingIceCandidatesRef.current.length > 0) {
+        console.log(`冲刷本地ICE候选: ${localPendingIceCandidatesRef.current.length}`);
+        for (const cand of localPendingIceCandidatesRef.current) {
+          socketRef.current.emit('webrtc_ice_candidate', {
+            callId: callIdToUse,
+            recipientId: contactId,
+            candidate: cand
+          });
+        }
+        localPendingIceCandidatesRef.current = [];
+      }
+    } catch (e) {
+      console.error('冲刷本地ICE候选失败:', e);
+    }
+  };
   
   // 创建一个安全的返回函数
   const safeGoBack = () => {
@@ -276,6 +302,8 @@ const VoiceCallScreen: React.FC = () => {
           // 设置callId
           if (routeCallId) {
             setActiveCallId(routeCallId);
+            isCallIdReadyRef.current = true;
+            flushLocalIceCandidates(routeCallId);
           }
           
           console.log('📱 [VoiceCall] 悬浮窗恢复完成，无需重新初始化WebRTC');
@@ -324,12 +352,16 @@ const VoiceCallScreen: React.FC = () => {
             console.log('这是主动呼叫，即将发起呼叫...');
             if (routeCallId) {
               setActiveCallId(routeCallId);
+              isCallIdReadyRef.current = true;
+              flushLocalIceCandidates(routeCallId);
             }
             initiateCall();
           } else {
             console.log('这是来电，准备接听...');
             if (routeCallId) {
               setActiveCallId(routeCallId);
+              isCallIdReadyRef.current = true;
+              flushLocalIceCandidates(routeCallId);
             }
             // 确保在PeerConnection与监听就绪之后再发送accept_call
             acceptCall();
@@ -491,6 +523,8 @@ const VoiceCallScreen: React.FC = () => {
       if (data && data.callId) {
         setActiveCallId(data.callId);
         console.log('保存callId:', data.callId);
+        isCallIdReadyRef.current = true;
+        flushLocalIceCandidates(data.callId);
       }
     });
     
@@ -510,6 +544,8 @@ const VoiceCallScreen: React.FC = () => {
       if (isIncoming && data.callId) {
         console.log('记录来电ID以备接听，来电者ID:', data.callerId, '通话ID:', data.callId);
         setActiveCallId(data.callId);
+        isCallIdReadyRef.current = true;
+        flushLocalIceCandidates(data.callId);
       }
     });
     
@@ -517,6 +553,11 @@ const VoiceCallScreen: React.FC = () => {
     socketRef.current.on('webrtc_offer', async (data: any) => {
       console.log('收到WebRTC offer');
       try {
+        if (data.callId && !activeCallId) {
+          setActiveCallId(data.callId);
+          isCallIdReadyRef.current = true;
+          flushLocalIceCandidates(data.callId);
+        }
         if (data.sdp) {
           console.log('设置远程描述...');
           await peerConnectionRef.current?.setRemoteDescription(
@@ -566,6 +607,11 @@ const VoiceCallScreen: React.FC = () => {
     socketRef.current.on('webrtc_answer', async (data: any) => {
       console.log('收到WebRTC answer');
       try {
+        if (data.callId && !activeCallId) {
+          setActiveCallId(data.callId);
+          isCallIdReadyRef.current = true;
+          flushLocalIceCandidates(data.callId);
+        }
         if (data.sdp) {
           console.log('设置远程描述...');
           await peerConnectionRef.current?.setRemoteDescription(
@@ -833,12 +879,19 @@ const VoiceCallScreen: React.FC = () => {
     // 监听ICE候选
     peerConnectionRef.current.onicecandidate = (event: any) => {
       if (event && event.candidate) {
-        console.log('发送ICE候选:', event.candidate.type, event.candidate.protocol, event.candidate.address);
-        socketRef.current?.emit('webrtc_ice_candidate', {
-          callId: activeCallId || routeCallId,
-          recipientId: contactId,
-          candidate: event.candidate
-        });
+        console.log('产生ICE候选:', event.candidate.type, event.candidate.protocol, event.candidate.address);
+        const callIdToUse = activeCallId || routeCallId;
+        if (!socketRef.current || !callIdToUse) {
+          // callId未就绪，缓存
+          localPendingIceCandidatesRef.current.push(event.candidate);
+          console.log('callId未就绪，缓存本地ICE候选。当前缓存数:', localPendingIceCandidatesRef.current.length);
+        } else {
+          socketRef.current.emit('webrtc_ice_candidate', {
+            callId: callIdToUse,
+            recipientId: contactId,
+            candidate: event.candidate
+          });
+        }
       } else if (event && event.candidate === null) {
         console.log('ICE候选收集完成');
       }
