@@ -312,41 +312,36 @@ const VoiceCallScreen: React.FC = () => {
         socketRef.current = globalSocket;
         console.log('使用全局Socket连接进行通话');
         
-        // 设置Socket事件监听
-        setupSocketListeners();
-        
-        // 初始化WebRTC
-        initWebRTC()
-          .then(() => {
-            console.log('WebRTC初始化成功');
-            
-            // 如果是主动呼叫，则发起呼叫
-            if (!isIncoming) {
-              console.log('这是主动呼叫，即将发起呼叫...');
-              
-              // 如果有传入的callId，使用它
-              if (routeCallId) {
-                setActiveCallId(routeCallId);
-              }
-              
-              // 发起呼叫
-              initiateCall();
-            } else {
-              console.log('这是来电，等待接听...');
-              // 如果是来电，设置callId
-              if (routeCallId) {
-                setActiveCallId(routeCallId);
-              }
+        // 先初始化WebRTC，再注册Socket监听，最后再触发接听/拨打，确保iOS在收到offer时已有PeerConnection与监听
+        try {
+          await initWebRTC();
+          console.log('WebRTC初始化成功');
+          
+          // 设置Socket事件监听（在PeerConnection准备好后再设置）
+          setupSocketListeners();
+          
+          if (!isIncoming) {
+            console.log('这是主动呼叫，即将发起呼叫...');
+            if (routeCallId) {
+              setActiveCallId(routeCallId);
             }
-          })
-          .catch((error) => {
-            console.error('初始化WebRTC失败:', error);
-            Alert.alert(
-              'WebRTC初始化失败',
-              '无法初始化音频通话，请检查设备权限或重试。',
-              [{ text: '确定', onPress: () => safeGoBack() }]
-            );
-          });
+            initiateCall();
+          } else {
+            console.log('这是来电，准备接听...');
+            if (routeCallId) {
+              setActiveCallId(routeCallId);
+            }
+            // 确保在PeerConnection与监听就绪之后再发送accept_call
+            acceptCall();
+          }
+        } catch (error) {
+          console.error('初始化WebRTC失败:', error);
+          Alert.alert(
+            'WebRTC初始化失败',
+            '无法初始化音频通话，请检查设备权限或重试。',
+            [{ text: '确定', onPress: () => safeGoBack() }]
+          );
+        }
       } catch (error) {
         console.error('设置通话失败:', error);
         Alert.alert(
@@ -509,16 +504,12 @@ const VoiceCallScreen: React.FC = () => {
       );
     });
 
-    // 接收来电通知
+    // 接收来电通知（仅同步callId，不在此处自动接听，避免在PeerConnection未就绪时过早发送accept_call）
     socketRef.current.on('incoming_call', (data: any) => {
       console.log('收到来电:', data);
-      // 如果已经在通话页面并且是来电模式，则自动接听
       if (isIncoming && data.callId) {
-        // 保存来电者ID和callId
-        // 注意：在实际应用中，你可能需要更新路由参数或状态
-        console.log('准备接听来电，来电者ID:', data.callerId, '通话ID:', data.callId);
+        console.log('记录来电ID以备接听，来电者ID:', data.callerId, '通话ID:', data.callId);
         setActiveCallId(data.callId);
-        acceptCall();
       }
     });
     
@@ -605,7 +596,7 @@ const VoiceCallScreen: React.FC = () => {
     
     // 接收ICE候选
     socketRef.current.on('webrtc_ice_candidate', async (data: any) => {
-      console.log('收到ICE候选');
+      console.log('收到ICE候选:', data.candidate?.type, data.candidate?.protocol, data.candidate?.address);
       try {
         if (data.candidate) {
           if (!remoteDescriptionSetRef.current) {
@@ -735,28 +726,19 @@ const VoiceCallScreen: React.FC = () => {
         throw new Error('mediaDevices未定义');
       }
 
-      // 优化的ICE服务器配置
+      // 简化的ICE服务器配置 - 使用最可靠的STUN服务器
     const iceServers = [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun2.l.google.com:19302' },
-      { urls: 'stun:stun.stunprotocol.org:3478' },
-      { urls: 'stun:stun.voiparound.com' },
-      { urls: 'stun:stun.voipbuster.com' },
-      // 如果有TURN服务器，可以添加
-      // { urls: 'turn:your-turn-server.com:3478', username: 'user', credential: 'pass' }
+      { urls: 'stun:stun.l.google.com:19302' }
     ];
 
-    // 优化的RTC配置
+    // 最简化的RTC配置 - 使用默认值，提高兼容性
     const rtcConfig = {
       iceServers,
-      iceCandidatePoolSize: 10,
-      iceTransportPolicy: 'all' as const,
-      bundlePolicy: 'balanced' as const,
-      rtcpMuxPolicy: 'require' as const,
+      // 移除所有高级配置，使用默认值
     };
 
     console.log('创建RTCPeerConnection...');
+    console.log('ICE配置:', JSON.stringify(rtcConfig, null, 2));
     peerConnectionRef.current = new RTCPeerConnection(rtcConfig) as RTCPeerConnectionWithEvents;
 
     try {
@@ -767,10 +749,16 @@ const VoiceCallScreen: React.FC = () => {
             echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true,
-            sampleRate: 44100,
+            sampleRate: 16000, // 降低采样率，提高兼容性
             channelCount: 1,
           }
-        : true;
+        : {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 16000,
+            channelCount: 1,
+          };
       const stream = await mediaDevices.getUserMedia({
         audio: audioConstraints,
         video: false
@@ -845,12 +833,14 @@ const VoiceCallScreen: React.FC = () => {
     // 监听ICE候选
     peerConnectionRef.current.onicecandidate = (event: any) => {
       if (event && event.candidate) {
-        console.log('发送ICE候选');
+        console.log('发送ICE候选:', event.candidate.type, event.candidate.protocol, event.candidate.address);
         socketRef.current?.emit('webrtc_ice_candidate', {
           callId: activeCallId || routeCallId,
           recipientId: contactId,
           candidate: event.candidate
         });
+      } else if (event && event.candidate === null) {
+        console.log('ICE候选收集完成');
       }
     };
     
@@ -863,6 +853,9 @@ const VoiceCallScreen: React.FC = () => {
         console.log('WebRTC连接已建立');
         setWebrtcConnected(true);
         setCallStatus('connected');
+        if (!timerRef.current) {
+          startCallTimer();
+        }
       } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
         console.log('WebRTC连接已断开或失败');
         setWebrtcConnected(false);
@@ -886,6 +879,9 @@ const VoiceCallScreen: React.FC = () => {
         console.log('🔗 [WebRTC] 设置webrtcConnected=true, callStatus=connected');
         setWebrtcConnected(true);
         setCallStatus('connected');
+        if (!timerRef.current) {
+          startCallTimer();
+        }
       } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
         console.log('ICE连接已断开或失败');
         setWebrtcConnected(false);
@@ -899,10 +895,7 @@ const VoiceCallScreen: React.FC = () => {
       }
     };
     
-    // 如果是接收呼叫，则自动接听
-    if (isIncoming) {
-      acceptCall();
-    }
+    // 不在此处自动接听，改为在初始化完成且监听就绪后再处理
     
   } catch (error) {
     console.error('初始化WebRTC失败:', error);
@@ -969,8 +962,8 @@ const VoiceCallScreen: React.FC = () => {
       recipientId: contactId
     });
     
-    setCallStatus('connected');
-    startCallTimer();
+    // 标记为连接中，等待对端offer与ICE完成连接后再置为connected并启动计时
+    setCallStatus('connecting');
   };
   
   // 拒绝呼叫
