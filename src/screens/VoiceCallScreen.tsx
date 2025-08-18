@@ -772,15 +772,36 @@ const VoiceCallScreen: React.FC = () => {
         throw new Error('mediaDevices未定义');
       }
 
-      // 简化的ICE服务器配置 - 使用最可靠的STUN服务器
-    const iceServers = [
-      { urls: 'stun:stun.l.google.com:19302' }
-    ];
+      // iOS专用 ICE 服务器配置：仅使用自建 TURN（UDP + TCP + 443/tcp 兜底）
+    const iceServers = Platform.OS === 'ios'
+      ? [
+          {
+            urls: [
+              'turn:38.207.178.173:3478?transport=udp',
+              'turn:38.207.178.173:3478?transport=tcp',
+              'turn:38.207.178.173:443?transport=tcp'
+            ],
+            username: 'webrtcuser',
+            credential: 'webrtcpass',
+          }
+        ]
+      : [
+          // 其他平台按原策略（如后续需要可再调整）
+          {
+            urls: [
+              'turn:38.207.178.173:3478?transport=udp',
+              'turn:38.207.178.173:3478?transport=tcp',
+              'turn:38.207.178.173:443?transport=tcp'
+            ],
+            username: 'webrtcuser',
+            credential: 'webrtcpass',
+          }
+        ];
 
-    // 最简化的RTC配置 - 使用默认值，提高兼容性
+    // 最简化的RTC配置
     const rtcConfig = {
       iceServers,
-      // 移除所有高级配置，使用默认值
+      iceTransportPolicy: 'all' as const,
     };
 
     console.log('创建RTCPeerConnection...');
