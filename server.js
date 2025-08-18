@@ -7,6 +7,7 @@ const fs = require('fs');
 const http = require('http');
 const socketIO = require('socket.io');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { notFound, errorHandler } = require('./src/middleware/errorMiddleware');
 const userRoutes = require('./src/routes/userRoutes');
 const messageRoutes = require('./src/routes/messageRoutes');
@@ -83,6 +84,71 @@ app.post('/api/ping', (req, res) => {
     timestamp: new Date().toISOString(),
     clientTimestamp: req.body.timestamp
   });
+});
+
+// 临时TURN凭证签发（基于 coturn use-auth-secret）
+// 需要在 coturn 中启用：use-auth-secret，并设置 static-auth-secret 与这里的 TURN_SECRET 一致
+app.get('/api/webrtc/ice-config', protect, (req, res) => {
+  try {
+    const ttlSeconds = Number(process.env.TURN_TTL || 600); // 默认10分钟
+    const turnSecret = process.env.TURN_SECRET || '';
+    const turnHost = process.env.TURN_HOST || '38.207.178.173';
+    const turnHostname = process.env.TURN_HOSTNAME; // 可选：如配置了域名证书
+
+    if (!turnSecret) {
+      // 未配置use-auth-secret时，返回静态账号以便兼容（强制中继模式）
+      const staticIceServers = [
+        {
+          urls: [
+            `turn:${turnHost}:3478?transport=udp`,
+            `turn:${turnHost}:3478?transport=tcp`,
+            `turn:${turnHost}:443?transport=tcp`,
+          ],
+          username: process.env.TURN_STATIC_USER || 'webrtcuser',
+          credential: process.env.TURN_STATIC_PASS || 'webrtcpass',
+        },
+      ];
+      return res.json({ 
+        iceServers: staticIceServers, 
+        ttl: 0, 
+        mode: 'static',
+        iceTransportPolicy: 'relay',  // 强制使用 TURN 中继
+        iceCandidatePoolSize: 10
+      });
+    }
+
+    // 动态凭证：username 采用到期时间戳（秒）+ 可选用户ID后缀
+    const expiry = Math.floor(Date.now() / 1000) + ttlSeconds;
+    const userSuffix = req.user && req.user._id ? `:${req.user._id}` : '';
+    const username = `${expiry}${userSuffix}`;
+    const hmac = crypto.createHmac('sha1', turnSecret);
+    hmac.update(username);
+    const credential = hmac.digest('base64');
+
+    // 组合可用的 TURN/TURNS URL 列表（强制中继模式）
+    const urls = [
+      `turn:${turnHost}:3478?transport=udp`,
+      `turn:${turnHost}:3478?transport=tcp`,
+      `turn:${turnHost}:443?transport=tcp`,
+    ];
+    if (turnHostname) {
+      // 若有域名与有效TLS证书，加入turns:443
+      urls.push(`turns:${turnHostname}:443?transport=tcp`);
+    }
+
+    // 强制使用 TURN 中继，解决 iOS 穿透问题
+    const iceServers = [{ urls, username, credential }];
+    res.json({ 
+      iceServers, 
+      ttl: ttlSeconds, 
+      mode: 'temporary',
+      iceTransportPolicy: 'relay',  // 强制使用 TURN 中继
+      iceCandidatePoolSize: 10
+    });
+  } catch (err) {
+    console.error('生成ICE配置失败:', err);
+    res.status(500).json({ message: '生成ICE配置失败' });
+  }
 });
 
 // 添加语音文件上传路由

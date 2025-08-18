@@ -28,7 +28,7 @@ import {
   MediaStreamTrack,
 } from 'react-native-webrtc';
 import { Socket } from 'socket.io-client';
-import { BASE_URL } from '../config/api';
+import { API_URL, API_ENDPOINTS } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { useFloatingCall } from '../context/FloatingCallContext';
@@ -772,37 +772,64 @@ const VoiceCallScreen: React.FC = () => {
         throw new Error('mediaDevices未定义');
       }
 
-      // iOS蜂窝网络优化：仅使用TCP TURN（优先443），移除UDP，避免蜂窝网络下UDP受限导致长时间连接中
-    const iceServers = Platform.OS === 'ios'
-      ? [
-          {
-            urls: [
-              'turn:38.207.178.173:443?transport=tcp',
-              'turn:38.207.178.173:3478?transport=tcp'
-              // 若有域名与有效TLS，可替换为：'turns:turn.your-domain.com:443?transport=tcp'
-            ],
-            username: 'webrtcuser',
-            credential: 'webrtcpass',
+      // 拉取临时ICE配置（动态 TURN 凭证）
+      let fetchedIceServers: any[] = [];
+      try {
+        const resp = await fetch(`${API_URL}${API_ENDPOINTS.ICE_CONFIG}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            // 后端 protect 中间件需要 Bearer <token>
+            Authorization: userToken ? `Bearer ${userToken}` : '',
+          },
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (Array.isArray(data.iceServers)) {
+            fetchedIceServers = data.iceServers;
           }
-        ]
-      : [
-          // 其他平台保留原策略（UDP + TCP）
+          console.log('获取ICE配置成功:', JSON.stringify(data, null, 2));
+        } else {
+          console.warn('获取ICE配置失败，使用静态备用配置:', resp.status);
+        }
+      } catch (e) {
+        console.warn('获取ICE配置异常，使用静态备用配置:', e);
+      }
+
+      // 兜底静态配置（当后端未配置use-auth-secret时亦会返回静态配置）
+      if (!fetchedIceServers || fetchedIceServers.length === 0) {
+        fetchedIceServers = [
+          { urls: ['stun:38.207.178.173:3478'] },
           {
             urls: [
               'turn:38.207.178.173:3478?transport=udp',
               'turn:38.207.178.173:3478?transport=tcp',
-              'turn:38.207.178.173:443?transport=tcp'
+              'turn:38.207.178.173:443?transport=tcp',
             ],
             username: 'webrtcuser',
             credential: 'webrtcpass',
-          }
+          },
         ];
+      }
 
-    // iOS下强制走TURN中继，避免蜂窝网络直连失败阻塞
-    const rtcConfig = {
-      iceServers,
-      iceTransportPolicy: (Platform.OS === 'ios' ? 'relay' : 'all') as 'relay' | 'all',
-    };
+      // iOS 优化：仅保留 TCP/TLS 路径，优先 443；Android 保留 UDP+TCP
+      let effectiveIceServers = fetchedIceServers;
+      if (Platform.OS === 'ios') {
+        effectiveIceServers = fetchedIceServers.map((srv) => {
+          if (!srv.urls) return srv;
+          const urls = Array.isArray(srv.urls) ? srv.urls : [srv.urls];
+          const filtered = urls.filter((u: string) =>
+            /turns?:.*:(443|3478)\?transport=tcp$/i.test(u) || /^stun:/i.test(u)
+          );
+          return { ...srv, urls: filtered };
+        });
+      }
+
+      // iOS下强制走TURN中继，避免蜂窝网络直连失败阻塞
+      const rtcConfig = {
+        iceServers: effectiveIceServers,
+        iceTransportPolicy: (Platform.OS === 'ios' ? 'relay' : 'all') as 'relay' | 'all',
+      };
 
     console.log('创建RTCPeerConnection...');
     console.log('ICE配置:', JSON.stringify(rtcConfig, null, 2));

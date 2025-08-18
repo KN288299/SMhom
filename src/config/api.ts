@@ -45,6 +45,7 @@ export const API_ENDPOINTS = {
   CUSTOMER_SERVICE_LIST: '/customer-service', // 获取客服列表（管理员用）
   ACTIVE_CUSTOMER_SERVICE_LIST: '/customer-service/active', // 获取活跃客服列表（用户用）
   USER_LIST: '/users', // 获取用户列表
+  ICE_CONFIG: '/webrtc/ice-config',
 };
 
 console.log('API配置:', {
