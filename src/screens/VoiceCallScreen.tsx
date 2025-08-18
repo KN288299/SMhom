@@ -126,6 +126,9 @@ const VoiceCallScreen: React.FC = () => {
   const peerConnectionRef = useRef<RTCPeerConnectionWithEvents | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  // iOS关键：在设置远端SDP之前缓冲远端ICE候选，避免addIceCandidate报错导致一直连接中
+  const remoteDescriptionSetRef = useRef(false);
+  const pendingRemoteIceCandidatesRef = useRef<any[]>([]);
   
   // 创建一个安全的返回函数
   const safeGoBack = () => {
@@ -434,6 +437,9 @@ const VoiceCallScreen: React.FC = () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      // 清理ICE缓冲状态
+      remoteDescriptionSetRef.current = false;
+      pendingRemoteIceCandidatesRef.current = [];
     };
   }, []);
   
@@ -454,6 +460,8 @@ const VoiceCallScreen: React.FC = () => {
       startCallTimer();
       
       try {
+        // 重新标记远端未设置，等待answer到来
+        remoteDescriptionSetRef.current = false;
         // 创建并发送offer
         console.log('创建WebRTC offer...');
         const offerOptions = {
@@ -523,6 +531,19 @@ const VoiceCallScreen: React.FC = () => {
           await peerConnectionRef.current?.setRemoteDescription(
             new RTCSessionDescription(data.sdp)
           );
+          // 远端描述已设置，冲刷缓冲的ICE候选
+          remoteDescriptionSetRef.current = true;
+          if (pendingRemoteIceCandidatesRef.current.length > 0) {
+            console.log(`冲刷待处理ICE候选: ${pendingRemoteIceCandidatesRef.current.length}`);
+            for (const cand of pendingRemoteIceCandidatesRef.current) {
+              try {
+                await peerConnectionRef.current?.addIceCandidate(new RTCIceCandidate(cand));
+              } catch (e) {
+                console.error('冲刷ICE候选失败:', e);
+              }
+            }
+            pendingRemoteIceCandidatesRef.current = [];
+          }
           
           // 创建应答
           console.log('创建WebRTC answer...');
@@ -560,6 +581,19 @@ const VoiceCallScreen: React.FC = () => {
             new RTCSessionDescription(data.sdp)
           );
           console.log('远程描述设置完成');
+          // 远端描述已设置，冲刷缓冲的ICE候选
+          remoteDescriptionSetRef.current = true;
+          if (pendingRemoteIceCandidatesRef.current.length > 0) {
+            console.log(`冲刷待处理ICE候选: ${pendingRemoteIceCandidatesRef.current.length}`);
+            for (const cand of pendingRemoteIceCandidatesRef.current) {
+              try {
+                await peerConnectionRef.current?.addIceCandidate(new RTCIceCandidate(cand));
+              } catch (e) {
+                console.error('冲刷ICE候选失败:', e);
+              }
+            }
+            pendingRemoteIceCandidatesRef.current = [];
+          }
         } else {
           console.error('收到的answer没有SDP');
         }
@@ -574,11 +608,15 @@ const VoiceCallScreen: React.FC = () => {
       console.log('收到ICE候选');
       try {
         if (data.candidate) {
-          console.log('添加ICE候选...');
-          await peerConnectionRef.current?.addIceCandidate(
-            new RTCIceCandidate(data.candidate)
-          );
-          console.log('ICE候选添加成功');
+          if (!remoteDescriptionSetRef.current) {
+            // 远端描述未设置，先缓冲，适配iOS严格顺序要求
+            pendingRemoteIceCandidatesRef.current.push(data.candidate);
+            console.log('远端SDP未设置，缓冲ICE候选。当前缓冲数:', pendingRemoteIceCandidatesRef.current.length);
+          } else {
+            console.log('添加ICE候选...');
+            await peerConnectionRef.current?.addIceCandidate(new RTCIceCandidate(data.candidate));
+            console.log('ICE候选添加成功');
+          }
         }
       } catch (error) {
         console.error('添加ICE候选失败:', error);
