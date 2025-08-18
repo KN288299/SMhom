@@ -293,8 +293,8 @@ export const useVoiceRecorder = ({
         }
         console.log('📱 Android录音路径 (MP3):', audioPath);
       } else {
-        // iOS：使用Document目录，m4a格式音质更好
-        audioPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+        // iOS：使用Document目录，需带 file:// 前缀
+        audioPath = `file://${RNFS.DocumentDirectoryPath}/${fileName}`;
         const dirExists = await RNFS.exists(RNFS.DocumentDirectoryPath);
         if (!dirExists) {
           await RNFS.mkdir(RNFS.DocumentDirectoryPath);
@@ -344,12 +344,12 @@ export const useVoiceRecorder = ({
       let result: string | undefined;
       try {
         if (Platform.OS === 'ios') {
-          // 显式指定iOS录音参数（AAC/m4a，防止初始化失败）
+          // 显式指定iOS录音参数（使用库要求的 *IOS 键名）
           result = await audioRecorderPlayerRef.current.startRecorder(audioPath, {
-            AVEncoderAudioQualityKey:  'high',
-            AVNumberOfChannelsKey:    1,
-            AVFormatIDKey:            'aac',
-            AVSampleRateKey:          44100,
+            AVEncoderAudioQualityKeyIOS: 96,
+            AVNumberOfChannelsKeyIOS: 1,
+            AVFormatIDKeyIOS: 'aac',
+            AVSampleRateKeyIOS: 44100,
           } as any);
         } else {
           result = await audioRecorderPlayerRef.current.startRecorder(audioPath);
@@ -357,8 +357,8 @@ export const useVoiceRecorder = ({
       } catch (startErr: any) {
         console.warn('首次启动录音失败，尝试回退路径:', startErr?.message || startErr);
         if (Platform.OS === 'ios') {
-          // 回退到Document目录的自定义m4a路径
-          const fallbackPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+          // 回退到Document目录的自定义m4a路径（确保带 file:// 前缀）
+          const fallbackPath = `file://${RNFS.DocumentDirectoryPath}/${fileName}`;
           try {
             const dirExists = await RNFS.exists(RNFS.DocumentDirectoryPath);
             if (!dirExists) {
@@ -366,10 +366,10 @@ export const useVoiceRecorder = ({
             }
             console.log('使用iOS回退录音路径:', fallbackPath);
             result = await audioRecorderPlayerRef.current.startRecorder(fallbackPath, {
-              AVEncoderAudioQualityKey:  'high',
-              AVNumberOfChannelsKey:    1,
-              AVFormatIDKey:            'aac',
-              AVSampleRateKey:          44100,
+              AVEncoderAudioQualityKeyIOS: 96,
+              AVNumberOfChannelsKeyIOS: 1,
+              AVFormatIDKeyIOS: 'aac',
+              AVSampleRateKeyIOS: 44100,
             } as any);
           } catch (fallbackErr) {
             throw fallbackErr;

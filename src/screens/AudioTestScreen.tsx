@@ -140,7 +140,7 @@ const AudioTestScreen: React.FC = () => {
       const fileName = `test_recording_${timestamp}${Platform.OS === 'ios' ? '.m4a' : '.mp3'}`;
       
       if (Platform.OS === 'ios') {
-        audioPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+        audioPath = `file://${RNFS.DocumentDirectoryPath}/${fileName}`;
       } else {
         // 在Android上使用正确的缓存目录
         audioPath = `${RNFS.CachesDirectoryPath}/${fileName}`;
@@ -170,10 +170,10 @@ const AudioTestScreen: React.FC = () => {
 
       const result = Platform.OS === 'ios'
         ? await audioRecorderPlayerRef.current.startRecorder(audioPath, {
-            AVEncoderAudioQualityKey: 'high',
-            AVNumberOfChannelsKey: 1,
-            AVFormatIDKey: 'aac',
-            AVSampleRateKey: 44100,
+            AVEncoderAudioQualityKeyIOS: 96,
+            AVNumberOfChannelsKeyIOS: 1,
+            AVFormatIDKeyIOS: 'aac',
+            AVSampleRateKeyIOS: 44100,
           } as any)
         : await audioRecorderPlayerRef.current.startRecorder(audioPath);
       audioRecorderPlayerRef.current.addRecordBackListener((e) => {
