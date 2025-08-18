@@ -94,7 +94,16 @@ const generateUniqueId = () => {
 // URL格式化工具函数
 const formatMediaUrl = (url: string): string => {
   if (!url) return '';
-  return url.startsWith('http') ? url : `${BASE_URL}${url}`;
+  // 保留本地/系统资产路径，避免错误地拼接到服务器域名
+  if (
+    url.startsWith('http') ||
+    url.startsWith('file://') ||
+    url.startsWith('ph://') ||
+    url.startsWith('assets-library://')
+  ) {
+    return url;
+  }
+  return `${BASE_URL}${url}`;
 };
 
 // 时间格式化工具函数

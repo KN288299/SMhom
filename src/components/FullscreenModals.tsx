@@ -109,6 +109,7 @@ const FullscreenModals: React.FC<FullscreenModalsProps> = ({
               <TouchableWithoutFeedback onPress={onToggleVideoControls}>
                 <View style={styles.fullscreenVideoWrapper}>
                   <Video
+                    // iOS: 支持 file:// / ph:// / assets-library://
                     source={{ uri: fullscreenVideoUrl }}
                     style={styles.fullscreenVideo}
                     resizeMode="contain"

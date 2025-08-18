@@ -134,7 +134,8 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
     if (item.isUploading) {
       return (
         <VideoMessageItem
-          videoUrl={item.videoUrl || ''}
+          // iOS 自发视频上传中：内部会优先用 localFileUri
+          videoUrl={formatMediaUrl(item.videoUrl || item.fileUrl || item.localFileUri || '')}
           timestamp={item.timestamp}
           isMe={isMe}
           videoDuration={item.videoDuration}

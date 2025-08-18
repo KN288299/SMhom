@@ -36,6 +36,8 @@ interface VideoMessageItemProps {
   onPress: (url: string) => void;
   isUploading?: boolean;
   uploadProgress?: number;
+  // iOS 自发视频的本地路径，用于缩略图/播放回退
+  localFileUri?: string;
 }
 
 const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
@@ -46,6 +48,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
   onPress,
   isUploading = false,
   uploadProgress = 0,
+  localFileUri,
 }) => {
   const [videoWidth, setVideoWidth] = useState(CONSTANTS.DEFAULT_VIDEO_WIDTH);
   const [videoHeight, setVideoHeight] = useState(CONSTANTS.DEFAULT_VIDEO_HEIGHT);
@@ -119,7 +122,35 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
       }
 
       try {
-        const fullVideoUrl = videoUrl.startsWith('http') ? videoUrl : BASE_URL + videoUrl;
+        // 解析用于生成缩略图的URL：支持 http、相对路径（拼 BASE_URL）、以及本地路径
+        const isHttp = videoUrl.startsWith('http');
+        const isRelative = videoUrl.startsWith('/');
+        const isLocalScheme =
+          videoUrl.startsWith('file://') ||
+          videoUrl.startsWith('assets-library://') ||
+          videoUrl.startsWith('ph://');
+
+        let fullVideoUrl = videoUrl;
+        if (isHttp) {
+          fullVideoUrl = videoUrl;
+        } else if (isRelative) {
+          fullVideoUrl = BASE_URL + videoUrl;
+        } else if (isLocalScheme) {
+          fullVideoUrl = videoUrl;
+        } else if (!videoUrl) {
+          fullVideoUrl = '';
+        }
+
+        // 如果是iOS且存在本地文件URI，优先尝试本地（避免网络抖动导致缩略图失败）
+        if (
+          Platform.OS === 'ios' &&
+          localFileUri &&
+          (localFileUri.startsWith('file://') ||
+            localFileUri.startsWith('assets-library://') ||
+            localFileUri.startsWith('ph://'))
+        ) {
+          fullVideoUrl = localFileUri;
+        }
         console.log('开始为视频生成缩略图:', fullVideoUrl);
         
         const result = await createThumbnail({
