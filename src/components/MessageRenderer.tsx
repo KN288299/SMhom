@@ -139,7 +139,13 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
           timestamp={item.timestamp}
           isMe={isMe}
           videoDuration={item.videoDuration}
-          onPress={() => {}}
+          // 允许在上传中预览本地视频（仅iOS有localFileUri时），否则禁用
+          onPress={(url) => {
+            const canPreviewLocal = !!(item.localFileUri && (item.localFileUri.startsWith('file://') || item.localFileUri.startsWith('ph://') || item.localFileUri.startsWith('assets-library://')));
+            if (canPreviewLocal) {
+              onOpenFullscreenVideo(item.localFileUri!);
+            }
+          }}
           isUploading={true}
           uploadProgress={item.uploadProgress || 0}
           localFileUri={item.localFileUri}

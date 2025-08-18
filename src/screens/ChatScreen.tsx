@@ -1452,9 +1452,14 @@ const ChatScreen: React.FC = () => {
       
       // 添加文件到FormData，增强对不同平台的兼容性
       // 处理不同平台的文件URL格式和类型
-      const fileUri = Platform.OS === 'android' 
-        ? (selectedVideoUri || '') 
-        : (selectedVideoUri ? selectedVideoUri.replace('file://', '') : '');
+      // iOS: 保持原始scheme（包含 file://、ph://、assets-library://）以供缩略图/预览使用;
+      // 但在FormData中，iOS部分库要求去掉file://。这里只在明确是file://时去掉前缀，其它scheme原样保留
+      let fileUri = selectedVideoUri || '';
+      if (Platform.OS === 'ios') {
+        if (fileUri.startsWith('file://')) {
+          fileUri = fileUri.replace('file://', '');
+        }
+      }
         
       console.log('准备上传视频文件:', {
         uri: fileUri,

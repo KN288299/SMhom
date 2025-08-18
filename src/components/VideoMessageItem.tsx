@@ -71,36 +71,39 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
 
       // 如果是上传中的视频，尝试生成缩略图（特别是iOS本地视频）
       if (isUploading) {
-        // 对于iOS本地视频，也尝试生成缩略图
-        if (Platform.OS === 'ios' && videoUrl && videoUrl.startsWith('file://')) {
-          console.log('尝试为iOS上传中的本地视频生成缩略图:', videoUrl);
-          
-          try {
-            const result = await createThumbnail({
-              url: videoUrl,
-              timeStamp: 1000,
-              cacheName: `upload_${Date.now()}`,
-            });
-
-            if (isMounted && result.path) {
-              console.log('iOS上传中视频缩略图生成成功:', result.path);
-              setThumbnailUrl(result.path);
-              
-              // 设置视频尺寸
-              const aspectRatio = result.width / result.height;
-              let newWidth = CONSTANTS.DEFAULT_VIDEO_WIDTH;
-              let newHeight = newWidth / aspectRatio;
-              
-              if (newHeight > CONSTANTS.DEFAULT_VIDEO_HEIGHT) {
-                newHeight = CONSTANTS.DEFAULT_VIDEO_HEIGHT;
-                newWidth = newHeight * aspectRatio;
+        // 对于iOS本地视频（file://, assets-library://, ph://），尝试生成缩略图
+        if (Platform.OS === 'ios') {
+          const localCandidate = localFileUri || videoUrl;
+          const isLocalScheme = !!localCandidate && (
+            localCandidate.startsWith('file://') ||
+            localCandidate.startsWith('assets-library://') ||
+            localCandidate.startsWith('ph://')
+          );
+          if (isLocalScheme) {
+            const sourceForThumb = localCandidate;
+            console.log('尝试为iOS上传中的本地视频生成缩略图:', sourceForThumb);
+            try {
+              const result = await createThumbnail({
+                url: sourceForThumb,
+                timeStamp: 1000,
+                cacheName: `upload_${Date.now()}`,
+              });
+              if (isMounted && result.path) {
+                console.log('iOS上传中视频缩略图生成成功:', result.path);
+                setThumbnailUrl(result.path);
+                const aspectRatio = result.width / result.height;
+                let newWidth = CONSTANTS.DEFAULT_VIDEO_WIDTH;
+                let newHeight = newWidth / aspectRatio;
+                if (newHeight > CONSTANTS.DEFAULT_VIDEO_HEIGHT) {
+                  newHeight = CONSTANTS.DEFAULT_VIDEO_HEIGHT;
+                  newWidth = newHeight * aspectRatio;
+                }
+                setVideoWidth(newWidth);
+                setVideoHeight(newHeight);
               }
-              
-              setVideoWidth(newWidth);
-              setVideoHeight(newHeight);
+            } catch (thumbError) {
+              console.log('iOS上传中视频缩略图生成失败:', thumbError);
             }
-          } catch (thumbError) {
-            console.log('iOS上传中视频缩略图生成失败:', thumbError);
           }
         }
         
@@ -261,13 +264,18 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
           }
         ]}
         onPress={() => {
-          if (!isUploading && videoUrl) {
-            // 调试日志已清理 - 视频点击事件
+          if (isUploading) {
+            if (Platform.OS === 'ios' && localFileUri) {
+              onPress(localFileUri);
+            }
+            return;
+          }
+          if (videoUrl) {
             onPress(videoUrl);
           }
         }}
         activeOpacity={0.8}
-        disabled={isUploading || !videoUrl}
+        disabled={isUploading ? !(Platform.OS === 'ios' && !!localFileUri) : !videoUrl}
       >
         <View style={[styles.videoContainer, { width: videoWidth, height: videoHeight }]}>
           {loading && !isUploading ? (
