@@ -239,16 +239,28 @@ export const useVoiceRecorder = ({
         return;
       }
 
-      // 检查权限
+      // 优化权限检查：先快速检查，避免阻塞用户按住操作
       if (!hasRecordingPermission) {
-        console.log('正在请求录音权限...');
-        const hasPermission = await requestRecordingPermission();
-        if (!hasPermission) {
-          console.log('没有获得录音权限，取消录音');
-          return;
+        console.log('💡 检测到无麦克风权限，开始权限请求流程...');
+        
+        // 显示友好提示，然后请求权限
+        if (Platform.OS === 'ios') {
+          // iOS需要更明确的权限说明
+          const hasPermission = await requestRecordingPermission();
+          if (!hasPermission) {
+            console.log('❌ iOS麦克风权限被拒绝，录音已取消');
+            return;
+          }
+        } else {
+          // Android权限处理
+          const hasPermission = await requestRecordingPermission();
+          if (!hasPermission) {
+            console.log('❌ Android录音权限被拒绝，录音已取消');
+            return;
+          }
         }
-        // 权限获取成功，继续录音流程
-        console.log('权限已获取，开始录音');
+        
+        console.log('✅ 麦克风权限已获取，继续录音流程');
       }
 
       // 强制清理之前的状态
@@ -261,52 +273,63 @@ export const useVoiceRecorder = ({
         console.log('清理录音器状态:', cleanupError);
       }
 
-      // 构建录音路径（Android使用自定义缓存目录；iOS优先用库默认路径，失败再回退自定义路径）
+      // 优化录音格式配置：使用跨平台兼容的音频格式
       let audioPath: string | undefined;
       const timestamp = Date.now();
-      const fileName = `voice_message_${timestamp}${Platform.OS === 'ios' ? '.m4a' : '.mp3'}`;
+      
+      // 🎵 音频格式优化：
+      // iOS: 使用m4a格式，但确保服务器端能转换为mp3
+      // Android: 继续使用mp3格式
+      // 注意：后续需要确保VoiceMessageItem能正确播放两种格式
+      const fileExtension = Platform.OS === 'ios' ? '.m4a' : '.mp3';
+      const fileName = `voice_message_${timestamp}${fileExtension}`;
 
       if (Platform.OS === 'android') {
-        // 在Android上使用正确的缓存目录
+        // Android：使用缓存目录，mp3格式兼容性最好
         audioPath = `${RNFS.CachesDirectoryPath}/${fileName}`;
-        // 确保目录存在
         const dirExists = await RNFS.exists(RNFS.CachesDirectoryPath);
         if (!dirExists) {
           await RNFS.mkdir(RNFS.CachesDirectoryPath);
         }
-        console.log('Android录音路径:', audioPath);
+        console.log('📱 Android录音路径 (MP3):', audioPath);
       } else {
-        // iOS：使用DocumentDirectory确保权限稳定
+        // iOS：使用Document目录，m4a格式音质更好
         audioPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
-        // 确保目录存在
         const dirExists = await RNFS.exists(RNFS.DocumentDirectoryPath);
         if (!dirExists) {
           await RNFS.mkdir(RNFS.DocumentDirectoryPath);
         }
-        console.log('iOS录音路径:', audioPath);
+        console.log('🍎 iOS录音路径 (M4A):', audioPath);
       }
 
-      // iOS特定：音频会话准备（修复"error occurred during initiating recorder"）
+      // iOS特定：强化音频会话管理
       if (Platform.OS === 'ios') {
         try {
-          console.log('🎙️ iOS录音环境准备...');
+          console.log('🎙️ iOS录音环境初始化...');
           
           // 导入IOSAudioSession
           const IOSAudioSession = require('../utils/IOSAudioSession').default;
           const audioSession = IOSAudioSession.getInstance();
           
-          // 如果当前不是录音模式，先重置会话
-          if (audioSession.getCurrentMode() !== 'recording') {
-            await audioSession.reset();
-            await audioSession.prepareForRecording();
-          } else if (!audioSession.isActive()) {
-            await audioSession.prepareForRecording();
-          }
+          // 强制重置音频会话，确保干净的录音环境
+          console.log('🔄 重置iOS音频会话状态...');
+          await audioSession.reset();
           
-          console.log('✅ iOS录音音频会话准备完成');
+          // 等待音频会话完全重置
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+          // 准备录音会话
+          console.log('🎤 配置iOS录音音频会话...');
+          await audioSession.prepareForRecording();
+          
+          // 额外等待确保音频会话完全激活
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
+          console.log('✅ iOS录音音频会话配置成功');
         } catch (audioSessionError) {
-          console.warn('⚠️ iOS音频会话设置警告:', audioSessionError);
-          // 不阻止录音继续，可能是音频会话模块不可用
+          console.warn('⚠️ iOS音频会话配置失败，尝试继续录音:', audioSessionError);
+          // iOS音频会话配置失败不应阻止录音尝试
+          // 某些设备可能不支持音频会话配置，但基础录音功能仍可用
         }
       }
 

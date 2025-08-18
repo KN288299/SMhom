@@ -229,12 +229,29 @@ class MediaUploadService {
       const formData = new FormData();
       const fileName = audioUri.split('/').pop() || `voice_message_${Date.now()}.mp3`;
       
-      // 确定音频类型
-      let mimeType = 'audio/mp3';
-      if (fileName.includes('.m4a')) {
+      // 🎵 智能音频类型检测和MIME类型设置
+      let mimeType = 'audio/mp3'; // 默认值
+      const fileExtension = fileName.toLowerCase();
+      
+      if (fileExtension.includes('.m4a')) {
         mimeType = 'audio/m4a';
-      } else if (fileName.includes('.wav')) {
+      } else if (fileExtension.includes('.mp3')) {
+        mimeType = 'audio/mpeg'; // 标准MIME类型
+      } else if (fileExtension.includes('.wav')) {
         mimeType = 'audio/wav';
+      } else if (fileExtension.includes('.aac')) {
+        mimeType = 'audio/aac';
+      } else if (fileExtension.includes('.mp4')) {
+        mimeType = 'audio/mp4'; // iOS可能使用的格式
+      }
+      
+      // 平台特定优化
+      if (Platform.OS === 'ios' && mimeType === 'audio/mp3') {
+        // iOS通常不会生成mp3，如果检测到可能是命名错误
+        console.warn('⚠️ iOS设备生成了MP3文件，这可能不正常');
+      } else if (Platform.OS === 'android' && mimeType === 'audio/m4a') {
+        // Android发送m4a也是可能的，但不常见
+        console.log('📱 Android设备发送M4A文件');
       }
       
       console.log('📝 构造语音上传FormData:', {

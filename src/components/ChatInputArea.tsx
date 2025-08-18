@@ -8,6 +8,7 @@ import {
   Animated,
   StyleSheet,
   Keyboard,
+  Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { iOSChatStyles, isIOS, getPlatformStyles, getIOSFontSize } from '../styles/iOSStyles';
@@ -65,7 +66,12 @@ const ChatInputArea: React.FC<ChatInputAreaProps> = ({
     }
     
     if (!hasRecordingPermission) {
-      return '按住说话（需要麦克风权限）';
+      // 根据平台显示不同的权限提示
+      if (Platform.OS === 'ios') {
+        return '按住说话（需要授权麦克风）';
+      } else {
+        return '按住说话（需要录音权限）';
+      }
     }
     
     return '按住说话';

@@ -4,6 +4,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import { BASE_URL } from '../config/api';
 import IOSAudioSession from '../utils/IOSAudioSession';
+import AudioCompatibility from '../utils/AudioCompatibility';
 import RNFS from 'react-native-fs';
 
 interface VoiceMessageItemProps {
@@ -79,33 +80,50 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
           return;
         }
         
+        // 🎵 检查音频兼容性
+        const compatInfo = AudioCompatibility.getAudioCompatibilityInfo(fullAudioUrl);
+        const recommendations = AudioCompatibility.getPlaybackRecommendations(fullAudioUrl);
+        
+        console.log('🎵 音频兼容性检查:', {
+          url: fullAudioUrl,
+          platform: Platform.OS,
+          compatibility: compatInfo,
+          recommendations: recommendations
+        });
+        
+        // 如果有兼容性问题，记录警告但继续尝试播放
+        if (!compatInfo.canPlayDirectly) {
+          console.warn('⚠️ 音频格式可能存在兼容性问题，但仍会尝试播放');
+          AudioCompatibility.logCompatibilityIssue(fullAudioUrl, '格式兼容性警告');
+        }
+        
         console.log('开始播放语音:', fullAudioUrl);
         setIsPlaying(true);
         
         try {
-          // iOS特定：准备音频播放会话
+          // iOS特定：强化音频播放会话管理
           if (Platform.OS === 'ios') {
-            console.log('iOS语音播放：准备音频会话...');
+            console.log('🎵 iOS语音播放：初始化音频会话...');
             const audioSession = IOSAudioSession.getInstance();
             
-            // 如果当前不是播放模式，先重置会话
-            if (audioSession.getCurrentMode() !== 'playback') {
-              await audioSession.reset();
-              await audioSession.prepareForPlayback();
-            } else if (!audioSession.isActive()) {
-              await audioSession.prepareForPlayback();
-            }
+            // 重置并准备播放会话
+            console.log('🔄 重置iOS播放音频会话...');
+            await audioSession.reset();
+            await new Promise(resolve => setTimeout(resolve, 100));
             
-            // iOS额外步骤：确保音频播放器配置正确
+            console.log('🔊 配置iOS播放音频会话...');
+            await audioSession.prepareForPlayback();
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
+            // 配置播放器订阅
             try {
-              // 设置iOS播放器的音频会话选项
               await audioPlayerRef.current.setSubscriptionDuration(0.1);
-              console.log('iOS音频播放器订阅已设置');
+              console.log('✅ iOS音频播放器订阅配置完成');
             } catch (subscriptionError) {
-              console.warn('iOS播放器订阅设置警告:', subscriptionError);
+              console.warn('⚠️ iOS播放器订阅配置警告:', subscriptionError);
             }
             
-            console.log('✅ iOS音频会话已准备完毕');
+            console.log('✅ iOS音频播放环境准备完成');
           }
           
           console.log('开始播放音频文件:', fullAudioUrl);

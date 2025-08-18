@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 
-// 配置语音文件存储
+// 配置语音文件存储 - 支持跨平台音频格式
 const audioStorage = multer.diskStorage({
   destination: function(req, file, cb) {
     const uploadDir = path.join(__dirname, '../uploads/audio');
@@ -18,21 +18,48 @@ const audioStorage = multer.diskStorage({
   },
   filename: function(req, file, cb) {
     const timestamp = Date.now();
-    const ext = path.extname(file.originalname) || '.mp3';
+    let ext = path.extname(file.originalname) || '.mp3';
+    
+    // 🎵 跨平台音频格式支持
+    // 根据MIME类型确定正确的文件扩展名
+    if (file.mimetype === 'audio/m4a' || file.mimetype === 'audio/x-m4a') {
+      ext = '.m4a';
+    } else if (file.mimetype === 'audio/mp3' || file.mimetype === 'audio/mpeg') {
+      ext = '.mp3';
+    } else if (file.mimetype === 'audio/wav' || file.mimetype === 'audio/x-wav') {
+      ext = '.wav';
+    } else if (file.mimetype === 'audio/aac') {
+      ext = '.aac';
+    }
+    
+    console.log(`📤 接收语音文件: ${file.originalname}, MIME: ${file.mimetype}, 扩展名: ${ext}`);
     cb(null, `voice_message_${timestamp}${ext}`);
   }
 });
 
-// 创建上传中间件
+// 创建上传中间件 - 扩展音频格式支持
 const uploadAudio = multer({ 
   storage: audioStorage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 限制10MB
   fileFilter: function(req, file, cb) {
-    // 只接受音频文件
-    if (file.mimetype.startsWith('audio/')) {
+    // 支持更多音频格式，特别是iOS的m4a格式
+    const supportedMimeTypes = [
+      'audio/mp3',
+      'audio/mpeg',
+      'audio/m4a',
+      'audio/x-m4a',
+      'audio/wav',
+      'audio/x-wav',
+      'audio/aac',
+      'audio/mp4'  // 某些iOS设备可能发送这个
+    ];
+    
+    if (supportedMimeTypes.includes(file.mimetype) || file.mimetype.startsWith('audio/')) {
+      console.log(`✅ 接受音频文件: ${file.mimetype}`);
       cb(null, true);
     } else {
-      cb(new Error('只允许上传音频文件'));
+      console.error(`❌ 不支持的音频格式: ${file.mimetype}`);
+      cb(new Error(`不支持的音频格式: ${file.mimetype}。支持的格式: MP3, M4A, WAV, AAC`));
     }
   }
 }).single('audio');
