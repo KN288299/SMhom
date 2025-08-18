@@ -274,11 +274,16 @@ export const useVoiceRecorder = ({
         if (!dirExists) {
           await RNFS.mkdir(RNFS.CachesDirectoryPath);
         }
-        console.log('开始录音，路径:', audioPath);
+        console.log('Android录音路径:', audioPath);
       } else {
-        // iOS：先尝试不传路径，使用库默认安全路径
-        audioPath = undefined;
-        console.log('iOS优先使用库默认录音路径');
+        // iOS：使用DocumentDirectory确保权限稳定
+        audioPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+        // 确保目录存在
+        const dirExists = await RNFS.exists(RNFS.DocumentDirectoryPath);
+        if (!dirExists) {
+          await RNFS.mkdir(RNFS.DocumentDirectoryPath);
+        }
+        console.log('iOS录音路径:', audioPath);
       }
 
       // iOS特定：可选的音频会话准备（库通常会自动处理）
