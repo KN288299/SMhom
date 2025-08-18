@@ -87,7 +87,14 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
           if (Platform.OS === 'ios') {
             console.log('iOS语音播放：准备音频会话...');
             const audioSession = IOSAudioSession.getInstance();
-            await audioSession.prepareForPlayback();
+            
+            // 如果当前不是播放模式，先重置会话
+            if (audioSession.getCurrentMode() !== 'playback') {
+              await audioSession.reset();
+              await audioSession.prepareForPlayback();
+            } else if (!audioSession.isActive()) {
+              await audioSession.prepareForPlayback();
+            }
             
             // iOS额外步骤：确保音频播放器配置正确
             try {
@@ -158,7 +165,14 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
 
               // 再次准备音频会话（针对本地文件播放）
               const audioSession = IOSAudioSession.getInstance();
-              await audioSession.prepareForPlayback();
+              
+              // 如果当前不是播放模式，先重置会话
+              if (audioSession.getCurrentMode() !== 'playback') {
+                await audioSession.reset();
+                await audioSession.prepareForPlayback();
+              } else if (!audioSession.isActive()) {
+                await audioSession.prepareForPlayback();
+              }
 
               console.log('🎵 使用本地缓存文件播放语音:', cachePath);
               await audioPlayerRef.current.startPlayer(cachePath); // 不需要file://前缀

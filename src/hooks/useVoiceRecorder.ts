@@ -286,12 +286,27 @@ export const useVoiceRecorder = ({
         console.log('iOS录音路径:', audioPath);
       }
 
-      // iOS特定：可选的音频会话准备（库通常会自动处理）
+      // iOS特定：音频会话准备（修复"error occurred during initiating recorder"）
       if (Platform.OS === 'ios') {
         try {
-          console.log('iOS录音环境准备...');
+          console.log('🎙️ iOS录音环境准备...');
+          
+          // 导入IOSAudioSession
+          const IOSAudioSession = require('../utils/IOSAudioSession').default;
+          const audioSession = IOSAudioSession.getInstance();
+          
+          // 如果当前不是录音模式，先重置会话
+          if (audioSession.getCurrentMode() !== 'recording') {
+            await audioSession.reset();
+            await audioSession.prepareForRecording();
+          } else if (!audioSession.isActive()) {
+            await audioSession.prepareForRecording();
+          }
+          
+          console.log('✅ iOS录音音频会话准备完成');
         } catch (audioSessionError) {
-          console.warn('iOS音频会话设置警告:', audioSessionError);
+          console.warn('⚠️ iOS音频会话设置警告:', audioSessionError);
+          // 不阻止录音继续，可能是音频会话模块不可用
         }
       }
 
