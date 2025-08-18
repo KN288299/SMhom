@@ -2,10 +2,41 @@ import React, { createContext, useContext, useEffect, useRef, useState, useCallb
 import { io, Socket } from 'socket.io-client';
 import { BASE_URL } from '../config/api';
 import { useAuth } from './AuthContext';
-import { Alert } from 'react-native';
-import { Platform } from 'react-native';
-import { Message } from '../types/Message';
+import { Alert, Platform, AppState } from 'react-native';
 import IOSCallService from '../services/IOSCallService';
+
+interface Message {
+  _id: string;
+  conversationId?: string;
+  senderId: string;
+  senderRole?: 'user' | 'customer_service';
+  content: string;
+  timestamp: Date;
+  isRead?: boolean;
+  messageType?: 'text' | 'voice' | 'image' | 'video' | 'location';
+  contentType?: 'text' | 'voice' | 'image' | 'video' | 'file' | 'location';
+  voiceDuration?: string;
+  voiceUrl?: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  videoDuration?: string;
+  isUploading?: boolean;
+  uploadProgress?: number;
+  videoWidth?: number;
+  videoHeight?: number;
+  aspectRatio?: number;
+  fileUrl?: string;
+  localFileUri?: string;
+  isCallRecord?: boolean;
+  callerId?: string;
+  callDuration?: string;
+  missed?: boolean;
+  rejected?: boolean;
+  latitude?: number;
+  longitude?: number;
+  locationName?: string;
+  address?: string;
+}
 
 interface SocketContextType {
   socket: Socket | null;
@@ -146,10 +177,20 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       console.log('📞 [GlobalSocket] 收到来电:', callData);
       console.log(`📞 [GlobalSocket] 当前通话订阅者数量: ${callSubscribersRef.current.size}`);
       
-      // iOS特殊处理：使用iOS通话服务
+      // iOS特殊处理：避免双重通知
       if (Platform.OS === 'ios') {
-        console.log('🍎 [GlobalSocket] iOS设备，使用iOS通话服务');
-        IOSCallService.showIncomingCallNotification(callData);
+        console.log('🍎 [GlobalSocket] iOS设备');
+        const appState = AppState.currentState;
+        console.log('🍎 [GlobalSocket] 当前应用状态:', appState);
+        
+        if (appState === 'active') {
+          console.log('🍎 [GlobalSocket] iOS前台：只使用全屏来电界面，跳过IOSCallService');
+          // 前台时只通知订阅者（PlatformCallManager显示全屏来电）
+          // 不调用IOSCallService避免重复弹窗
+        } else {
+          console.log('🍎 [GlobalSocket] iOS后台：使用iOS通话服务推送通知');
+          IOSCallService.showIncomingCallNotification(callData);
+        }
       }
       
       // 通知所有通话订阅者
