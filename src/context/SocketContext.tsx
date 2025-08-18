@@ -104,18 +104,18 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       processedToken.startsWith('CS_') ? '客服令牌' : 
       processedToken.startsWith('U_') ? '用户令牌' : '普通令牌');
     
-    // 创建Socket连接 - 增强重连机制
+    // 创建Socket连接 - iOS通话延迟优化
     const socket = io(BASE_URL, {
       auth: {
         token: processedToken  // 使用处理后的token
       },
       transports: ['websocket', 'polling'],
-      timeout: 10000,
+      timeout: 5000,           // 减少超时时间，快速失败重试
       reconnection: true,
-      reconnectionAttempts: 10, // 增加重连次数
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000, // 最大重连延迟
-      randomizationFactor: 0.5, // 随机化重连延迟
+      reconnectionAttempts: 20, // 大幅增加重连次数
+      reconnectionDelay: 200,   // 大幅减少重连延迟
+      reconnectionDelayMax: 1000, // 减少最大重连延迟
+      randomizationFactor: 0.2, // 减少随机化因子，更快重连
     });
 
     socketRef.current = socket;
@@ -177,19 +177,26 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       console.log('📞 [GlobalSocket] 收到来电:', callData);
       console.log(`📞 [GlobalSocket] 当前通话订阅者数量: ${callSubscribersRef.current.size}`);
       
-      // iOS特殊处理：避免双重通知
+      // iOS特殊处理：优化来电响应速度
       if (Platform.OS === 'ios') {
-        console.log('🍎 [GlobalSocket] iOS设备');
+        console.log('🍎 [GlobalSocket] iOS设备收到来电');
         const appState = AppState.currentState;
         console.log('🍎 [GlobalSocket] 当前应用状态:', appState);
         
         if (appState === 'active') {
-          console.log('🍎 [GlobalSocket] iOS前台：只使用全屏来电界面，跳过IOSCallService');
-          // 前台时只通知订阅者（PlatformCallManager显示全屏来电）
-          // 不调用IOSCallService避免重复弹窗
+          console.log('⚡ [GlobalSocket] iOS前台：快速路径，直接通知订阅者');
+          // 前台时直接通知，确保最快响应
         } else {
           console.log('🍎 [GlobalSocket] iOS后台：使用iOS通话服务推送通知');
           IOSCallService.showIncomingCallNotification(callData);
+          
+          // 同时尝试预热连接，为应用唤醒做准备
+          setTimeout(() => {
+            if (socketRef.current?.disconnected) {
+              console.log('🔄 [GlobalSocket] 预热Socket连接');
+              socketRef.current.connect();
+            }
+          }, 100);
         }
       }
       

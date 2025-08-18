@@ -89,10 +89,35 @@ class IOSCallService {
       console.log(`📱 [IOSCallService] 应用状态变化: ${AppState.currentState} -> ${nextAppState}`);
       
       if (nextAppState === 'active') {
+        console.log('🔄 [IOSCallService] 应用激活，执行快速恢复流程');
+        
+        // 立即检查并强制重连Socket
+        setTimeout(() => this.forceSocketReconnect(), 100);
+        
         // 应用回到前台，检查是否有待处理的来电
-        this.checkPendingCalls();
+        setTimeout(() => this.checkPendingCalls(), 200);
       }
     });
+  }
+
+  // 强制Socket重连
+  private forceSocketReconnect(): void {
+    try {
+      const socketRef = (global as any).socketRef;
+      if (socketRef?.current) {
+        if (socketRef.current.disconnected) {
+          console.log('🔄 [IOSCallService] 强制重连断开的Socket');
+          socketRef.current.connect();
+        } else if (!socketRef.current.connected) {
+          console.log('🔄 [IOSCallService] Socket未连接，尝试重新连接');
+          socketRef.current.connect();
+        } else {
+          console.log('✅ [IOSCallService] Socket已连接，无需重连');
+        }
+      }
+    } catch (error) {
+      console.error('❌ [IOSCallService] 强制重连失败:', error);
+    }
   }
 
   // 显示iOS来电通知

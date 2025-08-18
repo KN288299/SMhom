@@ -71,14 +71,19 @@ const PlatformCallManager: React.FC = () => {
     
     // 平台特定的来电处理
     if (Platform.OS === 'ios') {
-      console.log('🍎 [PlatformCallManager] iOS设备，使用iOS通话服务');
-      // iOS使用iOS通话服务，这里只处理前台显示
-      if (AppState.currentState === 'active') {
-        console.log('🍎 [PlatformCallManager] iOS前台，显示来电界面');
+      console.log('🍎 [PlatformCallManager] iOS设备，使用优化的来电处理');
+      const appState = AppState.currentState;
+      console.log('🍎 [PlatformCallManager] 当前应用状态:', appState);
+      
+      if (appState === 'active') {
+        // iOS前台时立即显示，跳过所有延迟处理
+        console.log('⚡ [PlatformCallManager] iOS前台，立即显示来电界面（快速路径）');
         setIsIncomingCall(true);
         setIncomingCallInfo(callData);
       } else {
-        console.log('🍎 [PlatformCallManager] iOS后台，iOS通话服务已处理');
+        // iOS后台时使用通话服务处理
+        console.log('🍎 [PlatformCallManager] iOS后台，使用iOS通话服务');
+        IOSCallService.showIncomingCallNotification(callData);
       }
     } else {
       // Android设备，使用原有的全局来电显示
