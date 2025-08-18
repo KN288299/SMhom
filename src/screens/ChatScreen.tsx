@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  SafeAreaView,
   StatusBar,
   Alert,
   PermissionsAndroid,
@@ -23,6 +22,7 @@ import {
   Linking,
   ToastAndroid,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { iOSChatStyles, iOSMessageStyles, isIOS, getPlatformStyles, getIOSFontSize, IOS_CHAT_HEADER_HEIGHT, IOS_SAFE_AREA_TOP } from '../styles/iOSStyles';
 import NetInfo from '@react-native-community/netinfo';
 import { getOptimizedConnectionStatus } from '../utils/iOSNetworkHelper';
@@ -1998,7 +1998,7 @@ const ChatScreen: React.FC = () => {
 
   
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <View style={styles.container}>
         <StatusBar backgroundColor="#fff" barStyle="dark-content" />
       
