@@ -3,39 +3,9 @@ import { io, Socket } from 'socket.io-client';
 import { BASE_URL } from '../config/api';
 import { useAuth } from './AuthContext';
 import { Alert } from 'react-native';
-
-interface Message {
-  _id: string;
-  conversationId?: string; // 关键字段：消息所属的对话ID
-  senderId: string;
-  senderRole?: 'user' | 'customer_service';
-  content: string;
-  timestamp: Date;
-  isRead?: boolean;
-  messageType?: 'text' | 'voice' | 'image' | 'video' | 'location';
-  contentType?: 'text' | 'voice' | 'image' | 'video' | 'file' | 'location';
-  voiceDuration?: string;
-  voiceUrl?: string;
-  imageUrl?: string;
-  videoUrl?: string;
-  videoDuration?: string;
-  isUploading?: boolean;
-  uploadProgress?: number;
-  videoWidth?: number;
-  videoHeight?: number;
-  aspectRatio?: number;
-  fileUrl?: string;
-  isCallRecord?: boolean;
-  callerId?: string;
-  callDuration?: string;
-  missed?: boolean;
-  rejected?: boolean;
-  // 位置消息字段
-  latitude?: number;
-  longitude?: number;
-  locationName?: string;
-  address?: string;
-}
+import { Platform } from 'react-native';
+import { Message } from '../types/Message';
+import IOSCallService from '../services/IOSCallService';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -175,6 +145,12 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     const handleIncomingCall = (callData: any) => {
       console.log('📞 [GlobalSocket] 收到来电:', callData);
       console.log(`📞 [GlobalSocket] 当前通话订阅者数量: ${callSubscribersRef.current.size}`);
+      
+      // iOS特殊处理：使用iOS通话服务
+      if (Platform.OS === 'ios') {
+        console.log('🍎 [GlobalSocket] iOS设备，使用iOS通话服务');
+        IOSCallService.showIncomingCallNotification(callData);
+      }
       
       // 通知所有通话订阅者
       let index = 0;

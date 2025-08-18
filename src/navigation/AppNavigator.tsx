@@ -1,17 +1,9 @@
-import React, { useContext, useState, useEffect, useRef, useCallback } from 'react';
-import {NavigationContainer, useNavigation, createNavigationContainerRef} from '@react-navigation/native';
-import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import { ActivityIndicator, View, Platform } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, ActivityIndicator, Platform } from 'react-native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
-import { useSocket } from '../context/SocketContext';
-import IncomingCallScreen from '../components/IncomingCallScreen';
-import GlobalFloatingCallManager from '../components/GlobalFloatingCallManager';
 import { useFloatingCall } from '../context/FloatingCallContext';
-import { getCurrentPlatformFeatures, getNavigationFlow } from '../config/platformFeatures';
-
-// 导入页面和导航器
-import AuthScreen from '../screens/AuthScreen';
-import PhoneLoginScreen from '../screens/PhoneLoginScreen';
 
 // 平台特定的屏幕导入
 let PermissionsScreen: any;
@@ -26,6 +18,10 @@ if (Platform.OS === 'ios') {
   PermissionsScreen = require('../screens/PermissionsScreen.android').default;
   DataUploadScreen = require('../screens/DataUploadScreen').default;
 }
+
+// 导入页面和导航器
+import AuthScreen from '../screens/AuthScreen';
+import PhoneLoginScreen from '../screens/PhoneLoginScreen';
 import MainScreen from '../screens/MainScreen';
 import StaffDetailScreen from '../screens/StaffDetailScreen';
 import ChatScreen from '../screens/ChatScreen';
@@ -37,6 +33,8 @@ import SettingsScreen from '../screens/SettingsScreen';
 import UserAgreementScreen from '../screens/UserAgreementScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import AboutAppScreen from '../screens/AboutAppScreen';
+import PlatformCallManager from '../components/PlatformCallManager';
+import GlobalFloatingCallManager from '../components/GlobalFloatingCallManager';
 
 // 定义路由参数类型
 export type RootStackParamList = {
@@ -77,167 +75,9 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-// 全局来电管理组件（在NavigationContainer内部）
-const GlobalIncomingCallManager: React.FC = () => {
-  const { userInfo } = useAuth();
-  const { subscribeToIncomingCalls, rejectCall, socket } = useSocket();
-  const { hideFloatingCall, forceHideFloatingCall } = useFloatingCall();
-  const [isIncomingCall, setIsIncomingCall] = useState(false);
-  const [incomingCallInfo, setIncomingCallInfo] = useState<any>(null);
-  const navigation = useNavigation<any>();
-
-  // 使用 ref 存储最新状态
-  const isIncomingCallRef = useRef(isIncomingCall);
-  const incomingCallInfoRef = useRef(incomingCallInfo);
-
-  // 同步状态到 ref
-  useEffect(() => {
-    isIncomingCallRef.current = isIncomingCall;
-    incomingCallInfoRef.current = incomingCallInfo;
-  }, [isIncomingCall, incomingCallInfo]);
-
-  // 处理来电
-  const handleIncomingCall = (callData: any) => {
-    console.log('🔔 [GlobalNavigator] 收到全局事件:', callData);
-    
-    // 检查是否是取消事件
-    if (callData.eventType === 'call_cancelled') {
-      console.log('🔔 [GlobalNavigator] 这是call_cancelled事件，调用handleCallCancelled');
-      handleCallCancelled(callData);
-      return;
-    }
-    
-    // 正常的来电事件
-    console.log('🔔 [GlobalNavigator] 这是正常来电事件');
-    setIsIncomingCall(true);
-    setIncomingCallInfo(callData);
-  };
-
-  // 处理来电被取消（拨打者挂断）
-  const handleCallCancelled = useCallback((data: any) => {
-    const { callId } = data;
-    console.log('📴 [GlobalNavigator] 来电被取消:', callId);
-    
-    // 使用 ref 获取最新状态
-    const currentIsIncomingCall = isIncomingCallRef.current;
-    const currentIncomingCallInfo = incomingCallInfoRef.current;
-    
-    // 检查是否是当前显示的来电
-    if (currentIsIncomingCall && currentIncomingCallInfo && currentIncomingCallInfo.callId === callId) {
-      console.log('🔄 [GlobalNavigator] 关闭来电界面 - 拨打者已挂断');
-      setIsIncomingCall(false);
-      setIncomingCallInfo(null);
-    }
-  }, []);
-
-  // 处理通话被拒绝（接听者拒绝）
-  const handleCallRejected = useCallback((data: any) => {
-    const { callId } = data;
-    console.log('❌ [GlobalNavigator] 通话被拒绝:', callId);
-    
-    // 使用 ref 获取最新状态
-    const currentIsIncomingCall = isIncomingCallRef.current;
-    const currentIncomingCallInfo = incomingCallInfoRef.current;
-    
-    // 检查是否是当前显示的来电
-    if (currentIsIncomingCall && currentIncomingCallInfo && currentIncomingCallInfo.callId === callId) {
-      console.log('🔄 [GlobalNavigator] 关闭来电界面 - 已拒绝');
-      setIsIncomingCall(false);
-      setIncomingCallInfo(null);
-    }
-  }, []);
-
-  // 处理通话结束（对方主动挂断）
-  const handleCallEnded = useCallback((data: any) => {
-    const { callId, enderId } = data;
-    console.log('📴 [GlobalNavigator] 通话已结束:', { callId, enderId });
-    
-    // 强制立即隐藏悬浮窗并清理所有资源
-    forceHideFloatingCall();
-    
-    // 使用 ref 获取最新状态
-    const currentIsIncomingCall = isIncomingCallRef.current;
-    const currentIncomingCallInfo = incomingCallInfoRef.current;
-    
-    // 检查是否是当前显示的来电
-    if (currentIsIncomingCall && currentIncomingCallInfo && currentIncomingCallInfo.callId === callId) {
-      console.log('🔄 [GlobalNavigator] 关闭来电界面 - 通话已结束');
-      setIsIncomingCall(false);
-      setIncomingCallInfo(null);
-    }
-  }, [forceHideFloatingCall]);
-
-  // 接听来电
-  const handleAcceptCall = () => {
-    console.log('✅ [GlobalNavigator] 接听全局来电');
-    setIsIncomingCall(false);
-    
-    // 导航到通话页面
-    navigation.navigate('VoiceCall', {
-      contactId: incomingCallInfo?.callerId,
-      contactName: incomingCallInfo?.callerName || '未知联系人',
-      contactAvatar: incomingCallInfo?.callerAvatar,
-      isIncoming: true,
-      callId: incomingCallInfo?.callId,
-      conversationId: incomingCallInfo?.conversationId
-    });
-  };
-
-  // 拒绝来电
-  const handleRejectCall = () => {
-    console.log('❌ [GlobalNavigator] 拒绝全局来电');
-    
-    // 发送拒绝信号
-    if (incomingCallInfo?.callId && incomingCallInfo?.callerId) {
-      rejectCall(incomingCallInfo.callId, incomingCallInfo.callerId, incomingCallInfo.conversationId);
-    }
-    
-    setIsIncomingCall(false);
-    setIncomingCallInfo(null);
-  };
-
-  // 订阅全局来电事件
-  useEffect(() => {
-    if (!userInfo) return;
-
-    console.log('🔗 [GlobalNavigator] 设置全局来电监听');
-    const unsubscribe = subscribeToIncomingCalls(handleIncomingCall);
-
-    return () => {
-      console.log('🧹 [GlobalNavigator] 清理全局来电监听');
-      unsubscribe();
-    };
-  }, [userInfo, subscribeToIncomingCalls]);
-
-  // 监听通话相关事件
-  useEffect(() => {
-    if (!socket || !userInfo) return;
-
-    console.log('🔗 [GlobalNavigator] 设置通话状态监听');
-    
-    socket.on('call_rejected', handleCallRejected);
-    socket.on('call_ended', handleCallEnded);
-
-    return () => {
-      console.log('🧹 [GlobalNavigator] 清理通话状态监听');
-      socket.off('call_rejected', handleCallRejected);
-      socket.off('call_ended', handleCallEnded);
-    };
-  }, [socket, userInfo, handleCallRejected, handleCallEnded]);
-
-  // 渲染全局来电界面
-  if (isIncomingCall && incomingCallInfo) {
-    return (
-      <IncomingCallScreen
-        contactName={incomingCallInfo.callerName || '未知联系人'}
-        contactAvatar={incomingCallInfo.callerAvatar}
-        onAccept={handleAcceptCall}
-        onReject={handleRejectCall}
-      />
-    );
-  }
-
-  return null;
+// 平台特定的来电管理组件（替换原有的GlobalIncomingCallManager）
+const PlatformIncomingCallManager: React.FC = () => {
+  return <PlatformCallManager />;
 };
 
 // 创建导航引用（React Navigation v7 标准方式）
@@ -383,7 +223,7 @@ const AppNavigator = () => {
         />
       </Stack.Navigator>
       {/* 全局来电管理器 */}
-      <GlobalIncomingCallManager />
+      <PlatformIncomingCallManager />
       {/* 全局悬浮窗管理器 */}
       <GlobalFloatingCallManager />
     </NavigationContainer>
