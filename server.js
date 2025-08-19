@@ -112,7 +112,7 @@ app.get('/api/webrtc/ice-config', protect, (req, res) => {
         iceServers: staticIceServers, 
         ttl: 0, 
         mode: 'static',
-        iceTransportPolicy: 'relay',  // 强制使用 TURN 中继
+        iceTransportPolicy: 'all',  // 允许直连和中继，自动选择最优路径
         iceCandidatePoolSize: 10
       });
     }
@@ -136,13 +136,13 @@ app.get('/api/webrtc/ice-config', protect, (req, res) => {
       urls.push(`turns:${turnHostname}:443?transport=tcp`);
     }
 
-    // 强制使用 TURN 中继，解决 iOS 穿透问题
+    // 提供 TURN 中继选项，让客户端自动选择最优路径
     const iceServers = [{ urls, username, credential }];
     res.json({ 
       iceServers, 
       ttl: ttlSeconds, 
       mode: 'temporary',
-      iceTransportPolicy: 'relay',  // 强制使用 TURN 中继
+      iceTransportPolicy: 'all',  // 允许直连和中继，自动选择最优路径
       iceCandidatePoolSize: 10
     });
   } catch (err) {

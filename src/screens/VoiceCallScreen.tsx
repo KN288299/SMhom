@@ -799,7 +799,10 @@ const VoiceCallScreen: React.FC = () => {
       // 兜底静态配置（当后端未配置use-auth-secret时亦会返回静态配置）
       if (!fetchedIceServers || fetchedIceServers.length === 0) {
         fetchedIceServers = [
+          // 多个STUN服务器提高连接成功率
           { urls: ['stun:38.207.178.173:3478'] },
+          { urls: ['stun:stun.l.google.com:19302'] },
+          { urls: ['stun:stun1.l.google.com:19302'] },
           {
             urls: [
               'turn:38.207.178.173:3478?transport=udp',
@@ -812,23 +815,37 @@ const VoiceCallScreen: React.FC = () => {
         ];
       }
 
-      // iOS 优化：仅保留 TCP/TLS 路径，优先 443；Android 保留 UDP+TCP
+      // iOS 优化：保留更多传输选项，WiFi下优先UDP，蜂窝网络下优先TCP
       let effectiveIceServers = fetchedIceServers;
       if (Platform.OS === 'ios') {
+        // 保留所有STUN服务器和TURN服务器，但优先排序
         effectiveIceServers = fetchedIceServers.map((srv) => {
           if (!srv.urls) return srv;
           const urls = Array.isArray(srv.urls) ? srv.urls : [srv.urls];
-          const filtered = urls.filter((u: string) =>
-            /turns?:.*:(443|3478)\?transport=tcp$/i.test(u) || /^stun:/i.test(u)
-          );
-          return { ...srv, urls: filtered };
+          
+          // 对于STUN服务器，保持不变
+          if (urls.some((u: string) => u.startsWith('stun:'))) {
+            return srv;
+          }
+          
+          // 对于TURN服务器，重新排序：UDP优先（WiFi友好），然后TCP
+          const reordered = [
+            ...urls.filter((u: string) => u.includes('transport=udp')),
+            ...urls.filter((u: string) => u.includes('transport=tcp')),
+            ...urls.filter((u: string) => !u.includes('transport='))
+          ];
+          
+          return { ...srv, urls: reordered };
         });
       }
 
-      // iOS下强制走TURN中继，避免蜂窝网络直连失败阻塞
+      // iOS下使用'all'策略，允许直连和中继，让WebRTC自动选择最优路径
       const rtcConfig = {
         iceServers: effectiveIceServers,
-        iceTransportPolicy: (Platform.OS === 'ios' ? 'relay' : 'all') as 'relay' | 'all',
+        iceTransportPolicy: 'all' as 'relay' | 'all',
+        iceCandidatePoolSize: 10,
+        bundlePolicy: 'balanced' as 'balanced' | 'max-compat' | 'max-bundle',
+        rtcpMuxPolicy: 'require' as 'negotiate' | 'require',
       };
 
     console.log('创建RTCPeerConnection...');
