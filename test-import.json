@@ -1,0 +1,22 @@
+[
+  {
+    "name": "测试员工1",
+    "age": 25,
+    "job": "服务员",
+    "province": "北京市",
+    "height": 165,
+    "weight": 50,
+    "description": "测试员工描述",
+    "tag": "可预约"
+  },
+  {
+    "name": "测试员工2", 
+    "age": 28,
+    "job": "技师",
+    "province": "上海市",
+    "height": 170,
+    "weight": 55,
+    "description": "另一个测试员工",
+    "tag": "可预约"
+  }
+]

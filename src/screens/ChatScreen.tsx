@@ -1209,8 +1209,8 @@ const ChatScreen: React.FC = () => {
           setShowVideoPreview(true);
         } else {
           // 检查图片大小限制
-          if (selectedAsset.fileSize && selectedAsset.fileSize > 5 * 1024 * 1024) { // 5MB
-            Alert.alert('文件过大', '图片文件大小不能超过5MB');
+          if (selectedAsset.fileSize && selectedAsset.fileSize > 50 * 1024 * 1024) { // 50MB
+            Alert.alert('文件过大', '图片文件大小不能超过50MB');
             return;
           }
           

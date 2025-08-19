@@ -249,7 +249,7 @@ const audioStorage = multer.diskStorage({
 
 const audioUpload = multer({ 
   storage: audioStorage,
-  limits: { fileSize: 10 * 1024 * 1024 } // 限制10MB
+  limits: { fileSize: 50 * 1024 * 1024 } // 限制50MB
 });
 
 // 添加图片文件上传路由
@@ -272,7 +272,7 @@ const imageStorage = multer.diskStorage({
 
 const imageUpload = multer({ 
   storage: imageStorage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 限制5MB
+  limits: { fileSize: 50 * 1024 * 1024 }, // 限制50MB
   fileFilter: function (req, file, cb) {
     // 检查文件类型
     if (file.mimetype.startsWith('image/')) {

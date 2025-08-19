@@ -40,7 +40,7 @@ const audioStorage = multer.diskStorage({
 // 创建上传中间件 - 扩展音频格式支持
 const uploadAudio = multer({ 
   storage: audioStorage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 限制10MB
+  limits: { fileSize: 50 * 1024 * 1024 }, // 限制50MB
   fileFilter: function(req, file, cb) {
     // 支持更多音频格式，特别是iOS的m4a格式
     const supportedMimeTypes = [

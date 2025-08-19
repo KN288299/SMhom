@@ -195,71 +195,15 @@ export const staffAPI = {
     return response.data.imageUrl;
   },
 
-  // 导出所有员工数据
-  exportAllStaff: async () => {
-    const response = await axios.get(`${SERVER_BASE_URL}/api/admin/staff/export`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('adminToken')}`
-      },
-      responseType: 'blob' // 重要：设置响应类型为blob以处理ZIP文件
-    });
-    return response;
-  },
 
-  // 导入员工数据
-  importStaff: async (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    const response = await uploadApi.post('/admin/staff/import', formData, {
-      timeout: 1200000, // 20分钟超时
-      maxContentLength: 500 * 1024 * 1024, // 500MB
-      maxBodyLength: 500 * 1024 * 1024, // 500MB
-      onUploadProgress: (progressEvent) => {
-        // 可以用于显示上传进度
-        console.log('Upload progress:', progressEvent);
-      }
-    });
-    return response.data;
-  },
 
-  // 分批导入 - 准备阶段
-  prepareBatchImport: async (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    const response = await uploadApi.post('/admin/staff/batch-import/prepare', formData, {
-      timeout: 600000, // 10分钟超时
-      maxContentLength: 500 * 1024 * 1024, // 500MB
-      maxBodyLength: 500 * 1024 * 1024, // 500MB
-    });
-    return response.data;
-  },
 
-  // 分批导入 - 执行单批次
-  executeBatchImport: async (batchId: string, batchNumber: number) => {
-    const response = await axios.post(`${SERVER_BASE_URL}/api/admin/staff/batch-import/execute`, {
-      batchId,
-      batchNumber
-    }, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('adminToken')}`
-      },
-      timeout: 300000, // 5分钟超时
-    });
-    return response.data;
-  },
 
-  // 分批导入 - 清理临时文件
-  cleanupBatchImport: async (batchId: string) => {
-    const response = await axios.delete(`${SERVER_BASE_URL}/api/admin/staff/batch-import/cleanup`, {
-      data: { batchId },
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('adminToken')}`
-      }
-    });
-    return response.data;
-  },
+
+
+
+
+
 
   // 获取批量删除预览
   getDeletePreview: async (batchSize: number, filters?: { search?: string; province?: string }) => {

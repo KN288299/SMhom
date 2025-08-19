@@ -27,7 +27,7 @@ const storage = multer.diskStorage({
 // 配置 multer
 const upload = multer({ 
   storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB限制
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB限制
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Button, Modal, Form, Input, Upload, InputNumber, message, Space, Image, Tabs, Select, Card, Row, Col, Progress, Divider, Alert, Statistic } from 'antd';
-import { PlusOutlined, UploadOutlined, FilterOutlined, ReloadOutlined, DownloadOutlined, ImportOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PlusOutlined, FilterOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons';
 import Layout from '../components/Layout';
 import type { RcFile, UploadProps } from 'antd/es/upload';
 import type { UploadFile } from 'antd/es/upload/interface';
@@ -55,27 +55,7 @@ const StaffManagement: React.FC = () => {
     showTotal: (total: number, range: [number, number]) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`,
   });
   
-  // 导入导出相关状态
-  const [exportLoading, setExportLoading] = useState(false);
-  const [importLoading, setImportLoading] = useState(false);
-  const [importModalVisible, setImportModalVisible] = useState(false);
-  const [importProgress, setImportProgress] = useState(0);
-  const [importResults, setImportResults] = useState<any>(null);
 
-  // 分批导入相关状态
-  const [batchImportMode, setBatchImportMode] = useState(false);
-  const [batchInfo, setBatchInfo] = useState<any>(null);
-  const [batchProgress, setBatchProgress] = useState<{
-    completed: number;
-    total: number;
-    currentBatch: number;
-    results: Array<{
-      batchNumber: number;
-      success: number;
-      failed: number;
-      errors: string[];
-    }>;
-  } | null>(null);
 
   // 批量删除相关状态
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -367,277 +347,17 @@ const StaffManagement: React.FC = () => {
     setPhotoList([...fileList]);
   };
 
-  // 处理导出员工数据
-  const handleExportStaff = async () => {
-    try {
-      setExportLoading(true);
-      message.loading('正在导出员工数据...', 0);
-      
-      const response = await staffAPI.exportAllStaff();
-      
-      // 创建下载链接
-      const blob = new Blob([response.data], { type: 'application/zip' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `员工数据导出-${new Date().toISOString().split('T')[0]}.zip`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
-      message.destroy();
-      message.success('员工数据导出成功！');
-    } catch (error: any) {
-      console.error('导出员工数据失败:', error);
-      console.error('错误详情:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message
-      });
-      
-      message.destroy();
-      
-      let errorMessage = '导出失败';
-      if (error.response?.status === 400) {
-        errorMessage = '请求错误：' + (error.response?.data?.message || '无效的请求参数');
-      } else if (error.response?.status === 404) {
-        errorMessage = '没有找到员工数据';
-      } else if (error.response?.status === 500) {
-        errorMessage = '服务器错误：' + (error.response?.data?.message || '内部服务器错误');
-      } else if (error.message) {
-        errorMessage = '网络错误：' + error.message;
-      }
-      
-      message.error(errorMessage);
-    } finally {
-      setExportLoading(false);
-    }
-  };
 
-  // 处理导入员工数据（智能检测是否需要分批）
-  const handleImportStaff = async (file: File) => {
-    try {
-      setImportLoading(true);
-      setImportProgress(20);
-      
-      const response = await staffAPI.importStaff(file);
-      
-      // 检查是否建议分批导入
-      if (response.suggestBatchImport) {
-        setImportProgress(0);
-        setImportLoading(false);
-        
-        // 显示分批导入选项
-        Modal.confirm({
-          title: '检测到大量数据',
-          content: (
-            <div>
-              <p>您的文件包含 <strong>{response.totalCount}</strong> 个员工数据</p>
-              <p>为确保导入成功，建议使用分批导入功能：</p>
-              <ul>
-                <li>每批处理 {response.batchRecommendation?.recommendedBatchSize} 个员工</li>
-                <li>总共需要 {response.batchRecommendation?.estimatedBatches} 个批次</li>
-                <li>支持断点续传，失败批次可重试</li>
-              </ul>
-            </div>
-          ),
-          okText: '使用分批导入',
-          cancelText: '取消',
-          onOk: () => handleStartBatchImport(file),
-        });
-        return;
-      }
-      
-      setImportProgress(100);
-      setImportResults(response.results);
-      
-      if (response.results.success > 0) {
-        message.success(`导入完成！成功 ${response.results.success} 条，失败 ${response.results.failed} 条`);
-        fetchStaffList(1); // 刷新员工列表
-      } else {
-        message.warning('没有成功导入任何员工数据');
-      }
-      
-    } catch (error: any) {
-      console.error('导入员工数据失败:', error);
-      setImportProgress(0);
-      
-      // 针对413错误提供具体的解决方案
-      if (error.response?.status === 413) {
-        message.error('文件过大！请确保文件小于500MB，或考虑分批导入员工数据。');
-      } else if (error.response?.status === 400) {
-        message.error('文件格式错误：' + (error.response?.data?.message || '请检查文件格式'));
-      } else if (error.response?.status === 500) {
-        message.error('服务器处理文件时出错，请稍后重试或联系管理员');
-      } else {
-        message.error('导入失败：' + (error.response?.data?.message || error.message));
-      }
-    } finally {
-      setImportLoading(false);
-    }
-  };
 
-  // 开始分批导入
-  const handleStartBatchImport = async (file: File) => {
-    try {
-      setImportLoading(true);
-      setBatchImportMode(true);
-      setImportProgress(10);
-      
-      // 准备分批导入
-      const response = await staffAPI.prepareBatchImport(file);
-      setBatchInfo(response.batchInfo);
-      
-      // 初始化批次进度
-      setBatchProgress({
-        completed: 0,
-        total: response.batchInfo.totalBatches,
-        currentBatch: 1,
-        results: []
-      });
-      
-      setImportProgress(20);
-      message.success(`文件准备完成，开始分批导入 ${response.batchInfo.totalStaff} 个员工`);
-      
-      // 开始执行批次导入
-      await executeBatchImport(response.batchInfo);
-      
-    } catch (error: any) {
-      console.error('准备分批导入失败:', error);
-      message.error('准备分批导入失败：' + (error.response?.data?.message || error.message));
-      setBatchImportMode(false);
-      setImportLoading(false);
-    }
-  };
 
-  // 执行分批导入
-  const executeBatchImport = async (batchInfo: any) => {
-    const { batchId, totalBatches } = batchInfo;
-    
-    for (let batchNumber = 1; batchNumber <= totalBatches; batchNumber++) {
-      try {
-        // 更新当前批次
-        setBatchProgress(prev => ({
-          ...prev!,
-          currentBatch: batchNumber
-        }));
-        
-        setImportProgress(20 + (batchNumber - 1) / totalBatches * 70);
-        
-        // 执行当前批次
-        const result = await staffAPI.executeBatchImport(batchId, batchNumber);
-        
-        // 更新批次结果
-        setBatchProgress(prev => ({
-          ...prev!,
-          completed: batchNumber,
-          results: [...prev!.results, {
-            batchNumber,
-            success: result.results.success,
-            failed: result.results.failed,
-            errors: result.results.errors
-          }]
-        }));
-        
-        console.log(`批次 ${batchNumber}/${totalBatches} 完成:`, result);
-        
-      } catch (error: any) {
-        console.error(`批次 ${batchNumber} 失败:`, error);
-        
-        // 记录失败的批次
-        setBatchProgress(prev => ({
-          ...prev!,
-          results: [...prev!.results, {
-            batchNumber,
-            success: 0,
-            failed: 0,
-            errors: [`批次 ${batchNumber} 执行失败: ${error.message}`]
-          }]
-        }));
-        
-        // 询问是否继续
-        const shouldContinue = await new Promise<boolean>((resolve) => {
-          Modal.confirm({
-            title: `批次 ${batchNumber} 导入失败`,
-            content: `错误：${error.response?.data?.message || error.message}\n\n是否继续导入剩余批次？`,
-            okText: '继续导入',
-            cancelText: '停止导入',
-            onOk: () => resolve(true),
-            onCancel: () => resolve(false),
-          });
-        });
-        
-        if (!shouldContinue) {
-          break;
-        }
-      }
-    }
-    
-    // 导入完成
-    setImportProgress(100);
-    setImportLoading(false);
-    
-    // 计算总结果
-    const allResults = batchProgress?.results || [];
-    const totalSuccess = allResults.reduce((sum, r) => sum + r.success, 0);
-    const totalFailed = allResults.reduce((sum, r) => sum + r.failed, 0);
-    const allErrors = allResults.flatMap(r => r.errors);
-    
-    setImportResults({
-      success: totalSuccess,
-      failed: totalFailed,
-      errors: allErrors,
-      batchSummary: allResults
-    });
-    
-    message.success(`分批导入完成！总计成功 ${totalSuccess} 条，失败 ${totalFailed} 条`);
-    
-    // 清理临时文件
-    try {
-      await staffAPI.cleanupBatchImport(batchId);
-    } catch (error) {
-      console.warn('清理临时文件失败:', error);
-    }
-    
-    // 刷新员工列表
-    fetchStaffList(1);
-  };
 
-  // 处理导入文件选择
-  const handleImportFileChange = (info: any) => {
-    const { status } = info.file;
-    
-    if (status === 'done') {
-      handleImportStaff(info.file.originFileObj);
-    } else if (status === 'error') {
-      message.error(`${info.file.name} 文件上传失败`);
-    }
-  };
 
-  // 导入文件验证
-  const beforeImportUpload = (file: File) => {
-    const isValidFormat = file.type === 'application/json' || 
-                         file.type === 'application/zip' || 
-                         file.name.endsWith('.json') || 
-                         file.name.endsWith('.zip');
-    
-    if (!isValidFormat) {
-      message.error('只支持 JSON 或 ZIP 格式的文件！');
-      return false;
-    }
-    
-    // 添加文件大小限制，防止413错误
-    const maxSize = 500; // 500MB
-    const isLtMaxSize = file.size / 1024 / 1024 < maxSize;
-    if (!isLtMaxSize) {
-      message.error(`文件大小不能超过 ${maxSize}MB！请压缩文件或分批导入。`);
-      return false;
-    }
-    
-    return true;
-  };
+
+
+
+
+
+
 
   // 获取批量删除预览
   const handleGetDeletePreview = async () => {
@@ -904,40 +624,14 @@ const StaffManagement: React.FC = () => {
         <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>员工管理</h2>
           <Space>
-            <Upload
-              accept=".json,.zip"
-              beforeUpload={beforeImportUpload}
-              onChange={handleImportFileChange}
-              showUploadList={false}
-              customRequest={({ onSuccess }) => {
-                onSuccess && onSuccess('ok');
-              }}
-            >
-              <Button 
-                icon={<UploadOutlined />} 
-                loading={importLoading}
-                disabled={exportLoading || deleteLoading}
-                title="支持JSON/ZIP格式，文件大小限制500MB"
-              >
-                导入员工
-              </Button>
-            </Upload>
-            
-            <Button 
-              icon={<DownloadOutlined />} 
-              onClick={handleExportStaff}
-              loading={exportLoading}
-              disabled={importLoading || deleteLoading}
-            >
-              导出员工
-            </Button>
+
             
             <Button 
               danger
               icon={<DeleteOutlined />}
               onClick={handleGetDeletePreview}
               loading={deleteLoading}
-              disabled={importLoading || exportLoading || !staffList.length}
+              disabled={deleteLoading || !staffList.length}
             >
               批量删除
             </Button>
@@ -948,15 +642,7 @@ const StaffManagement: React.FC = () => {
           </Space>
         </div>
 
-        {/* 添加文件上传提示 */}
-        <Alert
-          message="文件上传要求"
-          description="导入支持JSON或ZIP格式文件，单个文件大小不超过500MB。支持大型压缩包包含大量员工数据。"
-          type="info"
-          showIcon
-          style={{ marginBottom: '16px' }}
-          closable
-        />
+
 
         {/* 添加筛选区域 */}
         <Card style={{ marginBottom: 16 }}>
@@ -1020,158 +706,7 @@ const StaffManagement: React.FC = () => {
           {modalContent}
         </Modal>
 
-        {/* 导入进度Modal */}
-        <Modal
-          title={batchImportMode ? "分批导入员工数据" : "导入员工数据"}
-          open={importLoading}
-          footer={null}
-          closable={false}
-          centered
-          width={batchImportMode ? 600 : 400}
-        >
-          <div style={{ padding: '20px 0' }}>
-            {/* 总体进度 */}
-            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-              <Progress 
-                percent={importProgress} 
-                status={importProgress === 100 ? 'success' : 'active'}
-                strokeColor={{
-                  '0%': '#108ee9',
-                  '100%': '#87d068',
-                }}
-              />
-              <p style={{ marginTop: '16px', color: '#666' }}>
-                {batchImportMode ? '正在分批导入员工数据，请稍候...' : '正在导入员工数据，请稍候...'}
-              </p>
-            </div>
 
-            {/* 分批导入详细进度 */}
-            {batchImportMode && batchProgress && (
-              <div>
-                <Divider>批次进度详情</Divider>
-                
-                {/* 当前批次信息 */}
-                <Row gutter={16} style={{ marginBottom: '16px' }}>
-                  <Col span={8}>
-                    <Card size="small">
-                      <Statistic 
-                        title="当前批次" 
-                        value={batchProgress.currentBatch} 
-                        suffix={`/ ${batchProgress.total}`}
-                      />
-                    </Card>
-                  </Col>
-                  <Col span={8}>
-                    <Card size="small">
-                      <Statistic 
-                        title="已完成" 
-                        value={batchProgress.completed}
-                        suffix={`批次`}
-                      />
-                    </Card>
-                  </Col>
-                  <Col span={8}>
-                    <Card size="small">
-                      <Statistic 
-                        title="总员工数" 
-                        value={batchInfo?.totalStaff || 0}
-                      />
-                    </Card>
-                  </Col>
-                </Row>
-
-                {/* 批次详细结果 */}
-                {batchProgress.results.length > 0 && (
-                  <div>
-                    <h4>批次结果：</h4>
-                    <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                      {batchProgress.results.map((result, index) => (
-                        <div key={index} style={{ 
-                          marginBottom: '8px', 
-                          padding: '8px', 
-                          backgroundColor: result.failed > 0 ? '#fff2f0' : '#f6ffed',
-                          border: `1px solid ${result.failed > 0 ? '#ffccc7' : '#d9f7be'}`,
-                          borderRadius: '4px'
-                        }}>
-                          <span>
-                            批次 {result.batchNumber}: 
-                            成功 <strong style={{ color: '#52c41a' }}>{result.success}</strong> 条
-                            {result.failed > 0 && (
-                              <span>, 失败 <strong style={{ color: '#ff4d4f' }}>{result.failed}</strong> 条</span>
-                            )}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </Modal>
-
-        {/* 导入结果Modal */}
-        {importResults && (
-          <Modal
-            title="导入结果"
-            open={!!importResults}
-            onOk={() => {
-              setImportResults(null);
-              setBatchImportMode(false);
-              setBatchInfo(null);
-              setBatchProgress(null);
-            }}
-            onCancel={() => {
-              setImportResults(null);
-              setBatchImportMode(false);
-              setBatchInfo(null);
-              setBatchProgress(null);
-            }}
-            width={600}
-          >
-            <div style={{ padding: '16px 0' }}>
-              <Row gutter={16}>
-                <Col span={8}>
-                  <Statistic 
-                    title="成功导入" 
-                    value={importResults.success} 
-                    valueStyle={{ color: '#3f8600' }}
-                    suffix="条"
-                  />
-                </Col>
-                <Col span={8}>
-                  <Statistic 
-                    title="导入失败" 
-                    value={importResults.failed} 
-                    valueStyle={{ color: '#cf1322' }}
-                    suffix="条"
-                  />
-                </Col>
-                <Col span={8}>
-                  <Statistic 
-                    title="跳过重复" 
-                    value={importResults.skipped || 0} 
-                    valueStyle={{ color: '#fa8c16' }}
-                    suffix="条"
-                  />
-                </Col>
-              </Row>
-              
-              {importResults.errors && importResults.errors.length > 0 && (
-                <div style={{ marginTop: '20px' }}>
-                  <h4>错误详情：</h4>
-                  <div style={{ maxHeight: '200px', overflow: 'auto', backgroundColor: '#f5f5f5', padding: '8px', borderRadius: '4px' }}>
-                    {importResults.errors.map((error: string, index: number) => (
-                      <div key={index} style={{ marginBottom: '4px', fontSize: '12px' }}>
-                        {error}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </Modal>
-        )}
 
         {/* 批量删除确认Modal */}
         <Modal

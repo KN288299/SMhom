@@ -5,13 +5,11 @@ const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
 const sharp = require('sharp');
-const archiver = require('archiver');
-const AdmZip = require('adm-zip');
 const Staff = require('../models/staffModel');
 const mongoose = require('mongoose');
 
 // 确保上传目录存在
-const uploadDir = path.join(__dirname, '../../uploads/employees');
+const uploadDir = path.join(__dirname, '../../uploads/images');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -43,7 +41,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({ 
   storage: storage,
   fileFilter: fileFilter,
-  limits: { fileSize: 20 * 1024 * 1024 } // 20MB限制
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB限制
 });
 
 // 多文件上传配置
@@ -52,650 +50,330 @@ const multiUpload = upload.fields([
   { name: 'photos', maxCount: 10 }
 ]);
 
-// 数据导入专用multer配置（无文件大小限制）
-const importUpload = multer({
-  dest: 'uploads/temp/',
-  // 移除文件大小限制，支持大型员工数据导入
-  fileFilter: (req, file, cb) => {
-    // 只允许JSON和ZIP文件
-    const allowedTypes = [
-      'application/json',
-      'application/zip', 
-      'application/x-zip-compressed',
-      'text/json'
-    ];
-    const allowedExtensions = ['.json', '.zip'];
+// 压缩图片的辅助函数
+const compressImage = async (inputPath, outputPath, options = {}) => {
+  try {
+    const { width = 800, quality = 80 } = options;
     
-    const isAllowedType = allowedTypes.includes(file.mimetype);
-    const isAllowedExt = allowedExtensions.some(ext => 
-      file.originalname.toLowerCase().endsWith(ext)
-    );
+    await sharp(inputPath)
+      .resize(width, null, { 
+        withoutEnlargement: true,
+        fit: 'inside'
+      })
+      .jpeg({ quality })
+      .toFile(outputPath);
     
-    if (isAllowedType || isAllowedExt) {
-      cb(null, true);
-    } else {
-      cb(new Error('只支持JSON或ZIP格式的文件！'), false);
+    // 删除原始文件
+    if (fs.existsSync(inputPath)) {
+      fs.unlinkSync(inputPath);
     }
+    
+    return outputPath;
+  } catch (error) {
+    console.error('图片压缩失败:', error);
+    // 如果压缩失败，返回原始路径
+    return inputPath;
   }
-});
+};
 
 /**
  * @route   GET /api/staff
- * @desc    获取所有员工数据，支持分页、搜索和过滤
+ * @desc    获取所有员工（支持分页和筛选）
  * @access  Public
  */
 router.get('/', async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '', isActive, province, job, age } = req.query;
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      province = '',
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
-    
+    const skip = (pageNum - 1) * limitNum;
+
     // 构建查询条件
-    const filter = {};
+    const filter = { isActive: true };
     
-    // 如果提供了isActive参数，添加到查询条件
-    if (isActive !== undefined) {
-      filter.isActive = isActive === 'true';
-    } else {
-      filter.isActive = true; // 默认只返回活跃员工
-    }
-    
-    // 如果提供了省份参数，添加到查询条件
     if (province) {
       filter.province = province;
     }
     
-    // 如果提供了职业参数，添加精确职业搜索
-    if (job) {
-      filter.job = { $regex: new RegExp(job, 'i') };
-    }
-    
-    // 如果提供了年龄参数，精确匹配年龄
-    if (age) {
-      const ageNum = parseInt(age);
-      if (!isNaN(ageNum)) {
-        filter.age = ageNum;
-      }
-    }
-    
-    // 如果有搜索关键字，添加到查询条件（优先级低于具体字段搜索）
-    if (search && !job && !age) {
+    if (search) {
       filter.$or = [
         { name: { $regex: new RegExp(search, 'i') } },
-        { job: { $regex: new RegExp(search, 'i') } },
-        { description: { $regex: new RegExp(search, 'i') } }
+        { job: { $regex: new RegExp(search, 'i') } }
       ];
-    } else if (search) {
-      // 如果有搜索关键词但同时也有具体字段搜索，则仅搜索姓名
-      filter.name = { $regex: new RegExp(search, 'i') };
     }
-    
-    console.log('查询筛选条件:', filter);
-    
-    // 计算总数量和分页
+
+    // 构建排序条件
+    const sort = {};
+    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    // 获取员工数据
+    const staff = await Staff.find(filter)
+      .sort(sort)
+      .skip(skip)
+      .limit(limitNum)
+      .select('-__v');
+
+    // 获取总数
     const total = await Staff.countDocuments(filter);
-    const staffMembers = await Staff.find(filter)
-      .sort({ createdAt: -1 })
-      .skip((pageNum - 1) * limitNum)
-      .limit(limitNum);
-    
-    console.log(`找到 ${staffMembers.length} 名符合条件的员工`);
-    
+
     res.json({
-      data: staffMembers,
-      meta: {
-        page: pageNum,
-        limit: limitNum,
+      staff,
+      pagination: {
+        current: pageNum,
+        pageSize: limitNum,
         total,
-        totalPages: Math.ceil(total / limitNum)
+        pages: Math.ceil(total / limitNum)
       }
     });
   } catch (error) {
-    console.error('获取员工数据出错:', error);
-    res.status(500).json({ message: '服务器错误' });
+    console.error('获取员工列表失败:', error);
+    res.status(500).json({ message: '获取员工列表失败', error: error.message });
   }
 });
 
 /**
  * @route   GET /api/staff/:id
- * @desc    获取单个员工详细信息
+ * @desc    获取单个员工详情
  * @access  Public
  */
 router.get('/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-    
-    console.log(`请求获取员工ID: ${id}`);
-    
-    // 验证ID是否为合法的MongoDB ObjectId
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      console.log(`无效的员工ID格式: ${id}`);
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: '无效的员工ID格式' });
     }
+
+    const staff = await Staff.findById(req.params.id).select('-__v');
     
-    const staff = await Staff.findById(id);
-    if (!staff) {
-      console.log(`未找到员工，ID: ${id}`);
+    if (!staff || !staff.isActive) {
       return res.status(404).json({ message: '员工不存在' });
     }
-    
-    console.log(`成功获取员工: ${staff.name}`);
+
     res.json(staff);
   } catch (error) {
-    console.error('获取员工详情出错:', error);
-    res.status(500).json({ message: '服务器错误', error: error.message });
-  }
-});
-
-/**
- * @route   POST /api/staff/upload-image
- * @desc    上传员工图片
- * @access  Admin
- */
-router.post('/upload-image', upload.single('image'), (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: '请提供图片文件' });
-    }
-
-    // 构建访问URL
-    const imageUrl = `/uploads/employees/${req.file.filename}`;
-
-    res.status(201).json({ 
-      message: '图片上传成功',
-      imageUrl
-    });
-  } catch (error) {
-    console.error('上传图片出错:', error);
-    res.status(500).json({ message: '服务器错误' });
+    console.error('获取员工详情失败:', error);
+    res.status(500).json({ message: '获取员工详情失败', error: error.message });
   }
 });
 
 /**
  * @route   POST /api/staff
- * @desc    添加新员工
- * @access  Admin
+ * @desc    创建新员工
+ * @access  Private (需要认证)
  */
-router.post('/', multiUpload, async (req, res) => {
+router.post('/', authMiddleware, multiUpload, async (req, res) => {
   try {
-    const { 
-      name, age, job, province = '北京市',
-      height = 165, weight = 50, 
-      description = '', tag = '可预约' 
-    } = req.body;
+    const { name, age, job, province, height, weight, description, tag } = req.body;
 
     // 验证必填字段
     if (!name || !age || !job) {
-      return res.status(400).json({ message: '请提供员工基本信息（姓名、年龄、职业）' });
+      return res.status(400).json({ message: '姓名、年龄和职业为必填项' });
     }
 
-    let imageUrl = 'https://via.placeholder.com/150'; // 默认图片
-
-    // 如果有上传主图
-    if (req.files && req.files.image && req.files.image.length > 0) {
-      // 构建访问URL
-      imageUrl = `/uploads/employees/${req.files.image[0].filename}`;
+    // 检查员工是否已存在
+    const existingStaff = await Staff.findOne({ name, isActive: true });
+    if (existingStaff) {
+      return res.status(400).json({ message: '该员工已存在' });
     }
 
-    // 处理多张照片
-    const photoUrls = [];
-    if (req.files && req.files.photos && req.files.photos.length > 0) {
-      req.files.photos.forEach(photo => {
-        photoUrls.push(`/uploads/employees/${photo.filename}`);
-      });
+    // 处理主头像
+    let imageUrl = 'https://via.placeholder.com/150';
+    if (req.files && req.files.image && req.files.image[0]) {
+      const imageFile = req.files.image[0];
+      const compressedImagePath = path.join(uploadDir, `compressed-${imageFile.filename}`);
+      
+      try {
+        await compressImage(imageFile.path, compressedImagePath, { width: 400, quality: 80 });
+        imageUrl = `/uploads/images/${path.basename(compressedImagePath)}`;
+      } catch (error) {
+        console.error('图片压缩失败:', error);
+        imageUrl = `/uploads/images/${imageFile.filename}`;
+      }
     }
 
-    // 创建新员工
-    const newStaff = new Staff({
+    // 处理照片集
+    let photoUrls = [];
+    if (req.files && req.files.photos) {
+      for (const photo of req.files.photos) {
+        const compressedPhotoPath = path.join(uploadDir, `compressed-${photo.filename}`);
+        
+        try {
+          await compressImage(photo.path, compressedPhotoPath, { width: 800, quality: 85 });
+          photoUrls.push(`/uploads/images/${path.basename(compressedPhotoPath)}`);
+        } catch (error) {
+          console.error('照片压缩失败:', error);
+          photoUrls.push(`/uploads/images/${photo.filename}`);
+        }
+      }
+    }
+
+    // 创建员工记录
+    const staff = new Staff({
       name,
       age: parseInt(age),
       job,
       image: imageUrl,
-      province,
-      height: parseFloat(height),
-      weight: parseFloat(weight),
-      description,
+      province: province || '北京市',
+      height: parseFloat(height) || 165,
+      weight: parseFloat(weight) || 50,
+      description: description || '',
       photos: photoUrls,
-      tag
+      tag: tag || '可预约',
+      isActive: true
     });
 
-    // 保存到数据库
-    const savedStaff = await newStaff.save();
+    const savedStaff = await staff.save();
+    console.log(`✅ 成功创建员工: ${savedStaff.name}`);
 
     res.status(201).json(savedStaff);
   } catch (error) {
-    console.error('添加员工出错:', error);
-    res.status(500).json({ message: '服务器错误' });
+    console.error('创建员工失败:', error);
+    res.status(500).json({ message: '创建员工失败', error: error.message });
   }
 });
 
 /**
  * @route   PUT /api/staff/:id
  * @desc    更新员工信息
- * @access  Admin
+ * @access  Private (需要认证)
  */
-router.put('/:id', multiUpload, async (req, res) => {
+router.put('/:id', authMiddleware, multiUpload, async (req, res) => {
   try {
-    const { id } = req.params;
-    const { 
-      name, age, job, province,
-      height, weight, description, tag 
-    } = req.body;
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: '无效的员工ID格式' });
+    }
 
-    // 找到员工
-    const staff = await Staff.findById(id);
-    if (!staff) {
+    const staff = await Staff.findById(req.params.id);
+    
+    if (!staff || !staff.isActive) {
       return res.status(404).json({ message: '员工不存在' });
     }
 
-    let imageUrl = staff.image; // 保持原有图片
+    const { name, age, job, province, height, weight, description, tag } = req.body;
 
-    // 如果有上传新主图
-    if (req.files && req.files.image && req.files.image.length > 0) {
-      // 构建访问URL
-      imageUrl = `/uploads/employees/${req.files.image[0].filename}`;
+    // 更新基本信息
+    if (name) staff.name = name;
+    if (age) staff.age = parseInt(age);
+    if (job) staff.job = job;
+    if (province) staff.province = province;
+    if (height) staff.height = parseFloat(height);
+    if (weight) staff.weight = parseFloat(weight);
+    if (description !== undefined) staff.description = description;
+    if (tag) staff.tag = tag;
+
+    // 处理新的主头像
+    if (req.files && req.files.image && req.files.image[0]) {
+      const imageFile = req.files.image[0];
+      const compressedImagePath = path.join(uploadDir, `compressed-${imageFile.filename}`);
+      
+      try {
+        await compressImage(imageFile.path, compressedImagePath, { width: 400, quality: 80 });
+        staff.image = `/uploads/images/${path.basename(compressedImagePath)}`;
+      } catch (error) {
+        console.error('图片压缩失败:', error);
+        staff.image = `/uploads/images/${imageFile.filename}`;
+      }
     }
 
-    // 处理多张照片
-    let photoUrls = [...staff.photos]; // 保留原有照片
-    if (req.files && req.files.photos && req.files.photos.length > 0) {
-      // 如果客户端传了新的照片集，则替换原有照片
-      photoUrls = req.files.photos.map(photo => `/uploads/employees/${photo.filename}`);
+    // 处理新的照片集
+    if (req.files && req.files.photos) {
+      let newPhotoUrls = [];
+      for (const photo of req.files.photos) {
+        const compressedPhotoPath = path.join(uploadDir, `compressed-${photo.filename}`);
+        
+        try {
+          await compressImage(photo.path, compressedPhotoPath, { width: 800, quality: 85 });
+          newPhotoUrls.push(`/uploads/images/${path.basename(compressedPhotoPath)}`);
+        } catch (error) {
+          console.error('照片压缩失败:', error);
+          newPhotoUrls.push(`/uploads/images/${photo.filename}`);
+        }
+      }
+      staff.photos = newPhotoUrls;
     }
 
-    // 更新员工信息
-    staff.name = name || staff.name;
-    staff.age = age ? parseInt(age) : staff.age;
-    staff.job = job || staff.job;
-    staff.image = imageUrl;
-    staff.province = province !== undefined ? province : staff.province;
-    staff.height = height ? parseFloat(height) : staff.height;
-    staff.weight = weight ? parseFloat(weight) : staff.weight;
-    staff.description = description !== undefined ? description : staff.description;
-    staff.photos = photoUrls;
-    staff.tag = tag || staff.tag;
-
-    // 保存更新
     const updatedStaff = await staff.save();
+    console.log(`✅ 成功更新员工: ${updatedStaff.name}`);
 
     res.json(updatedStaff);
   } catch (error) {
-    console.error('更新员工信息出错:', error);
-    res.status(500).json({ message: '服务器错误' });
+    console.error('更新员工失败:', error);
+    res.status(500).json({ message: '更新员工失败', error: error.message });
   }
 });
 
 /**
  * @route   DELETE /api/staff/:id
- * @desc    删除员工
- * @access  Admin
+ * @desc    删除员工（软删除）
+ * @access  Private (需要认证)
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authMiddleware, async (req, res) => {
   try {
-    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: '无效的员工ID格式' });
+    }
 
-    // 找到员工
-    const staff = await Staff.findById(id);
-    if (!staff) {
+    const staff = await Staff.findById(req.params.id);
+    
+    if (!staff || !staff.isActive) {
       return res.status(404).json({ message: '员工不存在' });
     }
 
-    // 删除员工（软删除）
+    // 软删除：设置isActive为false
     staff.isActive = false;
+    staff.deletedAt = new Date();
+    
     await staff.save();
+    console.log(`✅ 成功删除员工: ${staff.name}`);
 
-    // 或者完全删除
-    // await Staff.findByIdAndDelete(id);
-
-    res.json({ message: '员工已删除' });
+    res.json({ message: '员工已删除', staff: staff });
   } catch (error) {
-    console.error('删除员工出错:', error);
-    res.status(500).json({ message: '服务器错误' });
+    console.error('删除员工失败:', error);
+    res.status(500).json({ message: '删除员工失败', error: error.message });
   }
 });
 
 /**
- * @route   GET /api/staff/export
- * @desc    导出所有员工数据（包含图片）
- * @access  Public
+ * @route   POST /api/staff/upload-image
+ * @desc    上传员工图片
+ * @access  Private (需要认证)
  */
-router.get('/export', async (req, res) => {
+router.post('/upload-image', authMiddleware, upload.single('image'), async (req, res) => {
   try {
-    console.log('📦 开始导出员工数据...');
-    
-    // 检查必要的模块
-    if (!archiver) {
-      console.error('❌ archiver模块未正确加载');
-      return res.status(500).json({ message: 'archiver模块未正确加载' });
-    }
-    
-    // 获取所有活跃员工
-    const staffMembers = await Staff.find({ isActive: true }).sort({ createdAt: -1 });
-    console.log(`📋 找到 ${staffMembers.length} 名员工`);
-
-    if (staffMembers.length === 0) {
-      console.log('⚠️ 没有找到员工数据');
-      return res.status(404).json({ message: '没有找到员工数据' });
-    }
-
-    console.log('📦 开始创建ZIP归档...');
-    const archive = archiver('zip', { zlib: { level: 9 } });
-    
-    // 添加错误处理
-    archive.on('error', (err) => {
-      console.error('📦 归档错误:', err);
-      throw err;
-    });
-    
-    archive.on('warning', (err) => {
-      console.warn('📦 归档警告:', err);
-    });
-    
-    // 设置响应头
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename=staff-export-${Date.now()}.zip`);
-    
-    // 将archive流连接到响应
-    archive.pipe(res);
-
-    // 准备员工数据JSON
-    const exportData = {
-      exportDate: new Date().toISOString(),
-      version: '1.0',
-      totalCount: staffMembers.length,
-      staff: staffMembers.map(staff => ({
-        name: staff.name,
-        age: staff.age,
-        job: staff.job,
-        province: staff.province,
-        height: staff.height,
-        weight: staff.weight,
-        description: staff.description,
-        tag: staff.tag,
-        image: staff.image,
-        photos: staff.photos || [],
-        createdAt: staff.createdAt,
-        updatedAt: staff.updatedAt
-      }))
-    };
-
-    // 添加JSON数据文件
-    archive.append(JSON.stringify(exportData, null, 2), { name: 'staff-data.json' });
-
-    // 创建images目录并添加图片文件
-    for (let i = 0; i < staffMembers.length; i++) {
-      const staff = staffMembers[i];
-      const staffId = staff._id.toString();
-      
-      // 处理主头像
-      if (staff.image && !staff.image.startsWith('http')) {
-        const imagePath = path.join(__dirname, '../../uploads/employees', path.basename(staff.image));
-        if (fs.existsSync(imagePath)) {
-          archive.file(imagePath, { name: `images/${staffId}/avatar${path.extname(staff.image)}` });
-        }
-      }
-      
-      // 处理照片集
-      if (staff.photos && staff.photos.length > 0) {
-        staff.photos.forEach((photo, index) => {
-          if (!photo.startsWith('http')) {
-            const photoPath = path.join(__dirname, '../../uploads/employees', path.basename(photo));
-            if (fs.existsSync(photoPath)) {
-              archive.file(photoPath, { name: `images/${staffId}/photo-${index}${path.extname(photo)}` });
-            }
-          }
-        });
-      }
-    }
-
-    // 完成归档
-    await archive.finalize();
-    console.log('✅ 员工数据导出完成');
-    
-  } catch (error) {
-    console.error('❌ 导出员工数据失败:', error);
-    console.error('❌ 错误详情:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    });
-    
-    // 确保响应没有被发送过
-    if (!res.headersSent) {
-      res.status(500).json({ 
-        message: '导出失败', 
-        error: error.message,
-        details: error.name
-      });
-    }
-  }
-});
-
-/**
- * @route   POST /api/staff/import
- * @desc    导入员工数据（无限制大小）
- * @access  Public
- */
-router.post('/import', importUpload.single('file'), async (req, res) => {
-  try {
-    console.log('📥 开始导入员工数据...');
-    
     if (!req.file) {
-      return res.status(400).json({ message: '请提供导入文件' });
+      return res.status(400).json({ message: '请选择要上传的图片' });
     }
 
-    const filePath = req.file.path;
-    const fileExt = path.extname(req.file.originalname).toLowerCase();
+    const compressedImagePath = path.join(uploadDir, `compressed-${req.file.filename}`);
     
-    let staffData = [];
-    let importResults = {
-      total: 0,
-      success: 0,
-      failed: 0,
-      errors: []
-    };
-
-    if (fileExt === '.json') {
-      // 处理JSON文件
-      const fileContent = fs.readFileSync(filePath, 'utf8');
-      const jsonData = JSON.parse(fileContent);
-      staffData = jsonData.staff || [jsonData]; // 支持单个对象或数组
+    try {
+      await compressImage(req.file.path, compressedImagePath, { width: 400, quality: 80 });
+      const imageUrl = `/uploads/images/${path.basename(compressedImagePath)}`;
       
-    } else if (fileExt === '.zip') {
-      // 处理ZIP文件
-      const zip = new AdmZip(filePath);
-      const zipEntries = zip.getEntries();
-      
-      // 查找JSON数据文件
-      const dataEntry = zipEntries.find(entry => entry.entryName === 'staff-data.json');
-      if (!dataEntry) {
-        return res.status(400).json({ message: 'ZIP文件中未找到staff-data.json数据文件' });
-      }
-      
-      const jsonContent = dataEntry.getData().toString('utf8');
-      const jsonData = JSON.parse(jsonContent);
-      staffData = jsonData.staff || [];
-      
-      // 提取图片文件
-      const imageEntries = zipEntries.filter(entry => entry.entryName.startsWith('images/'));
-      const tempImageDir = path.join(__dirname, '../../temp-import-images');
-      
-      if (!fs.existsSync(tempImageDir)) {
-        fs.mkdirSync(tempImageDir, { recursive: true });
-      }
-      
-      // 提取所有图片到临时目录
-      imageEntries.forEach(entry => {
-        const imagePath = path.join(tempImageDir, entry.entryName);
-        const imageDir = path.dirname(imagePath);
-        
-        if (!fs.existsSync(imageDir)) {
-          fs.mkdirSync(imageDir, { recursive: true });
-        }
-        
-        fs.writeFileSync(imagePath, entry.getData());
+      res.json({ 
+        message: '图片上传成功',
+        imageUrl: imageUrl
       });
+    } catch (error) {
+      console.error('图片压缩失败:', error);
+      const imageUrl = `/uploads/images/${req.file.filename}`;
       
-    } else {
-      return res.status(400).json({ message: '不支持的文件格式，请使用JSON或ZIP文件' });
+      res.json({ 
+        message: '图片上传成功（未压缩）',
+        imageUrl: imageUrl
+      });
     }
-
-    importResults.total = staffData.length;
-    console.log(`📊 准备导入 ${staffData.length} 名员工`);
-
-    // 批量导入员工数据
-    for (let i = 0; i < staffData.length; i++) {
-      try {
-        const staffInfo = staffData[i];
-        
-        // 验证必填字段
-        if (!staffInfo.name || !staffInfo.age || !staffInfo.job) {
-          importResults.failed++;
-          importResults.errors.push(`第${i+1}条记录：缺少必填字段（姓名、年龄、职业）`);
-          continue;
-        }
-
-        // 检查是否已存在同名员工
-        const existingStaff = await Staff.findOne({ 
-          name: staffInfo.name, 
-          isActive: true 
-        });
-        
-        if (existingStaff) {
-          importResults.failed++;
-          importResults.errors.push(`第${i+1}条记录：员工"${staffInfo.name}"已存在`);
-          continue;
-        }
-
-        // 处理图片文件
-        let imageUrl = 'https://via.placeholder.com/150';
-        let photoUrls = [];
-        
-        // 首先尝试从JSON数据中获取图片URL
-        if (staffInfo.image) {
-          // 如果JSON中包含图片URL，使用该URL
-          if (staffInfo.image.startsWith('http') || staffInfo.image.startsWith('/uploads/')) {
-            imageUrl = staffInfo.image;
-          } else if (staffInfo.image.startsWith('data:image/')) {
-            // 处理base64图片数据
-            try {
-              const base64Data = staffInfo.image.replace(/^data:image\/\w+;base64,/, '');
-              const buffer = Buffer.from(base64Data, 'base64');
-              const ext = staffInfo.image.match(/data:image\/(\w+);base64,/)?.[1] || 'jpg';
-              const newFileName = `employee-imported-${Date.now()}-${Math.round(Math.random() * 1E9)}.${ext}`;
-              const targetPath = path.join(__dirname, '../../uploads/employees', newFileName);
-              fs.writeFileSync(targetPath, buffer);
-              imageUrl = `/uploads/employees/${newFileName}`;
-            } catch (error) {
-              console.warn(`⚠️ 处理base64图片失败，员工: ${staffInfo.name}`, error.message);
-              imageUrl = 'https://via.placeholder.com/150';
-            }
-          }
-        }
-        
-        // 处理照片集（从JSON数据）
-        if (staffInfo.photos && Array.isArray(staffInfo.photos)) {
-          staffInfo.photos.forEach((photo, photoIndex) => {
-            if (photo.startsWith('http') || photo.startsWith('/uploads/')) {
-              photoUrls.push(photo);
-            } else if (photo.startsWith('data:image/')) {
-              // 处理base64图片数据
-              try {
-                const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
-                const buffer = Buffer.from(base64Data, 'base64');
-                const ext = photo.match(/data:image\/(\w+);base64,/)?.[1] || 'jpg';
-                const newFileName = `employee-photo-${Date.now()}-${photoIndex}-${Math.round(Math.random() * 1E9)}.${ext}`;
-                const targetPath = path.join(__dirname, '../../uploads/employees', newFileName);
-                fs.writeFileSync(targetPath, buffer);
-                photoUrls.push(`/uploads/employees/${newFileName}`);
-              } catch (error) {
-                console.warn(`⚠️ 处理照片base64数据失败，员工: ${staffInfo.name}, 照片: ${photoIndex}`, error.message);
-              }
-            }
-          });
-        }
-        
-        // 如果是ZIP文件，还需要处理ZIP中的图片文件
-        if (fileExt === '.zip') {
-          const tempImageDir = path.join(__dirname, '../../temp-import-images');
-          const staffImageDir = path.join(tempImageDir, 'images', i.toString());
-          
-          // 处理主头像（ZIP优先级更高，会覆盖JSON中的图片）
-          const avatarFiles = ['avatar.jpg', 'avatar.png', 'avatar.jpeg'];
-          for (const avatarFile of avatarFiles) {
-            const avatarPath = path.join(staffImageDir, avatarFile);
-            if (fs.existsSync(avatarPath)) {
-              // 复制到正式目录
-              const newFileName = `employee-imported-${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(avatarFile)}`;
-              const targetPath = path.join(__dirname, '../../uploads/employees', newFileName);
-              fs.copyFileSync(avatarPath, targetPath);
-              imageUrl = `/uploads/employees/${newFileName}`;
-              break;
-            }
-          }
-          
-          // 处理照片集（ZIP中的照片会追加到JSON照片之后）
-          if (fs.existsSync(staffImageDir)) {
-            const photoFiles = fs.readdirSync(staffImageDir)
-              .filter(file => file.startsWith('photo-'))
-              .sort();
-            
-            photoFiles.forEach(photoFile => {
-              const photoPath = path.join(staffImageDir, photoFile);
-              const newFileName = `employee-imported-${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(photoFile)}`;
-              const targetPath = path.join(__dirname, '../../uploads/employees', newFileName);
-              fs.copyFileSync(photoPath, targetPath);
-              photoUrls.push(`/uploads/employees/${newFileName}`);
-            });
-          }
-        }
-
-        // 创建新员工记录
-        const newStaff = new Staff({
-          name: staffInfo.name,
-          age: parseInt(staffInfo.age),
-          job: staffInfo.job,
-          image: imageUrl,
-          province: staffInfo.province || '北京市',
-          height: parseFloat(staffInfo.height) || 165,
-          weight: parseFloat(staffInfo.weight) || 50,
-          description: staffInfo.description || '',
-          photos: photoUrls,
-          tag: staffInfo.tag || '可预约'
-        });
-
-        await newStaff.save();
-        importResults.success++;
-        console.log(`✅ 成功导入员工: ${staffInfo.name}`);
-        
-      } catch (error) {
-        importResults.failed++;
-        importResults.errors.push(`第${i+1}条记录导入失败: ${error.message}`);
-        console.error(`❌ 导入员工失败:`, error);
-      }
-    }
-
-    // 清理临时文件
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-    
-    const tempImageDir = path.join(__dirname, '../../temp-import-images');
-    if (fs.existsSync(tempImageDir)) {
-      fs.rmSync(tempImageDir, { recursive: true, force: true });
-    }
-
-    console.log('📊 导入完成:', importResults);
-    
-    res.json({
-      message: '员工数据导入完成',
-      results: importResults
-    });
-    
   } catch (error) {
-    console.error('❌ 导入员工数据失败:', error);
-    res.status(500).json({ message: '导入失败', error: error.message });
+    console.error('图片上传失败:', error);
+    res.status(500).json({ message: '图片上传失败', error: error.message });
   }
 });
 
-module.exports = router; 
+module.exports = router;
