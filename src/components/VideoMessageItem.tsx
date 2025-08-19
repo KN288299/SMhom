@@ -145,6 +145,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
         }
 
         // 如果是iOS且存在本地文件URI，优先尝试本地（避免网络抖动导致缩略图失败）
+        // 这对于自己发送的视频特别重要，确保能正常显示缩略图
         if (
           Platform.OS === 'ios' &&
           localFileUri &&
@@ -153,6 +154,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
             localFileUri.startsWith('ph://'))
         ) {
           fullVideoUrl = localFileUri;
+          console.log('iOS视频使用本地路径生成缩略图:', fullVideoUrl);
         }
         console.log('开始为视频生成缩略图:', fullVideoUrl);
         

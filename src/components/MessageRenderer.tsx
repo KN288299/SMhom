@@ -1,4 +1,5 @@
 import React, { memo } from 'react';
+import { Platform } from 'react-native';
 import VoiceMessageItem from './VoiceMessageItem';
 import CallRecordItem from './CallRecordItem';
 import ImageMessageItem from './ImageMessageItem';
@@ -166,8 +167,16 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
           isMe={isMe}
           videoDuration={item.videoDuration}
           onPress={(url) => {
-            // 使用应用内视频播放器
-            onOpenFullscreenVideo(url);
+            // iOS: 如果有本地文件路径，优先使用本地播放（特别是自己发送的视频）
+            if (Platform.OS === 'ios' && item.localFileUri && 
+                (item.localFileUri.startsWith('file://') || 
+                 item.localFileUri.startsWith('ph://') || 
+                 item.localFileUri.startsWith('assets-library://'))) {
+              onOpenFullscreenVideo(item.localFileUri);
+            } else {
+              // 使用应用内视频播放器
+              onOpenFullscreenVideo(url);
+            }
           }}
           localFileUri={item.localFileUri}
         />

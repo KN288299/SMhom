@@ -1569,7 +1569,9 @@ const ChatScreen: React.FC = () => {
         videoDuration,
         videoWidth,
         videoHeight,
-        aspectRatio
+        aspectRatio,
+        // iOS: 保留本地文件路径，确保自己发送的视频可以正常显示缩略图和播放
+        localFileUri: Platform.OS === 'ios' ? selectedVideoUri : undefined
       });
       
       // 通过API保存消息以确保持久化
@@ -1643,6 +1645,8 @@ const ChatScreen: React.FC = () => {
           aspectRatio: selectedVideo?.width && selectedVideo?.height 
             ? selectedVideo.width / selectedVideo.height 
             : 1.78,
+          // iOS: 保留本地文件路径，确保失败情况下也能正常显示
+          localFileUri: Platform.OS === 'ios' ? selectedVideoUri : undefined
         });
       }
     } finally {
