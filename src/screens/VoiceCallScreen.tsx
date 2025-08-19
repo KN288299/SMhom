@@ -796,13 +796,25 @@ const VoiceCallScreen: React.FC = () => {
         console.warn('获取ICE配置异常，使用静态备用配置:', e);
       }
 
-      // 兜底静态配置（当后端未配置use-auth-secret时亦会返回静态配置）
+      // 兜底静态配置（当后端未配置时使用公共TURN服务器）
       if (!fetchedIceServers || fetchedIceServers.length === 0) {
         fetchedIceServers = [
           // 多个STUN服务器提高连接成功率
-          { urls: ['stun:38.207.178.173:3478'] },
-          { urls: ['stun:stun.l.google.com:19302'] },
-          { urls: ['stun:stun1.l.google.com:19302'] },
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:38.207.178.173:3478' },
+          // 公共TURN服务器作为备用
+          {
+            urls: [
+              'turn:openrelay.metered.ca:80',
+              'turn:openrelay.metered.ca:443',
+              'turn:openrelay.metered.ca:443?transport=tcp',
+            ],
+            username: 'openrelayproject',
+            credential: 'openrelayproject',
+          },
+          // 私有TURN服务器
           {
             urls: [
               'turn:38.207.178.173:3478?transport=udp',

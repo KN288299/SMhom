@@ -86,8 +86,7 @@ app.post('/api/ping', (req, res) => {
   });
 });
 
-// 临时TURN凭证签发（基于 coturn use-auth-secret）
-// 需要在 coturn 中启用：use-auth-secret，并设置 static-auth-secret 与这里的 TURN_SECRET 一致
+// WebRTC ICE配置接口 - 支持多种TURN服务器配置
 app.get('/api/webrtc/ice-config', protect, (req, res) => {
   try {
     const ttlSeconds = Number(process.env.TURN_TTL || 600); // 默认10分钟
@@ -95,10 +94,46 @@ app.get('/api/webrtc/ice-config', protect, (req, res) => {
     const turnHost = process.env.TURN_HOST || '38.207.178.173';
     const turnHostname = process.env.TURN_HOSTNAME; // 可选：如配置了域名证书
 
-    if (!turnSecret) {
-      // 未配置use-auth-secret时，返回静态账号以便兼容（强制中继模式）
+    // 构建STUN服务器列表
+    const stunServers = [];
+    if (process.env.STUN_SERVERS) {
+      const stunUrls = process.env.STUN_SERVERS.split(',');
+      stunUrls.forEach(url => {
+        stunServers.push({ urls: url.trim() });
+      });
+    } else {
+      // 默认STUN服务器
+      stunServers.push(
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' }
+      );
+    }
+
+    // 构建公共TURN服务器配置
+    const publicTurnServers = [];
+    if (process.env.TURN_SERVER_URL && process.env.TURN_SERVER_USERNAME && process.env.TURN_SERVER_CREDENTIAL) {
+      const turnUrls = [process.env.TURN_SERVER_URL];
+      if (process.env.TURN_SERVER_URL_2) turnUrls.push(process.env.TURN_SERVER_URL_2);
+      if (process.env.TURN_SERVER_URL_3) turnUrls.push(process.env.TURN_SERVER_URL_3);
+      
+      publicTurnServers.push({
+        urls: turnUrls,
+        username: process.env.TURN_SERVER_USERNAME,
+        credential: process.env.TURN_SERVER_CREDENTIAL
+      });
+    }
+
+    if (!turnSecret && publicTurnServers.length > 0) {
+      // 使用公共TURN服务器配置
       const staticIceServers = [
-        {
+        ...stunServers,
+        ...publicTurnServers
+      ];
+      
+      // 如果还有私有TURN服务器配置，也添加进去
+      if (turnHost) {
+        staticIceServers.push({
           urls: [
             `turn:${turnHost}:3478?transport=udp`,
             `turn:${turnHost}:3478?transport=tcp`,
@@ -106,13 +141,42 @@ app.get('/api/webrtc/ice-config', protect, (req, res) => {
           ],
           username: process.env.TURN_STATIC_USER || 'webrtcuser',
           credential: process.env.TURN_STATIC_PASS || 'webrtcpass',
-        },
-      ];
+        });
+      }
+      
+      // 如果配置了域名，优先使用域名
+      if (turnHostname) {
+        staticIceServers.push({
+          urls: [
+            `turn:${turnHostname}:3478?transport=udp`,
+            `turn:${turnHostname}:3478?transport=tcp`, 
+            `turns:${turnHostname}:443?transport=tcp`,
+          ],
+          username: process.env.TURN_STATIC_USER || 'webrtcuser',
+          credential: process.env.TURN_STATIC_PASS || 'webrtcpass',
+        });
+      }
+      
       return res.json({ 
         iceServers: staticIceServers, 
         ttl: 0, 
         mode: 'static',
-        iceTransportPolicy: 'all',  // 允许直连和中继，自动选择最优路径
+        iceTransportPolicy: process.env.WEBRTC_ICE_TRANSPORT_POLICY || 'all',
+        bundlePolicy: process.env.WEBRTC_BUNDLE_POLICY || 'max-bundle',
+        rtcpMuxPolicy: process.env.WEBRTC_RTCP_MUX_POLICY || 'require',
+        iceCandidatePoolSize: 10
+      });
+    }
+
+    if (!turnSecret) {
+      // 未配置任何TURN服务器时，返回基本STUN配置
+      return res.json({ 
+        iceServers: stunServers, 
+        ttl: 0, 
+        mode: 'stun-only',
+        iceTransportPolicy: process.env.WEBRTC_ICE_TRANSPORT_POLICY || 'all',
+        bundlePolicy: process.env.WEBRTC_BUNDLE_POLICY || 'max-bundle',
+        rtcpMuxPolicy: process.env.WEBRTC_RTCP_MUX_POLICY || 'require',
         iceCandidatePoolSize: 10
       });
     }
@@ -125,24 +189,40 @@ app.get('/api/webrtc/ice-config', protect, (req, res) => {
     hmac.update(username);
     const credential = hmac.digest('base64');
 
-    // 组合可用的 TURN/TURNS URL 列表（强制中继模式）
-    const urls = [
+    // 动态凭证配置，包含STUN和TURN服务器
+    const iceServers = [...stunServers];
+
+    // 添加公共TURN服务器（如果配置了的话）
+    if (publicTurnServers.length > 0) {
+      iceServers.push(...publicTurnServers);
+    }
+
+    // 组合可用的 TURN/TURNS URL 列表（私有服务器）
+    const turnUrls = [
       `turn:${turnHost}:3478?transport=udp`,
       `turn:${turnHost}:3478?transport=tcp`,
       `turn:${turnHost}:443?transport=tcp`,
     ];
+    
     if (turnHostname) {
-      // 若有域名与有效TLS证书，加入turns:443
-      urls.push(`turns:${turnHostname}:443?transport=tcp`);
+      // 若有域名与有效TLS证书，优先使用域名
+      turnUrls.unshift(
+        `turn:${turnHostname}:3478?transport=udp`,
+        `turn:${turnHostname}:3478?transport=tcp`,
+        `turns:${turnHostname}:443?transport=tcp`
+      );
     }
 
-    // 提供 TURN 中继选项，让客户端自动选择最优路径
-    const iceServers = [{ urls, username, credential }];
+    // 添加私有TURN服务器配置（使用动态凭证）
+    iceServers.push({ urls: turnUrls, username, credential });
+    
     res.json({ 
       iceServers, 
       ttl: ttlSeconds, 
       mode: 'temporary',
-      iceTransportPolicy: 'all',  // 允许直连和中继，自动选择最优路径
+      iceTransportPolicy: process.env.WEBRTC_ICE_TRANSPORT_POLICY || 'all',
+      bundlePolicy: process.env.WEBRTC_BUNDLE_POLICY || 'max-bundle',
+      rtcpMuxPolicy: process.env.WEBRTC_RTCP_MUX_POLICY || 'require',
       iceCandidatePoolSize: 10
     });
   } catch (err) {
