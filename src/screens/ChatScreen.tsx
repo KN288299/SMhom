@@ -2228,10 +2228,11 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    paddingHorizontal: 0, // 移除水平内边距，由iOS样式控制
   },
   chatHeader: {
     backgroundColor: '#fff',
-    paddingHorizontal: 16,
+    paddingHorizontal: 16, // Android保持原有的水平内边距
     paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',

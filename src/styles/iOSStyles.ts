@@ -22,9 +22,9 @@ const IOS_INPUT_HEIGHT = 44; // iOS标准输入框高度
 const IOS_MAIN_HEADER_HEIGHT = 100; // 主页面页头高度 - 增加高度给顶部更多空间
 const IOS_MAIN_HEADER_PADDING_TOP = isIOSPlatform ? 55 : 30; // iOS增加paddingTop避免被灵动岛遮挡
 
-// 聊天页面页头配置 - 与SafeAreaView配合使用
-export const IOS_CHAT_HEADER_HEIGHT = 64; // 收紧聊天页头高度
-const IOS_CHAT_HEADER_PADDING_TOP = isIOSPlatform ? 10 : 0; // 去除多余顶部留白
+// 聊天页面页头配置 - 与主页保持一致的高度
+export const IOS_CHAT_HEADER_HEIGHT = IOS_MAIN_HEADER_HEIGHT; // 与主页页头高度保持一致
+const IOS_CHAT_HEADER_PADDING_TOP = IOS_MAIN_HEADER_PADDING_TOP; // 与主页保持一致的paddingTop
 
 /**
  * 根据字体大小获取iOS适配的大小
@@ -37,24 +37,25 @@ export const getIOSFontSize = (fontSize: number): number => {
  * iOS专用聊天界面样式
  */
 export const iOSChatStyles = StyleSheet.create({
-  // 页头样式优化 - 与消息页面保持一致的高度
+  // 页头样式优化 - 与主页页面保持一致的高度
   headerContainer: {
-    height: IOS_CHAT_HEADER_HEIGHT, // 改为聊天页面专用高度
+    height: IOS_CHAT_HEADER_HEIGHT, // 与主页页头高度保持一致
     backgroundColor: '#fff',
-    paddingTop: IOS_CHAT_HEADER_PADDING_TOP, // 改为聊天页面专用paddingTop
-    borderBottomWidth: 0.5, // 更细的分割线
-    borderBottomColor: '#c6c6c8',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 0.5 },
-    shadowOpacity: 0.1,
-    shadowRadius: 0,
-    elevation: 0,
+    paddingTop: IOS_CHAT_HEADER_PADDING_TOP, // 与主页保持一致的paddingTop
+    paddingHorizontal: 15, // 与主页保持一致的水平内边距
+    borderBottomWidth: isIOSPlatform ? 0.5 : 1, // 与主页保持一致的分割线
+    borderBottomColor: isIOSPlatform ? '#c6c6c8' : '#eee',
+    shadowColor: isIOSPlatform ? '#000' : undefined,
+    shadowOffset: isIOSPlatform ? { width: 0, height: 0.5 } : undefined,
+    shadowOpacity: isIOSPlatform ? 0.1 : undefined,
+    shadowRadius: isIOSPlatform ? 0 : undefined,
+    elevation: isIOSPlatform ? 0 : 2,
     justifyContent: 'flex-end', // 确保chatHeader位于底部正确位置
   },
   
   chatHeader: {
     backgroundColor: '#fff',
-    paddingHorizontal: 16,
+    paddingHorizontal: 0, // 移除水平内边距，由父容器控制
     paddingVertical: 12, // 增加垂直padding确保内容居中
     height: IOS_HEADER_HEIGHT,
     flexDirection: 'row',
