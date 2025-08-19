@@ -62,13 +62,13 @@ async function importStaffData() {
                     // 将临时路径转换为永久路径
                     const oldPath = staffData.image;
                     const fileName = path.basename(oldPath);
-                    staffData.image = `/uploads/staff/${fileName}`;
+                    staffData.image = `/uploads/employees/${fileName}`;
                 }
                 
                 if (staffData.photos && staffData.photos.length > 0) {
                     staffData.photos = staffData.photos.map(photo => {
                         const fileName = path.basename(photo);
-                        return `/uploads/staff/${fileName}`;
+                        return `/uploads/employees/${fileName}`;
                     });
                 }
                 

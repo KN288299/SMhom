@@ -37,6 +37,17 @@ import Layout from '../components/Layout';
 import dayjs from 'dayjs';
 import { orderAPI, userAPI, staffAPI } from '../api/api';
 
+// 导入省份数据
+const PROVINCES = [
+  '北京市', '天津市', '河北省', '山西省', '内蒙古自治区',
+  '辽宁省', '吉林省', '黑龙江省', '上海市', '江苏省',
+  '浙江省', '安徽省', '福建省', '江西省', '山东省',
+  '河南省', '湖北省', '湖南省', '广东省', '广西壮族自治区',
+  '海南省', '重庆市', '四川省', '贵州省', '云南省',
+  '西藏自治区', '陕西省', '甘肃省', '青海省', '宁夏回族自治区',
+  '新疆维吾尔自治区', '台湾省', '香港特别行政区', '澳门特别行政区'
+];
+
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
 const { TextArea } = Input;
@@ -76,6 +87,8 @@ const OrderManagement: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [detailDrawerVisible, setDetailDrawerVisible] = useState(false);
+  const [selectedProvince, setSelectedProvince] = useState<string>('');
+  const [availableStaff, setAvailableStaff] = useState<any[]>([]);
   
   // 加载订单数据
   const fetchOrders = async (page: number = 1, status: string | null = null) => {
@@ -140,10 +153,14 @@ const OrderManagement: React.FC = () => {
   };
   
   // 加载员工列表
-  const fetchStaffList = async () => {
+  const fetchStaffList = async (province?: string) => {
     try {
-      console.log('正在请求员工数据');
-      const response = await staffAPI.getStaffList({ isActive: true });
+      console.log('正在请求员工数据，省份:', province);
+      const params: any = { isActive: true };
+      if (province) {
+        params.province = province;
+      }
+      const response = await staffAPI.getStaffList(params);
       console.log('员工API响应:', response);
       
       // 确保staff是数组
@@ -151,11 +168,21 @@ const OrderManagement: React.FC = () => {
                        (response?.data && Array.isArray(response.data)) ? response.data : [];
       
       setStaffList(staffData);
+      setAvailableStaff(staffData);
     } catch (error) {
       console.error('获取员工列表失败:', error);
       message.error('获取员工列表失败');
       setStaffList([]); // 设置为空数组，避免错误
+      setAvailableStaff([]);
     }
+  };
+
+  // 处理省份选择变化
+  const handleProvinceChange = (province: string) => {
+    setSelectedProvince(province);
+    fetchStaffList(province);
+    // 清空已选择的员工，因为员工列表已经变化
+    form.setFieldsValue({ staffId: undefined });
   };
   
   // 初始加载
@@ -179,8 +206,14 @@ const OrderManagement: React.FC = () => {
   const showModal = (record?: any) => {
     if (record) {
       setCurrentOrder(record);
+      // 如果编辑订单，设置省份并加载对应员工
+      const orderProvince = record.province || '北京市';
+      setSelectedProvince(orderProvince);
+      fetchStaffList(orderProvince);
+      
       form.setFieldsValue({
         userId: record.user?._id || record.user?.id,
+        province: orderProvince,
         staffId: record.staff?._id || record.staff?.id,
         appointmentTime: dayjs(record.appointmentTime),
         price: record.price,
@@ -192,6 +225,9 @@ const OrderManagement: React.FC = () => {
     } else {
       setCurrentOrder(null);
       form.resetFields();
+      // 重置省份选择状态
+      setSelectedProvince('');
+      setAvailableStaff([]);
       // 默认状态为待接单
       form.setFieldsValue({ status: 'pending' });
     }
@@ -203,6 +239,9 @@ const OrderManagement: React.FC = () => {
     setIsModalVisible(false);
     setCurrentOrder(null);
     form.resetFields();
+    // 重置省份选择状态
+    setSelectedProvince('');
+    setAvailableStaff([]);
   };
   
   // 处理表单提交
@@ -243,6 +282,9 @@ const OrderManagement: React.FC = () => {
       setIsModalVisible(false);
       setCurrentOrder(null);
       form.resetFields();
+      // 重置省份选择状态
+      setSelectedProvince('');
+      setAvailableStaff([]);
       fetchOrders(pagination.current, filterStatus);
     } catch (error: any) {
       console.error('保存订单失败:', error);
@@ -476,14 +518,38 @@ const OrderManagement: React.FC = () => {
             </Col>
             <Col span={12}>
               <Form.Item
+                name="province"
+                label="服务地区"
+                rules={[{ required: true, message: '请选择服务地区' }]}
+              >
+                <Select 
+                  placeholder="请选择服务地区"
+                  onChange={handleProvinceChange}
+                  value={selectedProvince}
+                >
+                  {PROVINCES.map(province => (
+                    <Select.Option key={province} value={province}>{province}</Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+          
+          <Row gutter={16}>
+            <Col span={24}>
+              <Form.Item
                 name="staffId"
                 label="选择员工"
                 rules={[{ required: true, message: '请选择员工' }]}
+                help={selectedProvince ? `显示 ${selectedProvince} 的可用员工` : '请先选择服务地区'}
               >
-                <Select placeholder="选择员工">
-                  {staffList.map((staff) => (
+                <Select 
+                  placeholder={selectedProvince ? "选择员工" : "请先选择服务地区"}
+                  disabled={!selectedProvince}
+                >
+                  {availableStaff.map((staff) => (
                     <Select.Option key={staff._id || staff.id} value={staff._id || staff.id}>
-                      {staff.name} - {staff.job}
+                      {staff.name} - {staff.job} ({staff.province || '北京市'})
                     </Select.Option>
                   ))}
                 </Select>

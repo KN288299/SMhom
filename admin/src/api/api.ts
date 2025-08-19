@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// 服务器基础URL - 使用相对路径通过Nginx代理
-export const SERVER_BASE_URL = '';
+// 服务器基础URL - 修改为服务器IP地址
+export const SERVER_BASE_URL = 'http://38.207.178.173:3000';
 
 // 创建 axios 实例
 const api = axios.create({
@@ -14,20 +14,10 @@ const api = axios.create({
 // 创建上传文件的axios实例
 export const uploadApi = axios.create({
   baseURL: `${SERVER_BASE_URL}/api`,
-});
-
-// 为上传实例添加请求拦截器，自动附带管理员 Token
-uploadApi.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('adminToken');
-    if (token) {
-      config.headers = config.headers || {};
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
+  headers: {
+    'Content-Type': 'multipart/form-data',
   },
-  (error) => Promise.reject(error)
-);
+});
 
 // 请求拦截器 - 添加 token 到请求头
 api.interceptors.request.use(
@@ -85,10 +75,16 @@ uploadApi.interceptors.response.use(
 
 // 管理员认证 API
 export const authAPI = {
-  login: async (username: string, password: string) => {
+  getCaptcha: async () => {
+    const response = await api.get('/captcha');
+    return response.data;
+  },
+  login: async (username: string, password: string, captcha: string, captchaSessionId: string) => {
     const response = await api.post('/login', { 
       username, 
-      password
+      password, 
+      captcha, 
+      captchaSessionId 
     });
     return response.data;
   },
@@ -162,12 +158,20 @@ export const staffAPI = {
     const queryString = queryParams.toString();
     const url = queryString ? `${SERVER_BASE_URL}/api/staff?${queryString}` : `${SERVER_BASE_URL}/api/staff`;
     
-    const response = await axios.get(url);
+    const response = await axios.get(url, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('adminToken')}`
+      }
+    });
     return response.data;
   },
   
   getStaffById: async (id: string) => {
-    const response = await axios.get(`${SERVER_BASE_URL}/api/staff/${id}`);
+    const response = await axios.get(`${SERVER_BASE_URL}/api/staff/${id}`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('adminToken')}`
+      }
+    });
     return response.data;
   },
   
@@ -182,7 +186,11 @@ export const staffAPI = {
   },
   
   deleteStaff: async (id: string) => {
-    const response = await axios.delete(`${SERVER_BASE_URL}/api/staff/${id}`);
+    const response = await axios.delete(`${SERVER_BASE_URL}/api/staff/${id}`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('adminToken')}`
+      }
+    });
     return response.data;
   },
   
@@ -195,28 +203,46 @@ export const staffAPI = {
     return response.data.imageUrl;
   },
 
+  // 导出所有员工数据
+  exportAllStaff: async () => {
+    const response = await axios.get(`${SERVER_BASE_URL}/api/staff/export`, {
+      responseType: 'blob',
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('adminToken')}`
+      }
+    });
+    return response;
+  },
 
+  // 导入员工数据
+  importStaff: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await uploadApi.post('/staff/import', formData);
+    return response.data;
+  },
 
-
-
-
-
-
-
-
+  // 获取导入状态
+  getImportStatus: async (importId: string) => {
+    const response = await axios.get(`${SERVER_BASE_URL}/api/staff/import-status/${importId}`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('adminToken')}`
+      }
+    });
+    return response.data;
+  },
 
   // 获取批量删除预览
-  getDeletePreview: async (batchSize: number, filters?: { search?: string; province?: string }) => {
-    const queryParams = new URLSearchParams();
-    queryParams.append('batchSize', batchSize.toString());
+  getDeletePreview: async (batchSize: number = 10, filters?: { search?: string; province?: string }) => {
+    const queryParams = new URLSearchParams({
+      batchSize: batchSize.toString()
+    });
     
     if (filters?.search) queryParams.append('search', filters.search);
     if (filters?.province) queryParams.append('province', filters.province);
     
-    const queryString = queryParams.toString();
-    const url = `${SERVER_BASE_URL}/api/admin/staff/delete-preview?${queryString}`;
-    
-    const response = await axios.get(url, {
+    const response = await axios.get(`${SERVER_BASE_URL}/api/staff/delete-preview?${queryParams.toString()}`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem('adminToken')}`
       }
@@ -225,18 +251,12 @@ export const staffAPI = {
   },
 
   // 批量删除员工
-  batchDeleteStaff: async (batchSize: number, confirm: boolean = false, filters?: { search?: string; province?: string }) => {
-    const queryParams = new URLSearchParams();
-    queryParams.append('batchSize', batchSize.toString());
-    queryParams.append('confirm', confirm.toString());
-    
-    if (filters?.search) queryParams.append('search', filters.search);
-    if (filters?.province) queryParams.append('province', filters.province);
-    
-    const queryString = queryParams.toString();
-    const url = `${SERVER_BASE_URL}/api/admin/staff/batch-delete?${queryString}`;
-    
-    const response = await axios.delete(url, {
+  batchDeleteStaff: async (batchSize: number = 10, confirmDelete: boolean = false, filters?: { search?: string; province?: string }) => {
+    const response = await axios.post(`${SERVER_BASE_URL}/api/staff/batch-delete`, {
+      batchSize,
+      confirmDelete,
+      filters: filters || {}
+    }, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem('adminToken')}`
       }
@@ -305,6 +325,7 @@ export const orderAPI = {
     notes?: string;
     serviceType: string;
     status?: string;
+    province?: string;
   }) => {
     try {
       console.log('API调用: 创建订单，数据:', orderData);
@@ -437,16 +458,16 @@ export const customerServiceAPI = {
         }
       });
       console.log('获取到的客服列表数据:', response.data);
-      // 兼容两种返回格式：数组 或 { customerServices, pagination }
-      const data = response.data;
-      const list = Array.isArray(data) ? data : (data && Array.isArray(data.customerServices) ? data.customerServices : []);
-      // 可选：调试每个头像路径
-      list.forEach((cs: { avatar?: string; name?: string }) => {
-        if (cs && cs.avatar) {
-          console.log(`客服 ${cs.name} 的头像路径: ${cs.avatar} -> 完整URL: ${SERVER_BASE_URL}${cs.avatar}`);
-        }
-      });
-      return list;
+      // 检查每个客服的头像路径
+      if (Array.isArray(response.data)) {
+        response.data.forEach(cs => {
+          console.log(`客服 ${cs.name} 的头像路径: ${cs.avatar}`);
+          if (cs.avatar) {
+            console.log(`完整URL: ${SERVER_BASE_URL}${cs.avatar}`);
+          }
+        });
+      }
+      return response.data;
     } catch (error) {
       console.error('获取客服列表失败:', error);
       throw error;

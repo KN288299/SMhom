@@ -37,6 +37,10 @@ const orderSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    province: {
+      type: String,
+      default: '北京市',
+    },
     orderNumber: {
       type: String,
       unique: true,

@@ -42,7 +42,7 @@ const server = http.createServer(app);
 // 创建Socket.io实例
 const io = socketIO(server, {
   cors: {
-    origin: ['http://38.207.178.173:3000', 'http://38.207.178.173:8080', 'http://10.0.2.2:3000', 'http://10.0.2.2:8081'],
+    origin: ['http://38.207.178.173', 'http://38.207.178.173:3000', 'http://38.207.178.173:8080', 'http://10.0.2.2:3000', 'http://10.0.2.2:8081'],
     methods: ['GET', 'POST'],
     credentials: true
   }
@@ -54,7 +54,7 @@ connectDB();
 // 中间件
 app.set('trust proxy', 1);
 app.use(cors({
-  origin: ['http://38.207.178.173:3000', 'http://38.207.178.173:8080', 'http://10.0.2.2:3000', 'http://10.0.2.2:8081'],
+  origin: ['http://38.207.178.173', 'http://38.207.178.173:3000', 'http://38.207.178.173:8080', 'http://10.0.2.2:3000', 'http://10.0.2.2:8081'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']

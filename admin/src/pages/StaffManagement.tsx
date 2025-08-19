@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, Upload, InputNumber, message, Space, Image, Tabs, Select, Card, Row, Col, Progress, Divider, Alert, Statistic } from 'antd';
-import { PlusOutlined, FilterOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, Upload, InputNumber, message, Space, Image, Tabs, Select, Card, Row, Col, Progress, Divider } from 'antd';
+import { PlusOutlined, UploadOutlined, FilterOutlined, ReloadOutlined, DownloadOutlined, ImportOutlined } from '@ant-design/icons';
 import Layout from '../components/Layout';
 import type { RcFile, UploadProps } from 'antd/es/upload';
 import type { UploadFile } from 'antd/es/upload/interface';
@@ -55,7 +55,12 @@ const StaffManagement: React.FC = () => {
     showTotal: (total: number, range: [number, number]) => `第 ${range[0]}-${range[1]} 条/共 ${total} 条`,
   });
   
-
+  // 导入导出相关状态
+  const [exportLoading, setExportLoading] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importModalVisible, setImportModalVisible] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importResults, setImportResults] = useState<any>(null);
 
   // 批量删除相关状态
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -347,17 +352,114 @@ const StaffManagement: React.FC = () => {
     setPhotoList([...fileList]);
   };
 
+  // 处理导出员工数据
+  const handleExportStaff = async () => {
+    try {
+      setExportLoading(true);
+      message.loading('正在导出员工数据...', 0);
+      
+      const response = await staffAPI.exportAllStaff();
+      
+      // 创建下载链接
+      const blob = new Blob([response.data], { type: 'application/zip' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `员工数据导出-${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      message.destroy();
+      message.success('员工数据导出成功！');
+    } catch (error: any) {
+      console.error('导出员工数据失败:', error);
+      console.error('错误详情:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      
+      message.destroy();
+      
+      let errorMessage = '导出失败';
+      if (error.response?.status === 400) {
+        errorMessage = '请求错误：' + (error.response?.data?.message || '无效的请求参数');
+      } else if (error.response?.status === 404) {
+        errorMessage = '没有找到员工数据';
+      } else if (error.response?.status === 500) {
+        errorMessage = '服务器错误：' + (error.response?.data?.message || '内部服务器错误');
+      } else if (error.message) {
+        errorMessage = '网络错误：' + error.message;
+      }
+      
+      message.error(errorMessage);
+    } finally {
+      setExportLoading(false);
+    }
+  };
 
+  // 处理导入员工数据
+  const handleImportStaff = async (file: File) => {
+    try {
+      setImportLoading(true);
+      setImportProgress(20);
+      
+      const response = await staffAPI.importStaff(file);
+      setImportProgress(100);
+      
+      setImportResults(response.results);
+      
+      if (response.results.success > 0) {
+        message.success(`导入完成！成功 ${response.results.success} 条，失败 ${response.results.failed} 条`);
+        fetchStaffList(); // 刷新员工列表
+      } else {
+        message.warning('没有成功导入任何员工数据');
+      }
+      
+    } catch (error: any) {
+      console.error('导入员工数据失败:', error);
+      setImportProgress(0);
+      message.error('导入失败：' + (error.response?.data?.message || error.message));
+    } finally {
+      setImportLoading(false);
+    }
+  };
 
+  // 处理导入文件选择
+  const handleImportFileChange = (info: any) => {
+    const { status } = info.file;
+    
+    if (status === 'done') {
+      handleImportStaff(info.file.originFileObj);
+    } else if (status === 'error') {
+      message.error(`${info.file.name} 文件上传失败`);
+    }
+  };
 
-
-
-
-
-
-
-
-
+  // 导入文件验证
+  const beforeImportUpload = (file: File) => {
+    const isValidFormat = file.type === 'application/json' || 
+                         file.type === 'application/zip' || 
+                         file.name.endsWith('.json') || 
+                         file.name.endsWith('.zip');
+    
+    if (!isValidFormat) {
+      message.error('只支持 JSON 或 ZIP 格式的文件！');
+      return false;
+    }
+    
+    // 移除文件大小限制，支持大型员工数据导入
+    // const isLt50M = file.size / 1024 / 1024 < 50;
+    // if (!isLt50M) {
+    //   message.error('文件大小不能超过 50MB！');
+    //   return false;
+    // }
+    
+    return true;
+  };
 
   // 获取批量删除预览
   const handleGetDeletePreview = async () => {
@@ -621,28 +723,41 @@ const StaffManagement: React.FC = () => {
   return (
     <Layout>
       <div style={{ padding: '20px' }}>
-        <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between' }}>
           <h2>员工管理</h2>
           <Space>
-
+            {/* 调试信息 */}
+            <div style={{ fontSize: '12px', color: '#999', marginRight: '10px' }}>
+              按钮状态: 导出={exportLoading ? '加载中' : '就绪'}, 导入={importLoading ? '加载中' : '就绪'}
+            </div>
             
             <Button 
+              icon={<DownloadOutlined />} 
+              onClick={handleExportStaff}
+              loading={exportLoading}
+              type="default"
+              style={{ display: 'inline-block' }}
+            >
+              导出数据
+            </Button>
+            <Button 
+              icon={<ImportOutlined />} 
+              onClick={() => setImportModalVisible(true)}
+              type="default"
+              style={{ display: 'inline-block' }}
+            >
+              导入数据
+            </Button>
+            <Button 
               danger
-              icon={<DeleteOutlined />}
               onClick={handleGetDeletePreview}
               loading={deleteLoading}
-              disabled={deleteLoading || !staffList.length}
             >
               批量删除
             </Button>
-            
-            <Button type="primary" onClick={showModal}>
-              添加员工
-            </Button>
+            <Button type="primary" onClick={showModal}>添加员工</Button>
           </Space>
         </div>
-
-
 
         {/* 添加筛选区域 */}
         <Card style={{ marginBottom: 16 }}>
@@ -683,13 +798,7 @@ const StaffManagement: React.FC = () => {
           dataSource={staffList}
           loading={loading}
           rowKey={(record) => record.id || (record as any)._id}
-          pagination={{
-            ...pagination,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) => `第 ${range?.[0] || 0}-${range?.[1] || 0} 条/共 ${total} 条`,
-            pageSizeOptions: ['10', '20', '50', '100'],
-          }}
+          pagination={pagination}
           onChange={handleTableChange}
         />
 
@@ -706,89 +815,256 @@ const StaffManagement: React.FC = () => {
           {modalContent}
         </Modal>
 
+        {/* 导入数据Modal */}
+        <Modal
+          title="导入员工数据"
+          open={importModalVisible}
+          onCancel={() => {
+            setImportModalVisible(false);
+            setImportResults(null);
+            setImportProgress(0);
+          }}
+          footer={[
+            <Button 
+              key="close" 
+              onClick={() => {
+                setImportModalVisible(false);
+                setImportResults(null);
+                setImportProgress(0);
+              }}
+            >
+              关闭
+            </Button>
+          ]}
+          width={600}
+        >
+          <div style={{ padding: '20px 0' }}>
+            <div style={{ marginBottom: 24 }}>
+              <h4>支持的文件格式：</h4>
+              <ul>
+                <li><strong>JSON文件</strong>：纯数据导入，不包含图片</li>
+                <li><strong>ZIP文件</strong>：完整导入，包含员工数据和图片文件</li>
+              </ul>
+            </div>
 
+            <div style={{ marginBottom: 24 }}>
+              <Upload
+                accept=".json,.zip"
+                beforeUpload={beforeImportUpload}
+                onChange={handleImportFileChange}
+                showUploadList={false}
+                customRequest={({ onSuccess }) => onSuccess?.({})}
+              >
+                <Button 
+                  icon={<UploadOutlined />} 
+                  size="large" 
+                  type="primary"
+                  loading={importLoading}
+                  block
+                >
+                  {importLoading ? '正在导入...' : '选择文件并开始导入'}
+                </Button>
+              </Upload>
+            </div>
+
+            {importLoading && (
+              <div style={{ marginBottom: 24 }}>
+                <Progress 
+                  percent={importProgress} 
+                  status={importProgress === 100 ? 'success' : 'active'}
+                />
+              </div>
+            )}
+
+            {importResults && (
+              <Card title="导入结果" size="small">
+                <Row gutter={16}>
+                  <Col span={8}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 24, color: '#1890ff' }}>{importResults.total}</div>
+                      <div>总计</div>
+                    </div>
+                  </Col>
+                  <Col span={8}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 24, color: '#52c41a' }}>{importResults.success}</div>
+                      <div>成功</div>
+                    </div>
+                  </Col>
+                  <Col span={8}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 24, color: '#f5222d' }}>{importResults.failed}</div>
+                      <div>失败</div>
+                    </div>
+                  </Col>
+                </Row>
+
+                {importResults.errors && importResults.errors.length > 0 && (
+                  <div style={{ marginTop: 16 }}>
+                    <Divider>错误详情</Divider>
+                    <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+                      {importResults.errors.map((error: string, index: number) => (
+                        <div key={index} style={{ color: '#f5222d', marginBottom: 4 }}>
+                          {error}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            )}
+
+            <div style={{ marginTop: 24, padding: 16, backgroundColor: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
+              <h4 style={{ color: '#389e0d', marginBottom: 8 }}>使用说明：</h4>
+              <ol style={{ margin: 0, paddingLeft: 20, color: '#389e0d' }}>
+                <li>导出的ZIP文件可以直接用于导入</li>
+                <li>JSON文件必须包含员工数据数组</li>
+                <li>如果员工姓名已存在，将跳过该条记录</li>
+                <li>图片文件会自动重命名并保存</li>
+              </ol>
+            </div>
+          </div>
+        </Modal>
 
         {/* 批量删除确认Modal */}
         <Modal
-          title="批量删除确认"
+          title="批量删除当前页面员工确认"
           open={deleteModalVisible}
-          onOk={handleBatchDelete}
           onCancel={() => {
             setDeleteModalVisible(false);
             setDeletePreview(null);
           }}
-          confirmLoading={deleteLoading}
-          okText="确认删除"
-          cancelText="取消"
-          okButtonProps={{ danger: true }}
+          footer={[
+            <Button 
+              key="cancel" 
+              onClick={() => {
+                setDeleteModalVisible(false);
+                setDeletePreview(null);
+              }}
+            >
+              取消
+            </Button>,
+            <Button 
+              key="delete" 
+              type="primary" 
+              danger
+              loading={deleteLoading}
+              onClick={handleBatchDelete}
+              disabled={!deletePreview?.canDelete}
+            >
+              确认删除当前页 {batchSize} 个员工
+            </Button>
+          ]}
           width={700}
         >
-          {deletePreview && (
-            <div>
-              <Alert
-                message="批量删除警告"
-                description={`您即将删除当前筛选条件下的前 ${batchSize} 名员工。此操作不可恢复，请谨慎操作！`}
-                type="warning"
-                showIcon
-                style={{ marginBottom: '16px' }}
-              />
-              
-              <div style={{ marginBottom: '16px' }}>
-                <Row gutter={16}>
-                  <Col span={8}>
-                    <Statistic 
-                      title="当前页待删除" 
-                      value={deletePreview.currentBatchCount} 
-                      valueStyle={{ color: '#cf1322' }}
-                      suffix="名"
-                    />
-                  </Col>
-                  <Col span={8}>
-                    <Statistic 
-                      title="筛选结果总数" 
-                      value={deletePreview.filteredTotalCount} 
-                      valueStyle={{ color: '#1890ff' }}
-                      suffix="名"
-                    />
-                  </Col>
-                  <Col span={8}>
-                    <Statistic 
-                      title="数据库总数" 
-                      value={deletePreview.totalCount} 
-                      valueStyle={{ color: '#666' }}
-                      suffix="名"
-                    />
-                  </Col>
-                </Row>
-              </div>
+          <div style={{ padding: '20px 0' }}>
+            <div style={{ marginBottom: 24, padding: 16, backgroundColor: '#fff2f0', border: '1px solid #ffccc7', borderRadius: 6 }}>
+              <h4 style={{ color: '#cf1322', marginBottom: 8 }}>⚠️ 危险操作警告</h4>
+              <p style={{ margin: 0, color: '#cf1322' }}>
+                此操作将<strong>软删除</strong>当前页面显示的前 {batchSize} 名员工！
+              </p>
+              <p style={{ margin: '8px 0 0 0', color: '#cf1322', fontSize: '12px' }}>
+                • 删除顺序：按员工ID顺序删除<br/>
+                • 筛选条件：{searchText ? `搜索"${searchText}"` : '无搜索条件'} + {filterProvince ? `省份"${filterProvince}"` : '全部省份'}<br/>
+                • 删除方式：软删除（数据不会永久丢失，但界面不再显示）
+              </p>
+            </div>
 
-              <div style={{ marginBottom: '16px' }}>
-                <h4>即将删除的员工：</h4>
-                <div style={{ maxHeight: '200px', overflow: 'auto', border: '1px solid #d9d9d9', borderRadius: '4px' }}>
-                  <Table
-                    dataSource={deletePreview.previewStaff}
-                    columns={[
-                      { title: '姓名', dataIndex: 'name', width: 100 },
-                      { title: '职业', dataIndex: 'occupation', width: 120 },
-                      { title: '省份', dataIndex: 'province', width: 80 },
-                      { title: '城市', dataIndex: 'city', width: 80 },
-                      { title: '标签', dataIndex: 'tag', width: 80 },
-                    ]}
-                    pagination={false}
-                    size="small"
-                    rowKey={(record: any) => record.id || record._id}
-                  />
+            {deletePreview && (
+              <div>
+                <Card title={`将要删除的 ${deletePreview.previewList?.length || 0} 名员工`} size="small">
+                  <div style={{ marginBottom: 16 }}>
+                    <Row gutter={16}>
+                      <Col span={6}>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 18, color: '#1890ff' }}>{deletePreview.totalActive}</div>
+                          <div style={{ fontSize: '12px' }}>系统总员工</div>
+                        </div>
+                      </Col>
+                      <Col span={6}>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 18, color: '#722ed1' }}>{deletePreview.filteredActive}</div>
+                          <div style={{ fontSize: '12px' }}>当前页面</div>
+                        </div>
+                      </Col>
+                      <Col span={6}>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 18, color: '#f5222d' }}>{deletePreview.batchSize}</div>
+                          <div style={{ fontSize: '12px' }}>本次删除</div>
+                        </div>
+                      </Col>
+                      <Col span={6}>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 18, color: '#52c41a' }}>{Math.max(0, deletePreview.filteredActive - deletePreview.batchSize)}</div>
+                          <div style={{ fontSize: '12px' }}>页面剩余</div>
+                        </div>
+                      </Col>
+                    </Row>
+                  </div>
+
+                  <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+                    <Table
+                      dataSource={deletePreview.previewList || []}
+                      pagination={false}
+                      size="small"
+                      rowKey="_id"
+                      columns={[
+                        {
+                          title: '姓名',
+                          dataIndex: 'name',
+                          key: 'name'
+                        },
+                        {
+                          title: '职业',
+                          dataIndex: 'job', 
+                          key: 'job'
+                        },
+                        {
+                          title: '年龄',
+                          dataIndex: 'age',
+                          key: 'age'
+                        },
+                        {
+                          title: '省份',
+                          dataIndex: 'province',
+                          key: 'province'
+                        },
+                        {
+                          title: '创建时间',
+                          dataIndex: 'createdAt',
+                          key: 'createdAt',
+                          render: (date: string) => new Date(date).toLocaleDateString()
+                        }
+                      ]}
+                    />
+                  </div>
+                </Card>
+
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ marginRight: 8 }}>批量删除数量:</label>
+                    <InputNumber
+                      min={1}
+                      max={50}
+                      value={batchSize}
+                      onChange={(value) => setBatchSize(value || 10)}
+                      style={{ width: 120 }}
+                    />
+                    <span style={{ marginLeft: 8, color: '#666' }}>
+                      (推荐每次删除10个员工)
+                    </span>
+                  </div>
                 </div>
               </div>
+            )}
 
-              <div style={{ backgroundColor: '#f0f0f0', padding: '8px', borderRadius: '4px', fontSize: '12px' }}>
-                <strong>当前筛选条件：</strong>
-                {filterProvince && <span>省份：{filterProvince} </span>}
-                {searchText && <span>搜索：{searchText} </span>}
-                {!filterProvince && !searchText && <span>无筛选条件（所有员工）</span>}
+            {!deletePreview?.canDelete && (
+              <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>
+                <h3>没有可删除的员工</h3>
+                <p>当前系统中没有活跃的员工数据</p>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </Modal>
       </div>
     </Layout>

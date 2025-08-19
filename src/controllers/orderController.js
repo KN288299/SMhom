@@ -76,7 +76,7 @@ const createOrder = asyncHandler(async (req, res) => {
     console.log('用户信息:', req.user);
     console.log('请求体:', req.body);
     
-    const { userId, staffId, appointmentTime, price, address, notes, serviceType, status } = req.body;
+    const { userId, staffId, appointmentTime, price, address, notes, serviceType, status, province } = req.body;
 
     // 验证用户和员工存在
     const user = await User.findById(userId);
@@ -103,6 +103,7 @@ const createOrder = asyncHandler(async (req, res) => {
       notes: notes || '',
       serviceType,
       status: status || 'pending',
+      province: province || '北京市',
     });
 
     console.log('准备保存订单:', order);
@@ -157,7 +158,7 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
 // @route   PUT /api/orders/:id
 // @access  Private/Admin
 const updateOrder = asyncHandler(async (req, res) => {
-  const { appointmentTime, price, address, notes, serviceType, status, userId, staffId } = req.body;
+  const { appointmentTime, price, address, notes, serviceType, status, userId, staffId, province } = req.body;
 
   const order = await Order.findById(req.params.id);
 
@@ -188,6 +189,7 @@ const updateOrder = asyncHandler(async (req, res) => {
     order.notes = notes !== undefined ? notes : order.notes;
     order.serviceType = serviceType || order.serviceType;
     order.status = status || order.status;
+    order.province = province || order.province;
 
     const updatedOrder = await order.save();
     

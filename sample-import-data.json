@@ -1,0 +1,82 @@
+{
+  "staff": [
+    {
+      "name": "小美",
+      "age": 24,
+      "job": "模特",
+      "province": "北京市",
+      "image": "https://via.placeholder.com/300x400/FF6B6B/FFFFFF?text=小美",
+      "photos": [
+        "https://via.placeholder.com/300x400/4ECDC4/FFFFFF?text=小美-照片1",
+        "https://via.placeholder.com/300x400/45B7D1/FFFFFF?text=小美-照片2",
+        "https://via.placeholder.com/300x400/96CEB4/FFFFFF?text=小美-照片3"
+      ],
+      "height": 168,
+      "weight": 50,
+      "description": "专业模特，形象气质佳，擅长时尚摄影",
+      "tag": "可预约"
+    },
+    {
+      "name": "小雨",
+      "age": 22,
+      "job": "舞蹈老师",
+      "province": "上海市",
+      "image": "https://via.placeholder.com/300x400/96CEB4/FFFFFF?text=小雨",
+      "photos": [
+        "https://via.placeholder.com/300x400/FFEAA7/FFFFFF?text=小雨-照片1",
+        "https://via.placeholder.com/300x400/DDA0DD/FFFFFF?text=小雨-照片2"
+      ],
+      "height": 165,
+      "weight": 48,
+      "description": "专业舞蹈老师，身材优美，擅长各种舞蹈",
+      "tag": "可预约"
+    },
+    {
+      "name": "小丽",
+      "age": 25,
+      "job": "健身教练",
+      "province": "广州市",
+      "image": "https://via.placeholder.com/300x400/F7DC6F/FFFFFF?text=小丽",
+      "photos": [
+        "https://via.placeholder.com/300x400/BB8FCE/FFFFFF?text=小丽-照片1",
+        "https://via.placeholder.com/300x400/85C1E9/FFFFFF?text=小丽-照片2",
+        "https://via.placeholder.com/300x400/FF6B6B/FFFFFF?text=小丽-照片3"
+      ],
+      "height": 170,
+      "weight": 55,
+      "description": "专业健身教练，身材健美，擅长力量训练",
+      "tag": "可预约"
+    },
+    {
+      "name": "小芳",
+      "age": 23,
+      "job": "瑜伽老师",
+      "province": "深圳市",
+      "image": "https://via.placeholder.com/300x400/4ECDC4/FFFFFF?text=小芳",
+      "photos": [
+        "https://via.placeholder.com/300x400/45B7D1/FFFFFF?text=小芳-照片1",
+        "https://via.placeholder.com/300x400/96CEB4/FFFFFF?text=小芳-照片2"
+      ],
+      "height": 163,
+      "weight": 47,
+      "description": "专业瑜伽老师，身材柔美，擅长各种瑜伽体式",
+      "tag": "可预约"
+    },
+    {
+      "name": "小婷",
+      "age": 26,
+      "job": "美容师",
+      "province": "杭州市",
+      "image": "https://via.placeholder.com/300x400/FFEAA7/FFFFFF?text=小婷",
+      "photos": [
+        "https://via.placeholder.com/300x400/DDA0DD/FFFFFF?text=小婷-照片1",
+        "https://via.placeholder.com/300x400/98D8C8/FFFFFF?text=小婷-照片2",
+        "https://via.placeholder.com/300x400/F7DC6F/FFFFFF?text=小婷-照片3"
+      ],
+      "height": 167,
+      "weight": 52,
+      "description": "专业美容师，皮肤护理专家，擅长各种美容项目",
+      "tag": "可预约"
+    }
+  ]
+}
