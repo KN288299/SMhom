@@ -1,7 +1,7 @@
 # 🚀 家政服务APP手动部署指南
 
 ## 📋 服务器信息
-- **服务器IP**: `38.207.178.173`
+- **服务器IP**: `38.207.176.241`
 - **SSH端口**: `55122`
 - **目标目录**: `/opt/homeservice`
 
@@ -12,7 +12,7 @@
 打开终端/PowerShell，连接到服务器：
 
 ```bash
-ssh root@38.207.178.173 -p 55122
+ssh root@38.207.176.241 -p 55122
 ```
 
 输入密码后，你应该看到服务器的命令行界面。
@@ -134,7 +134,7 @@ git clone [你的Git仓库地址] .
 tar --exclude=node_modules --exclude=android/app/build --exclude=ios/build --exclude=admin/node_modules --exclude=admin/dist --exclude=.git -czf homeservice.tar.gz .
 
 # 上传到服务器
-scp -P 55122 homeservice.tar.gz root@38.207.178.173:/opt/homeservice/
+scp -P 55122 homeservice.tar.gz root@38.207.176.241:/opt/homeservice/
 ```
 
 然后在服务器上解压：
@@ -175,7 +175,7 @@ JWT_SECRET=your_super_secure_jwt_secret_key_please_change_this
 UPLOAD_PATH=./uploads
 
 # CORS允许的域名
-CORS_ORIGINS=http://38.207.178.173:3000,http://38.207.178.173:8080,http://38.207.178.173
+CORS_ORIGINS=http://38.207.176.241:3000,http://38.207.176.241:8080,http://38.207.176.241
 
 # 环境设置
 NODE_ENV=production
@@ -261,7 +261,7 @@ nano /etc/nginx/sites-available/homeservice
 ```nginx
 server {
     listen 80;
-    server_name 38.207.178.173;
+    server_name 38.207.176.241;
 
     # 增加客户端最大上传大小
     client_max_body_size 50M;
@@ -361,9 +361,9 @@ curl http://localhost:3000/api/health
 
 ### 10.2 测试Web访问
 在浏览器中访问：
-- `http://38.207.178.173` - 应该重定向到管理后台
-- `http://38.207.178.173/admin/` - 管理后台界面
-- `http://38.207.178.173/api/health` - API健康检查
+- `http://38.207.176.241` - 应该重定向到管理后台
+- `http://38.207.176.241/admin/` - 管理后台界面
+- `http://38.207.176.241/api/health` - API健康检查
 
 ### 10.3 检查服务状态
 ```bash
@@ -388,8 +388,8 @@ pm2 logs homeservice-api
 在移动端代码中，确保API地址指向你的服务器：
 ```javascript
 // 在相关配置文件中
-const API_BASE_URL = 'http://38.207.178.173/api';
-const SOCKET_URL = 'http://38.207.178.173';
+const API_BASE_URL = 'http://38.207.176.241/api';
+const SOCKET_URL = 'http://38.207.176.241';
 ```
 
 ### 11.2 打包Android APK
@@ -496,6 +496,6 @@ nginx -s reload
 **🎉 恭喜！如果所有步骤都完成了，你的家政服务APP应该已经成功部署并运行在服务器上了！**
 
 **访问地址**:
-- Web管理后台: `http://38.207.178.173/admin/`
-- API接口: `http://38.207.178.173/api/`
-- Socket.io: `http://38.207.178.173`
+- Web管理后台: `http://38.207.176.241/admin/`
+- API接口: `http://38.207.176.241/api/`
+- Socket.io: `http://38.207.176.241`

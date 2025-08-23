@@ -15,11 +15,11 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://38.207.178.173:3000',
+        target: 'http://38.207.176.241:3000',
         changeOrigin: true,
       },
       '/uploads': {
-        target: 'http://38.207.178.173:3000',
+        target: 'http://38.207.176.241:3000',
         changeOrigin: true,
       },
     },

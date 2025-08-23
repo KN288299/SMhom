@@ -7,7 +7,7 @@
 
 const axios = require('axios');
 
-const SERVER_BASE_URL = 'http://38.207.178.173:3000';
+const SERVER_BASE_URL = 'http://38.207.176.241:3000';
 
 async function testStaffEdit() {
   console.log('🧪 开始测试员工编辑功能...\n');

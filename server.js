@@ -42,7 +42,7 @@ const server = http.createServer(app);
 // 创建Socket.io实例
 const io = socketIO(server, {
   cors: {
-    origin: ['http://38.207.178.173', 'http://38.207.178.173:3000', 'http://38.207.178.173:8080', 'http://10.0.2.2:3000', 'http://10.0.2.2:8081'],
+    origin: ['http://38.207.176.241', 'http://38.207.176.241:3000', 'http://38.207.176.241:8080', 'http://10.0.2.2:3000', 'http://10.0.2.2:8081'],
     methods: ['GET', 'POST'],
     credentials: true
   }
@@ -54,7 +54,7 @@ connectDB();
 // 中间件
 app.set('trust proxy', 1);
 app.use(cors({
-  origin: ['http://38.207.178.173', 'http://38.207.178.173:3000', 'http://38.207.178.173:8080', 'http://10.0.2.2:3000', 'http://10.0.2.2:8081'],
+  origin: ['http://38.207.176.241', 'http://38.207.176.241:3000', 'http://38.207.176.241:8080', 'http://10.0.2.2:3000', 'http://10.0.2.2:8081'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
@@ -91,7 +91,7 @@ app.get('/api/webrtc/ice-config', protect, (req, res) => {
   try {
     const ttlSeconds = Number(process.env.TURN_TTL || 600); // 默认10分钟
     const turnSecret = process.env.TURN_SECRET || '';
-    const turnHost = process.env.TURN_HOST || '38.207.178.173';
+    const turnHost = process.env.TURN_HOST || '38.207.176.241';
     const turnHostname = process.env.TURN_HOSTNAME; // 可选：如配置了域名证书
 
     // 构建STUN服务器列表
@@ -952,7 +952,7 @@ io.on('connection', (socket) => {
           let avatarUrl = null;
           if (callerInfo && callerInfo.avatar) {
             // 获取服务器基础URL
-            const serverBaseUrl = `http://38.207.178.173:3000`;
+            const serverBaseUrl = `http://38.207.176.241:3000`;
             
             // 如果头像路径以/开头，说明是服务器上的相对路径，需要转换为完整URL
             if (callerInfo.avatar.startsWith('/')) {

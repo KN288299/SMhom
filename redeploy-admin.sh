@@ -42,4 +42,4 @@ echo "检查nginx状态..."
 systemctl status nginx --no-pager
 
 echo "管理后台重新部署完成！"
-echo "请访问: http://38.207.178.173/admin" 
+echo "请访问: http://38.207.176.241/admin" 

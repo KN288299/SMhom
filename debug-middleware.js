@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 // 服务器基础URL
-const SERVER_BASE_URL = 'http://38.207.178.173:3000';
+const SERVER_BASE_URL = 'http://38.207.176.241:3000';
 
 async function debugMiddleware() {
   try {
