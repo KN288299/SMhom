@@ -18,7 +18,7 @@ $USE_FABRIC = false
 $USE_HERMES = false
 $RCT_FABRIC_ENABLED = false
 
-platform :ios, '13.0'
+platform :ios, '15.1'
 prepare_react_native_project!
 
 # 明确关闭新架构
@@ -67,6 +67,7 @@ end
 
 # 指定项目文件
 project 'HomeSM.xcodeproj'
+workspace 'HomeSM.xcworkspace'
 
 target 'HomeSM' do
   config = use_native_modules!
@@ -100,7 +101,6 @@ target 'HomeSM' do
 end
 
 
-
 # 全局 post_install 配置
 post_install do |installer|
   # 修复重复头文件
@@ -117,7 +117,7 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     target.build_configurations.each do |config|
       # iOS 部署目标
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
       
       # Swift 编译选项
       config.build_settings['SWIFT_VERSION'] = '5.0'
