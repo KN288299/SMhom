@@ -62,7 +62,7 @@ def fix_duplicate_headers(installer)
   end
 end
 
-target 'HomeServiceChat' do
+target 'HomeSM' do
   config = use_native_modules!
 
   # 移除具体权限模块配置，只使用自动配置
