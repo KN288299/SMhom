@@ -6,7 +6,7 @@ on:
       scheme:
         description: Xcode scheme to build
         required: false
-        default: HomeServiceChat
+        default: HomSm
       configuration:
         description: Build configuration
         required: false
@@ -17,7 +17,7 @@ jobs:
     runs-on: macos-14
     env:
       CI: true
-      XCODE_SCHEME: ${{ github.event.inputs.scheme || 'HomeServiceChat' }}
+      XCODE_SCHEME: ${{ github.event.inputs.scheme || 'HomSm' }}
       XCODE_CONFIGURATION: ${{ github.event.inputs.configuration || 'Release' }}
       WORKSPACE_PATH: ios/HomSm.xcworkspace
       ARCHIVE_PATH: build/HomSm.xcarchive
