@@ -1,13 +1,6 @@
 import UIKit
 import React
-
-#if __has_include("React/RCTAppDelegate.h")
-import React
-#endif
-
-#if __has_include("React-RCTAppDelegate/RCTAppDelegate.h")
-@_exported import React_RCTAppDelegate
-#endif
+import React_RCTAppDelegate
 
 
 @UIApplicationMain
