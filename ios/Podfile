@@ -1,0 +1,171 @@
+# Resolve react_native_pods.rb with node to allow for hoisting
+require Pod::Executable.execute_command('node', ['-p',
+  'require.resolve(
+    "react-native/scripts/react_native_pods.rb",
+    {paths: [process.argv[1]]},
+  )', __dir__]).strip
+
+# 使用 CDN 源
+source 'https://cdn.cocoapods.org/'
+
+# react-native-permissions v5+ 集成脚本（以 setup_permissions 方式选择所需权限）
+require_relative '../node_modules/react-native-permissions/scripts/setup'
+
+# 全局强制设置，确保关闭新架构
+$RCT_NEW_ARCH_ENABLED = false
+$fabric_enabled = false
+$USE_FABRIC = false
+$USE_HERMES = false
+$RCT_FABRIC_ENABLED = false
+
+platform :ios, '15.1'
+prepare_react_native_project!
+
+# 明确关闭新架构
+ENV['RCT_NEW_ARCH_ENABLED'] = '0'
+ENV['NO_FLIPPER'] = '1'
+ENV['USE_FABRIC'] = '0'
+ENV['USE_HERMES'] = '0'
+
+# 不全局开启 modular headers 或 use_frameworks，避免广泛冲突
+
+# 辅助函数：禁用React-RCTFabric目标
+def disable_react_fabric_target(installer)
+  puts "禁用React-RCTFabric目标..."
+
+  installer.pods_project.targets.each do |target|
+    if target.name == 'React-RCTFabric'
+      puts "找到React-RCTFabric目标，禁用新架构相关代码"
+
+      # 处理重复的头文件问题
+      target.headers_build_phase.files.each do |build_file|
+        if build_file.display_name == 'RCTViewComponentView.h'
+          file_path = build_file.file_ref.real_path.to_s
+          puts "找到头文件: #{file_path}"
+          if file_path.include?('ComponentViews/View')
+            # PBXBuildFile 没有 remove_from_build_phase，使用 remove_from_project 即可
+            build_file.remove_from_project
+            puts "已移除冲突的RCTViewComponentView.h文件: #{file_path}"
+          end
+        end
+      end
+
+      target.build_configurations.each do |config|
+        # 确保未定义 RCT_NEW_ARCH_ENABLED 宏（而不是将其设置为 0）
+        defs = Array(config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] || ['$(inherited)'])
+        defs = defs.reject { |d| d.to_s.include?('RCT_NEW_ARCH_ENABLED') }
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs
+        config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
+      end
+    end
+  end
+end
+
+# 修复重复头文件的函数
+def fix_duplicate_headers(installer)
+  # 禁用React-RCTFabric目标（优先处理潜在冲突）
+  disable_react_fabric_target(installer)
+  puts "正在修复重复头文件..."
+  installer.pods_project.targets.each do |target|
+    if target.name == 'RNPermissions'
+      puts "修复RNPermissions头文件..."
+      target.build_phases.each do |phase|
+        if phase.is_a?(Xcodeproj::Project::Object::PBXHeadersBuildPhase)
+          duplicate_files = phase.files.group_by(&:display_name).select { |_, v| v.size > 1 }
+          if duplicate_files.any?
+            puts "发现重复头文件: #{duplicate_files.keys.join(', ')}"
+            duplicate_files.each do |name, files|
+              files[1..-1].each { |file| file.remove_from_project }
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
+target 'HomSm' do
+  config = use_native_modules!
+
+  # 选择需要的权限（需与 Info.plist 中的用途说明相匹配）
+  setup_permissions([
+    'Camera',
+    'Microphone',
+    'PhotoLibrary',
+    'LocationWhenInUse'
+  ])
+
+  use_react_native!(
+    :path => config[:reactNativePath],
+    :hermes_enabled => false,
+    # 禁用新架构
+    :fabric_enabled => false,
+    # An absolute path to your application root.
+    :app_path => "#{Pod::Config.instance.installation_root}/.."
+  )
+
+  # 移除 Firebase 相关配置，暂时注释掉
+  # pod 'FirebaseCoreInternal', :modular_headers => true, :inhibit_warnings => true
+  # pod 'FirebaseCore', :modular_headers => true, :inhibit_warnings => true
+  # pod 'FirebaseMessaging', :modular_headers => true, :inhibit_warnings => true
+  # pod 'GoogleUtilities', :modular_headers => true, :inhibit_warnings => true
+
+  # Vector Icons 配置 - 使用自动链接
+  # pod 'RNVectorIcons', :path => '../node_modules/react-native-vector-icons'
+
+  post_install do |installer|
+    # 修复重复头文件
+    fix_duplicate_headers(installer)
+    
+    # https://github.com/facebook/react-native/blob/main/packages/react-native/scripts/react_native_pods.rb#L197-L202
+    react_native_post_install(
+      installer,
+      config[:reactNativePath],
+      :mac_catalyst_enabled => false,
+      # :ccache_enabled => true
+    )
+    
+    # 设置编译选项
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        # iOS 部署目标，和 Xcode 工程保持一致
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+        
+        # Swift 编译选项
+        config.build_settings['SWIFT_VERSION'] = '5.0'
+        if config.name == 'Debug'
+          config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
+        else
+          config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Osize'
+        end
+        
+        # C++ 标准
+        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++20'
+        
+        # 禁用 arm64 模拟器构建
+        config.build_settings["EXCLUDED_ARCHS[sdk=iphonesimulator*]"] = "arm64"
+        
+        # 其它优化
+        if config.name == 'Debug'
+          config.build_settings['GCC_OPTIMIZATION_LEVEL'] = '0'
+        else
+          config.build_settings['GCC_OPTIMIZATION_LEVEL'] = 's'
+        end
+        config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
+        config.build_settings['ENABLE_BITCODE'] = 'NO'
+        
+        # 确保未定义新架构宏，避免触发 #ifdef RCT_NEW_ARCH_ENABLED 代码路径
+        defs = Array(config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] || ['$(inherited)'])
+        defs = defs.reject { |d| d.to_s.include?('RCT_NEW_ARCH_ENABLED') }
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs
+        
+        # 为RNPermissions添加特殊处理
+        if target.name == 'RNPermissions'
+          config.build_settings['HEADER_SEARCH_PATHS'] ||= '$(inherited)'
+          config.build_settings['HEADER_SEARCH_PATHS'] << ' $(PODS_ROOT)/Headers/Public/RNPermissions'
+          config.build_settings['HEADER_SEARCH_PATHS'] << ' $(PODS_ROOT)/../../node_modules/react-native-permissions/ios'
+        end
+      end
+    end
+  end
+end
