@@ -5,7 +5,7 @@ buildscript {
         compileSdkVersion = 35
         targetSdkVersion = 34
         ndkVersion = "26.1.10909125"
-        kotlinVersion = "1.8.22"
+        kotlinVersion = "1.9.10"
     }
     repositories {
         google()
@@ -15,7 +15,7 @@ buildscript {
     dependencies {
         classpath("com.android.tools.build:gradle:8.6.0")
         classpath("com.facebook.react:react-native-gradle-plugin")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.8.22")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.10")
         classpath 'com.google.gms:google-services:4.3.15'
     }
 }
@@ -39,11 +39,11 @@ allprojects { project ->
 subprojects { subproject ->
 	configurations.configureEach { cfg ->
 		cfg.resolutionStrategy {
-			force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
-			force 'org.jetbrains.kotlin:kotlin-stdlib-common:1.8.22'
-			force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
-			force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
-			force 'org.jetbrains.kotlin:kotlin-reflect:1.8.22'
+			force 'org.jetbrains.kotlin:kotlin-stdlib:1.9.10'
+			force 'org.jetbrains.kotlin:kotlin-stdlib-common:1.9.10'
+			force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.10'
+			force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.10'
+			force 'org.jetbrains.kotlin:kotlin-reflect:1.9.10'
 		}
 	}
 

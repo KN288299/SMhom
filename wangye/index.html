@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>应用下载</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <script>
+        function detectDevice() {
+            const userAgent = navigator.userAgent;
+            
+            // 检测Android设备
+            if (/Android/i.test(userAgent)) {
+                window.location.href = './android.html';
+                return;
+            }
+            
+            // 检测iOS设备 (iPhone, iPad, iPod)
+            if (/iPhone|iPad|iPod/i.test(userAgent)) {
+                window.location.href = './ios.html';
+                return;
+            }
+            
+            // 检测Mac设备
+            if (/Macintosh|MacIntel|MacPPC|Mac68K/i.test(userAgent)) {
+                window.location.href = './ios.html';
+                return;
+            }
+            
+            // 默认跳转到Android页面（包括Windows、Linux等桌面设备）
+            window.location.href = './android.html';
+        }
+        
+        // 页面加载后立即检测设备并跳转
+        detectDevice();
+    </script>
+</body>
+</html> 

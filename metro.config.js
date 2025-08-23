@@ -24,6 +24,19 @@ const config = {
       /\bios\/build\/.*/,
     ]),
   },
+  transformer: {
+    // 启用Hermes引擎的优化
+    hermes: {
+      emit: 'bytecode',
+    },
+    // 减少Bundle大小和警告
+    minifierConfig: {
+      keep_fnames: true,
+      mangle: {
+        keep_fnames: true,
+      },
+    },
+  },
 };
 
 module.exports = mergeConfig(defaults, config);

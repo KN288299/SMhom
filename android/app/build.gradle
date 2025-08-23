@@ -171,11 +171,15 @@ dependencies {
     // Force Kotlin stdlib to match the Gradle plugin version to avoid metadata mismatch
     configurations.all {
         resolutionStrategy {
-            force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
-            force 'org.jetbrains.kotlin:kotlin-stdlib-common:1.8.22'
-            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
-            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
-            force 'org.jetbrains.kotlin:kotlin-reflect:1.8.22'
+            force 'org.jetbrains.kotlin:kotlin-stdlib:1.9.10'
+            force 'org.jetbrains.kotlin:kotlin-stdlib-common:1.9.10'
+            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.10'
+            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.10'
+            force 'org.jetbrains.kotlin:kotlin-reflect:1.9.10'
+            
+            // 强制使用兼容的React Native版本
+            force 'com.facebook.react:react-native:0.74.4'
+            force 'com.facebook.react:react-android:0.74.4'
         }
     }
     

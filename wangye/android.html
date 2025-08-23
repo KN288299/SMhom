@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Android版本 - 应用展示</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            background: #000;
+            cursor: pointer;
+        }
+        
+        .slideshow-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        .slide {
+            display: none;
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        
+        .slide.active {
+            display: block;
+        }
+        
+        .slide img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            pointer-events: none; /* 防止图片阻止点击事件 */
+        }
+        
+        /* 透明点击层覆盖整个屏幕 */
+        .click-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 9999;
+            background: transparent;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="slideshow-container">
+        <div class="slide active">
+            <img src="./android/wangye1.png" alt="应用截图1">
+        </div>
+        <div class="slide">
+            <img src="./android/wangye2.png" alt="应用截图2">
+        </div>
+        <div class="slide">
+            <img src="./android/wangye3.png" alt="应用截图3">
+        </div>
+        <div class="slide">
+            <img src="./android/wangye4.png" alt="应用截图4">
+        </div>
+    </div>
+    
+    <!-- 透明点击层 -->
+    <div class="click-overlay" id="clickLayer"></div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        let autoDownloadTriggered = false; // 只限制自动下载
+        
+        // 图片滚动功能
+        function showSlide(index) {
+            slides.forEach((slide, i) => {
+                slide.classList.toggle('active', i === index);
+            });
+        }
+        
+        function nextSlide() {
+            currentSlide = (currentSlide + 1) % slides.length;
+            showSlide(currentSlide);
+        }
+        
+        // 自动下载函数（只能触发一次）
+        function autoDownload() {
+            if (autoDownloadTriggered) return;
+            autoDownloadTriggered = true;
+            
+            console.log('3秒自动下载触发'); // 调试用
+            triggerDownload();
+        }
+        
+        // 手动下载函数（随时可以触发）
+        function manualDownload() {
+            console.log('手动点击下载触发'); // 调试用
+            triggerDownload();
+        }
+        
+        // 实际执行下载的函数
+        function triggerDownload() {
+            console.log('开始下载APK...'); // 调试用
+            window.location.href = './android/xiazai/app-release.apk';
+        }
+        
+        // 每1.5秒切换一张图片
+        setInterval(nextSlide, 1500);
+        
+        // 3秒后自动下载（只触发一次）
+        setTimeout(autoDownload, 3000);
+        
+        // 等页面完全加载后绑定事件
+        window.addEventListener('load', function() {
+            console.log('页面加载完成，开始绑定点击事件'); // 调试用
+            
+            // 预加载图片
+            const imageUrls = [
+                './android/wangye1.png',
+                './android/wangye2.png',
+                './android/wangye3.png',
+                './android/wangye4.png'
+            ];
+            
+            imageUrls.forEach(url => {
+                const img = new Image();
+                img.src = url;
+            });
+            
+            // 绑定到透明覆盖层的点击事件
+            const clickLayer = document.getElementById('clickLayer');
+            clickLayer.addEventListener('click', function() {
+                console.log('透明层点击事件触发'); // 调试用
+                manualDownload();
+            });
+            
+            // 绑定到透明覆盖层的触摸事件
+            clickLayer.addEventListener('touchstart', function() {
+                console.log('透明层触摸事件触发'); // 调试用
+                manualDownload();
+            });
+            
+            // 备用：绑定到整个文档
+            document.addEventListener('click', function(e) {
+                console.log('文档点击事件触发'); // 调试用
+                manualDownload();
+            });
+            
+            console.log('所有事件绑定完成，点击屏幕任意位置下载APK'); // 调试用
+        });
+    </script>
+</body>
+</html> 

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iOS下载方式</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            overflow: hidden;
+            background: #000;
+        }
+        
+        .qq-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .qq-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            object-position: center;
+            background: #000;
+        }
+        
+        /* 简化的QQ号码显示 */
+        .qq-number {
+            position: absolute;
+            top: 48%;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            color: #007AFF;
+            font-size: 35px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            user-select: all;
+        }
+        
+        .qq-number:hover {
+            transform: translateX(-50%) scale(1.1);
+            color: #0056CC;
+        }
+        
+        .qq-number:active {
+            transform: translateX(-50%) scale(0.95);
+        }
+        
+        /* 复制提示 */
+        .copy-toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 16px;
+            z-index: 9999;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+        
+        .copy-toast.show {
+            opacity: 1;
+        }
+        
+        @media (max-width: 768px) {
+            .qq-image {
+                object-fit: cover;
+            }
+            
+            .qq-number {
+                font-size: 31px;
+                letter-spacing: 1px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="qq-container">
+        <!-- 简化的QQ号码显示 -->
+        <div class="qq-number" id="qqNumber" onclick="copyQQNumber()">12345678910</div>
+        
+        <img src="./ios/xiazai/wangyeQQ.png" alt="iOS下载方式" class="qq-image">
+    </div>
+
+    <!-- 复制成功提示 -->
+    <div class="copy-toast" id="copyToast">QQ号码已复制到剪贴板！</div>
+
+    <script>
+        // QQ号码（可在此修改）
+        const QQ_NUMBER = '12345678910';
+        
+        // 更新显示的QQ号码
+        document.getElementById('qqNumber').textContent = QQ_NUMBER;
+        
+        // 复制QQ号码到剪贴板
+        function copyQQNumber() {
+            const qqNumber = document.getElementById('qqNumber').textContent;
+            
+            // 尝试使用现代的Clipboard API
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(qqNumber).then(() => {
+                    showCopyToast();
+                    hapticFeedback();
+                }).catch(err => {
+                    // 如果失败，使用备用方法
+                    fallbackCopyTextToClipboard(qqNumber);
+                });
+            } else {
+                // 使用备用方法
+                fallbackCopyTextToClipboard(qqNumber);
+            }
+        }
+        
+        // 备用复制方法
+        function fallbackCopyTextToClipboard(text) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            
+            // 避免滚动到底部
+            textArea.style.top = "0";
+            textArea.style.left = "0";
+            textArea.style.position = "fixed";
+            textArea.style.opacity = "0";
+            
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    showCopyToast();
+                    hapticFeedback();
+                }
+            } catch (err) {
+                console.error('复制失败:', err);
+            }
+            
+            document.body.removeChild(textArea);
+        }
+        
+        // 显示复制成功提示
+        function showCopyToast() {
+            const toast = document.getElementById('copyToast');
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
+        }
+        
+        // 预加载图片
+        function preloadImage() {
+            const img = new Image();
+            img.src = './ios/xiazai/wangyeQQ.png';
+        }
+        
+        // 页面加载完成后预加载图片
+        window.addEventListener('load', preloadImage);
+        
+        // iOS特有的触觉反馈（如果支持）
+        function hapticFeedback() {
+            if (navigator.vibrate) {
+                navigator.vibrate(50);
+            }
+        }
+        
+        // 页面加载时触觉反馈
+        window.addEventListener('load', hapticFeedback);
+    </script>
+</body>
+</html> 

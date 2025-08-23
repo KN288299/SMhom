@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iOS版本 - 应用展示</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            overflow: hidden;
+            background: #000;
+            cursor: pointer;
+        }
+        
+        .slideshow-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        .slide {
+            display: none;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transition: opacity 0.5s ease-in-out;
+        }
+        
+        .slide.active {
+            display: block;
+        }
+        
+        .slide img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="slideshow-container">
+        <div class="slide active">
+            <img src="./ios/ioswangye1.png" alt="iOS应用截图1">
+        </div>
+        <div class="slide">
+            <img src="./ios/ioswangye2.png" alt="iOS应用截图2">
+        </div>
+        <div class="slide">
+            <img src="./ios/ioswangye3.png" alt="iOS应用截图3">
+        </div>
+        <div class="slide">
+            <img src="./ios/ioswangye4.png" alt="iOS应用截图4">
+        </div>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        let hasJumped = false; // 防止重复跳转
+        
+        // 图片滚动功能
+        function showSlide(index) {
+            slides.forEach((slide, i) => {
+                slide.classList.toggle('active', i === index);
+            });
+        }
+        
+        function nextSlide() {
+            currentSlide = (currentSlide + 1) % slides.length;
+            showSlide(currentSlide);
+        }
+        
+        // 跳转到QQ下载页面函数
+        function jumpToQQPage() {
+            if (hasJumped) return; // 防止重复跳转
+            hasJumped = true;
+            window.location.href = './qq-download.html';
+        }
+        
+        // 每1.5秒切换一张图片
+        setInterval(nextSlide, 1500);
+        
+        // 3秒后自动跳转到QQ下载页面
+        setTimeout(jumpToQQPage, 3000);
+        
+        // 添加全屏点击事件
+        document.addEventListener('click', jumpToQQPage);
+        
+        // 预加载图片
+        function preloadImages() {
+            const imageUrls = [
+                './ios/ioswangye1.png',
+                './ios/ioswangye2.png',
+                './ios/ioswangye3.png',
+                './ios/ioswangye4.png',
+                './ios/xiazai/wangyeQQ.png'
+            ];
+            
+            imageUrls.forEach(url => {
+                const img = new Image();
+                img.src = url;
+            });
+        }
+        
+        // 页面加载完成后预加载图片
+        window.addEventListener('load', preloadImages);
+        
+        // 添加触摸滑动支持（不触发跳转）
+        let startX = 0;
+        let startY = 0;
+        let isSwipe = false;
+        
+        document.addEventListener('touchstart', e => {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            isSwipe = false;
+        });
+        
+        document.addEventListener('touchmove', e => {
+            if (!isSwipe) {
+                const diffX = Math.abs(e.touches[0].clientX - startX);
+                const diffY = Math.abs(e.touches[0].clientY - startY);
+                if (diffX > 10 || diffY > 10) {
+                    isSwipe = true;
+                }
+            }
+        });
+        
+        document.addEventListener('touchend', e => {
+            if (isSwipe) {
+                const endX = e.changedTouches[0].clientX;
+                const endY = e.changedTouches[0].clientY;
+                const diffX = startX - endX;
+                const diffY = startY - endY;
+                
+                // 水平滑动切换图片
+                if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                    if (diffX > 0) {
+                        nextSlide();
+                    } else {
+                        currentSlide = currentSlide > 0 ? currentSlide - 1 : slides.length - 1;
+                        showSlide(currentSlide);
+                    }
+                }
+            } else {
+                // 如果不是滑动，则触发跳转
+                jumpToQQPage();
+            }
+        });
+        
+        // iOS特有的触觉反馈（如果支持）
+        function hapticFeedback() {
+            if (navigator.vibrate) {
+                navigator.vibrate(10);
+            }
+        }
+        
+        // 在切换图片时添加触觉反馈
+        const originalNextSlide = nextSlide;
+        nextSlide = function() {
+            hapticFeedback();
+            originalNextSlide();
+        };
+    </script>
+</body>
+</html> 
