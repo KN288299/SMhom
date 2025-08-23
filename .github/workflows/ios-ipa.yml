@@ -17,10 +17,10 @@ jobs:
     runs-on: macos-14
     env:
       CI: true
-      XCODE_SCHEME: ${{ github.event.inputs.scheme || 'HomeServiceChat' }}
+      XCODE_SCHEME: ${{ github.event.inputs.scheme || 'HomeSM' }}
       XCODE_CONFIGURATION: ${{ github.event.inputs.configuration || 'Release' }}
-      WORKSPACE_PATH: ios/HomeServiceChat.xcworkspace
-      ARCHIVE_PATH: build/HomeServiceChat.xcarchive
+      WORKSPACE_PATH: ios/HomeSM.xcworkspace
+      ARCHIVE_PATH: build/HomeSM.xcarchive
       EXPORT_PATH: build/ipa
       EXPORT_PLIST: ios/exportOptions.plist
     steps:
