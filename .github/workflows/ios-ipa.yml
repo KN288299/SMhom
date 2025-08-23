@@ -19,7 +19,7 @@ jobs:
       CI: true
       XCODE_SCHEME: ${{ github.event.inputs.scheme || 'HomeSM' }}
       XCODE_CONFIGURATION: ${{ github.event.inputs.configuration || 'Release' }}
-      WORKSPACE_PATH: ios/HomeSM.xcworkspace
+      WORKSPACE_PATH: ios/HomeSM.xcodeproj
       ARCHIVE_PATH: build/HomeSM.xcarchive
       EXPORT_PATH: build/ipa
       EXPORT_PLIST: ios/exportOptions.plist
@@ -71,7 +71,7 @@ jobs:
         run: |
           set -e
           xcodebuild \
-            -workspace "$WORKSPACE_PATH" \
+            -project "$WORKSPACE_PATH" \
             -scheme "$XCODE_SCHEME" \
             -configuration "$XCODE_CONFIGURATION" \
             -sdk iphoneos \
