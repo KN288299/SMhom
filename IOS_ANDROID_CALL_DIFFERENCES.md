@@ -84,7 +84,7 @@ const PlatformCallManager: React.FC = () => {
 ### **3. iOS后台模式配置**
 
 ```xml
-<!-- ios/HomeServiceChat/Info.plist -->
+<!-- ios/HomSm/Info.plist -->
 <key>UIBackgroundModes</key>
 <array>
   <string>voip</string>           <!-- 语音通话 -->

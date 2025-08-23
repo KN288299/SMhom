@@ -6,7 +6,7 @@ on:
       scheme:
         description: Xcode scheme to build
         required: false
-        default: HomeSM
+        default: HomeServiceChat
       configuration:
         description: Build configuration
         required: false
@@ -17,12 +17,13 @@ jobs:
     runs-on: macos-14
     env:
       CI: true
-      XCODE_SCHEME: ${{ github.event.inputs.scheme || 'HomeSM' }}
+      XCODE_SCHEME: ${{ github.event.inputs.scheme || 'HomeServiceChat' }}
       XCODE_CONFIGURATION: ${{ github.event.inputs.configuration || 'Release' }}
-      WORKSPACE_PATH: ios/HomeSM.xcodeproj
-      ARCHIVE_PATH: build/HomeSM.xcarchive
+      WORKSPACE_PATH: ios/HomSm.xcworkspace
+      ARCHIVE_PATH: build/HomSm.xcarchive
       EXPORT_PATH: build/ipa
       EXPORT_PLIST: ios/exportOptions.plist
+      APP_NAME: HomSm
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -71,7 +72,7 @@ jobs:
         run: |
           set -e
           xcodebuild \
-            -project "$WORKSPACE_PATH" \
+            -workspace "$WORKSPACE_PATH" \
             -scheme "$XCODE_SCHEME" \
             -configuration "$XCODE_CONFIGURATION" \
             -sdk iphoneos \
@@ -89,7 +90,7 @@ jobs:
         run: |
           set -e
           mkdir -p "$EXPORT_PATH"
-          APP_PATH="$ARCHIVE_PATH/Products/Applications/${XCODE_SCHEME}.app"
+          APP_PATH="$ARCHIVE_PATH/Products/Applications/${APP_NAME}.app"
           if [ ! -d "$APP_PATH" ]; then
             echo "App not found at $APP_PATH" >&2
             exit 1
@@ -98,9 +99,9 @@ jobs:
           mkdir -p "$WORK_DIR/Payload"
           cp -R "$APP_PATH" "$WORK_DIR/Payload/"
           cd "$WORK_DIR"
-          zip -r "${XCODE_SCHEME}-unsigned.ipa" Payload > /dev/null
+          zip -r "${APP_NAME}-unsigned.ipa" Payload > /dev/null
           cd -
-          mv "$WORK_DIR/${XCODE_SCHEME}-unsigned.ipa" "$EXPORT_PATH/"
+          mv "$WORK_DIR/${APP_NAME}-unsigned.ipa" "$EXPORT_PATH/"
           rm -rf "$WORK_DIR"
 
       - name: List exported files
@@ -119,7 +120,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-xcarchive
-          path: build/HomeSM.xcarchive
+          path: build/HomSm.xcarchive
           if-no-files-found: warn
 
       - name: Upload build logs (if present)
