@@ -1,4 +1,4 @@
-package com.homeservicechat
+package com.homsm
 
 import android.app.Application
 import android.util.Log

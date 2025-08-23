@@ -1,7 +1,7 @@
-# 📱 HomeServiceChat 移动端构建指南
+# 📱 HomeSM 移动端构建指南
 
 ## 🎯 概述
-本指南将帮助你构建和测试HomeServiceChat移动端应用。
+本指南将帮助你构建和测试HomeSM移动端应用。
 
 ## ✅ 前置条件检查
 - ✅ 服务器已部署并运行正常
@@ -13,7 +13,7 @@
 ### 1. 环境准备
 ```bash
 # 确保你在项目根目录
-cd HomeServiceChat
+cd HomeSM
 
 # 安装依赖
 npm install
@@ -54,7 +54,7 @@ cd ios
 pod install
 
 # 在Xcode中打开项目
-open HomeServiceChat.xcworkspace
+open HomeSM.xcworkspace
 ```
 
 ## 🧪 测试指南

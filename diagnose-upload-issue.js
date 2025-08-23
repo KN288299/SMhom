@@ -148,7 +148,7 @@ console.log('5. 如果问题持续，检查服务器内存和磁盘空间');
 
 console.log('\n🔧 9. 快速修复命令:');
 console.log('# 修复Git权限:');
-console.log('git config --global --add safe.directory /var/www/HomeServiceChat');
+console.log('git config --global --add safe.directory /var/www/HomeSM');
 console.log('');
 console.log('# 检查Nginx配置:');
 console.log('cat /etc/nginx/sites-available/homeservicechat | grep client_max_body_size');

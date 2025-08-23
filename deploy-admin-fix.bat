@@ -9,12 +9,12 @@ echo IP: 38.207.176.241
 echo 端口: 55122
 echo 用户名: root
 echo 密码: NkGKaEDJmF0t
-echo 服务器路径: /var/www/HomeServiceChat/admin/dist
+echo 服务器路径: /var/www/HomeSM/admin/dist
 echo.
 
 echo 部署步骤:
 echo 1. 使用 WinSCP 连接到服务器
-echo 2. 导航到 /var/www/HomeServiceChat/admin/
+echo 2. 导航到 /var/www/HomeSM/admin/
 echo 3. 删除旧的 dist 目录内容
 echo 4. 上传新的 dist 目录内容
 echo 5. 重启 nginx 服务
@@ -31,7 +31,7 @@ echo    - 密码: NkGKaEDJmF0t
 echo.
 
 echo 上传完成后，在服务器上执行:
-echo cd /var/www/HomeServiceChat
+echo cd /var/www/HomeSM
 echo sudo systemctl restart nginx
 echo.
 

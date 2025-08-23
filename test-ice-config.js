@@ -8,7 +8,7 @@
 const https = require('https');
 const http = require('http');
 
-console.log('🧪 HomeServiceChat ICE配置测试工具');
+console.log('🧪 HomeSM ICE配置测试工具');
 console.log('=====================================');
 
 // 获取有效的测试token

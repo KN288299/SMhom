@@ -62,7 +62,7 @@ async function generateIcons(inputImagePath) {
 
   // 生成iOS图标
   console.log('🍎 生成iOS图标...');
-  const iosOutputDir = path.join(__dirname, 'ios/HomeServiceChat/Images.xcassets/AppIcon.appiconset');
+  const iosOutputDir = path.join(__dirname, 'ios/HomeSM/Images.xcassets/AppIcon.appiconset');
   ensureDir(iosOutputDir);
 
   for (const icon of iosSizes) {

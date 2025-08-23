@@ -17,7 +17,7 @@ if exist "src\routes\staffRoutes.js" (
     echo %GREEN%📂 项目目录: %PROJECT_DIR%%NC%
 ) else (
     echo %RED%❌ 未找到项目目录%NC%
-    echo 请在HomeServiceChat项目根目录下运行此脚本
+    echo 请在HomeSM项目根目录下运行此脚本
     pause
     exit /b 1
 )

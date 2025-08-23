@@ -1,4 +1,4 @@
-package com.homeservicechat
+package com.homsm
 
 import android.app.NotificationChannel
 import android.app.NotificationManager

@@ -2,12 +2,12 @@
 
 ## 🎉 恭喜！APK已成功安装
 
-您的 HomeServiceChat 应用已经安装到设备 `3f7688f3` 上，现在可以开始测试推送功能了！
+您的 HomeSM 应用已经安装到设备 `3f7688f3` 上，现在可以开始测试推送功能了！
 
 ## 📱 第一步：基础应用测试
 
 ### 1.1 启动应用
-- 在设备上找到 "HomeServiceChat" 应用图标
+- 在设备上找到 "HomeSM" 应用图标
 - 点击启动应用
 - 检查应用是否正常启动
 
@@ -88,7 +88,7 @@ pm2 logs homeservice-chat --lines 100
 - [ ] 服务器日志是否显示发送推送？
 
 **解决方法**：
-1. 检查通知权限：`设置 > 应用 > HomeServiceChat > 通知`
+1. 检查通知权限：`设置 > 应用 > HomeSM > 通知`
 2. 检查FCM Token：查看应用登录日志
 3. 检查服务器推送日志：`pm2 logs homeservice-chat`
 
@@ -144,6 +144,6 @@ pm2 logs homeservice-chat --lines 100
 
 ## 🚀 开始测试吧！
 
-现在就去您的设备上启动 HomeServiceChat 应用，开始测试推送功能！
+现在就去您的设备上启动 HomeSM 应用，开始测试推送功能！
 
 记住：**推送功能只有在用户真正离线时才会触发**，如果用户在线，消息会通过Socket.io实时发送，不会发送推送通知。 

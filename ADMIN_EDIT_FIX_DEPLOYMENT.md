@@ -26,14 +26,14 @@
      - 密码：NkGKaEDJmF0t
 
 3. **上传文件**
-   - 连接到服务器后，导航到 `/var/www/HomeServiceChat/admin/`
+   - 连接到服务器后，导航到 `/var/www/HomeSM/admin/`
    - 删除 `dist` 目录下的所有文件
    - 将本地的 `admin/dist` 目录下的所有文件上传到服务器的 `dist` 目录
 
 4. **重启服务**
    - 在服务器上执行：
    ```bash
-   cd /var/www/HomeServiceChat
+   cd /var/www/HomeSM
    sudo systemctl restart nginx
    ```
 
@@ -46,7 +46,7 @@
 
 2. **备份当前文件**
    ```bash
-   cd /var/www/HomeServiceChat/admin
+   cd /var/www/HomeSM/admin
    cp -r dist dist_backup_$(date +%Y%m%d_%H%M%S)
    ```
 
@@ -93,14 +93,14 @@
 
 3. **重新构建前端**
    ```bash
-   cd /var/www/HomeServiceChat/admin
+   cd /var/www/HomeSM/admin
    npm run build
    ```
 
 4. **检查文件权限**
    ```bash
-   chown -R www-data:www-data /var/www/HomeServiceChat/admin/dist
-   chmod -R 755 /var/www/HomeServiceChat/admin/dist
+   chown -R www-data:www-data /var/www/HomeSM/admin/dist
+   chmod -R 755 /var/www/HomeSM/admin/dist
    ```
 
 ## 联系信息

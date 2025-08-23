@@ -3,7 +3,7 @@
 echo "开始重新构建和部署管理后台..."
 
 # 进入admin目录
-cd /var/www/HomeServiceChat/admin
+cd /var/www/HomeSM/admin
 
 # 清理旧的构建文件
 echo "清理旧的构建文件..."

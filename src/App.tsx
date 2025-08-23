@@ -1,5 +1,5 @@
 /**
- * HomeServiceChat - 上门服务实时聊天应用
+ * HomSm - 上门服务实时聊天应用
  *
  * @format
  */

@@ -3,7 +3,7 @@
 # 配置TURN服务器域名的脚本
 # 使用方法: ./configure-turn-domain.sh your-domain.com
 
-echo "🔧 HomeServiceChat TURN服务器域名配置工具"
+echo "🔧 HomeSM TURN服务器域名配置工具"
 echo "============================================="
 
 if [ $# -eq 0 ]; then
@@ -25,7 +25,7 @@ echo "📝 配置域名: $DOMAIN"
 if [ ! -f "$ENV_FILE" ]; then
     echo "⚠️  未找到.env文件，创建新的配置文件..."
     cat > "$ENV_FILE" << EOF
-# HomeServiceChat Environment Configuration
+# HomeSM Environment Configuration
 MONGODB_URI=mongodb://localhost:27017/homeservice
 JWT_SECRET=your-super-secret-jwt-key-here
 PORT=3000
@@ -63,7 +63,7 @@ echo "2. 为域名配置SSL证书（推荐使用Let's Encrypt）"
 echo "3. 配置coturn服务器支持TLS/DTLS:"
 echo "   - cert=/path/to/your/cert.pem"
 echo "   - pkey=/path/to/your/private.key"
-echo "4. 重启HomeServiceChat服务"
+echo "4. 重启HomeSM服务"
 echo "5. 测试语音通话功能"
 
 echo ""

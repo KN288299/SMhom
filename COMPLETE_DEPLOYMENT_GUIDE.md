@@ -316,7 +316,7 @@ cd android
 # 需要macOS和Xcode
 cd ios
 pod install
-# 在Xcode中打开 HomeServiceChat.xcworkspace 进行打包
+# 在Xcode中打开 HomeSM.xcworkspace 进行打包
 ```
 
 ---
