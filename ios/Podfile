@@ -118,27 +118,7 @@ target 'HomeSM' do
 
 end
 
-# 保持向后兼容的旧 target
-target 'HomeServiceChat' do
-  config = use_native_modules!
 
-  # 选择需要的权限（需与 Info.plist 中的用途说明相匹配）
-  setup_permissions([
-    'Camera',
-    'Microphone',
-    'PhotoLibrary',
-    'LocationWhenInUse'
-  ])
-
-  use_react_native!(
-    :path => config[:reactNativePath],
-    :hermes_enabled => false,
-    # 禁用新架构
-    :fabric_enabled => false,
-    # An absolute path to your application root.
-    :app_path => "#{Pod::Config.instance.installation_root}/.."
-  )
-end
 
 # 全局 post_install 配置
 post_install do |installer|
