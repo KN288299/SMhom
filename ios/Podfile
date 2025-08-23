@@ -66,7 +66,30 @@ def fix_duplicate_headers(installer)
   # 禁用React-RCTFabric目标（优先处理潜在冲突）
   disable_react_fabric_target(installer)
   puts "正在修复重复头文件..."
+  
   installer.pods_project.targets.each do |target|
+    # 修复 React Core 重复定义问题
+    if target.name.start_with?('React-')
+      puts "修复React target头文件: #{target.name}"
+      
+      target.build_configurations.each do |config|
+        # 添加预处理器定义来避免重复定义
+        defs = Array(config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] || ['$(inherited)'])
+        
+        # 防止重复定义 category
+        unless defs.any? { |d| d.to_s.include?('RCT_DISABLE_DUPLICATE_CATEGORIES') }
+          defs << 'RCT_DISABLE_DUPLICATE_CATEGORIES=1'
+        end
+        
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs
+        
+        # 设置其他编译标志
+        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+        config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
+      end
+    end
+    
+    # 修复 RNPermissions 头文件
     if target.name == 'RNPermissions'
       puts "修复RNPermissions头文件..."
       target.build_phases.each do |phase|

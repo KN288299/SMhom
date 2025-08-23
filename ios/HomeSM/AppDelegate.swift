@@ -1,6 +1,13 @@
 import UIKit
 import React
-import React_RCTAppDelegate
+
+#if __has_include("React/RCTAppDelegate.h")
+import React
+#endif
+
+#if __has_include("React-RCTAppDelegate/RCTAppDelegate.h")
+@_exported import React_RCTAppDelegate
+#endif
 
 
 @UIApplicationMain
@@ -9,7 +16,7 @@ class AppDelegate: RCTAppDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
-    self.moduleName = "HomSm"
+    self.moduleName = "HomeSM"
     self.initialProps = [:]
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
