@@ -279,21 +279,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#DDDDDD',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 8,
     marginBottom: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     marginHorizontal: 20,
   },
   inputLabel: {
     paddingHorizontal: 15,
-    color: '#333',
+    color: '#FFFFFF',
     fontSize: 16,
+    fontWeight: '500',
   },
   divider: {
     width: 1,
     height: 30,
-    backgroundColor: '#DDDDDD',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
   },
   phoneInput: {
     flex: 1,
@@ -302,6 +303,8 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 0,
     height: 50,
+    backgroundColor: 'transparent',
+    color: '#FFFFFF',
   },
   inviteCodeContainer: {
     marginBottom: 20,
@@ -310,9 +313,9 @@ const styles = StyleSheet.create({
   inviteCodeInput: {
     marginBottom: 0,
     borderWidth: 1,
-    borderColor: '#DDDDDD',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   loginButtonContainer: {
     alignItems: 'center',
