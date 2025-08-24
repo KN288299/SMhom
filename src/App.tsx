@@ -8,7 +8,7 @@
 // import 'react-native-get-random-values';
 
 import React, { useEffect, useRef } from 'react';
-import {StatusBar, Platform} from 'react-native';
+import {StatusBar, Platform, PermissionsAndroid} from 'react-native';
 import AppNavigator from './navigation/AppNavigator';
 import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
@@ -16,6 +16,7 @@ import { FloatingCallProvider } from './context/FloatingCallContext';
 import BackgroundNotificationManager from './components/BackgroundNotificationManager';
 import AndroidPushService from './services/AndroidPushService';
 import IOSCallService from './services/IOSCallService';
+import { check, PERMISSIONS, RESULTS } from 'react-native-permissions';
 
 // 声明全局类型
 declare global {
@@ -39,6 +40,41 @@ function App(): React.JSX.Element {
       console.log('🍎 [App] 初始化iOS通话服务');
       IOSCallService.initialize();
     }
+  }, []);
+
+  // 检查麦克风权限状态（确保语音通话功能正常）
+  useEffect(() => {
+    const checkMicrophonePermission = async () => {
+      try {
+        console.log('🔍 [App] 检查麦克风权限状态...');
+        
+        if (Platform.OS === 'android') {
+          // 检查Android麦克风权限
+          const hasPermission = await PermissionsAndroid.check(
+            PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
+          );
+          console.log('📱 [App] Android麦克风权限状态:', hasPermission ? '已授权' : '未授权');
+          
+          if (!hasPermission) {
+            console.log('⚠️ [App] Android麦克风权限未授权，语音通话功能可能受影响');
+          }
+        } else {
+          // 检查iOS麦克风权限
+          const permissionStatus = await check(PERMISSIONS.IOS.MICROPHONE);
+          console.log('🍎 [App] iOS麦克风权限状态:', permissionStatus);
+          
+          if (permissionStatus !== RESULTS.GRANTED) {
+            console.log('⚠️ [App] iOS麦克风权限未授权，语音通话功能可能受影响');
+          }
+        }
+      } catch (error) {
+        console.error('❌ [App] 检查麦克风权限失败:', error);
+      }
+    };
+
+    // 延迟检查权限，确保应用完全初始化
+    const timer = setTimeout(checkMicrophonePermission, 1000);
+    return () => clearTimeout(timer);
   }, []);
 
   return (

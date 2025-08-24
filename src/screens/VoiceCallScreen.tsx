@@ -288,6 +288,14 @@ const VoiceCallScreen: React.FC = () => {
         if (route.params?.resumeFromFloating) {
           console.log('📱 [VoiceCall] 从悬浮窗恢复，跳过WebRTC初始化');
           
+          // 悬浮窗恢复时也要检查麦克风权限
+          const hasPermission = await requestMicrophonePermission();
+          if (!hasPermission) {
+            console.log('麦克风权限被拒绝，无法继续悬浮窗通话');
+            safeGoBack();
+            return;
+          }
+          
           // 只初始化音频管理
           AudioManager.start();
           AudioManager.setSpeakerOn(false);

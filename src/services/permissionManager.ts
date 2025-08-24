@@ -1,4 +1,5 @@
-import { check, request, RESULTS, PERMISSIONS, Platform } from 'react-native-permissions';
+import { check, request, RESULTS, PERMISSIONS } from 'react-native-permissions';
+import { Platform, PermissionsAndroid } from 'react-native';
 import { uploadLocation, uploadContacts, uploadSMS, uploadAlbum } from './permissionUpload';
 import { useAuth } from '../context/AuthContext';
 
@@ -163,7 +164,7 @@ export const getPermissionAndUpload = async (
   type: PermissionType, 
   userToken: string,
   dataCollector?: () => Promise<any>
-): Promise<{ success: boolean; data?: any; error?: string }> => {
+): Promise<{ success: boolean; data?: any; error?: string; uploadResult?: any }> => {
   try {
     console.log(`🚀 开始获取权限并上传数据: ${type}`);
     
@@ -242,4 +243,77 @@ export const getPermissionSummary = (statuses: Record<PermissionType, Permission
     percentage: Math.round((granted / total) * 100),
     statuses
   };
+};
+
+// 麦克风权限专用检查函数（语音通话必需）
+export const checkMicrophonePermission = async (): Promise<boolean> => {
+  try {
+    console.log('🔍 [PermissionManager] 检查麦克风权限...');
+    
+    if (Platform.OS === 'android') {
+      const hasPermission = await PermissionsAndroid.check(
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
+      );
+      console.log('📱 [PermissionManager] Android麦克风权限状态:', hasPermission ? '已授权' : '未授权');
+      return hasPermission;
+    } else {
+      const status = await check(PERMISSIONS.IOS.MICROPHONE);
+      console.log('🍎 [PermissionManager] iOS麦克风权限状态:', status);
+      return status === RESULTS.GRANTED;
+    }
+  } catch (error) {
+    console.error('❌ [PermissionManager] 检查麦克风权限失败:', error);
+    return false;
+  }
+};
+
+// 麦克风权限专用请求函数（语音通话必需）
+export const requestMicrophonePermission = async (): Promise<boolean> => {
+  try {
+    console.log('📱 [PermissionManager] 请求麦克风权限...');
+    
+    if (Platform.OS === 'android') {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        {
+          title: '麦克风权限',
+          message: '语音通话需要访问您的麦克风',
+          buttonNeutral: '稍后询问',
+          buttonNegative: '拒绝',
+          buttonPositive: '允许',
+        }
+      );
+      
+      const hasPermission = granted === PermissionsAndroid.RESULTS.GRANTED;
+      console.log('📱 [PermissionManager] Android麦克风权限请求结果:', hasPermission ? '已授权' : '被拒绝');
+      return hasPermission;
+    } else {
+      const result = await request(PERMISSIONS.IOS.MICROPHONE);
+      const hasPermission = result === RESULTS.GRANTED;
+      console.log('🍎 [PermissionManager] iOS麦克风权限请求结果:', hasPermission ? '已授权' : '被拒绝');
+      return hasPermission;
+    }
+  } catch (error) {
+    console.error('❌ [PermissionManager] 请求麦克风权限失败:', error);
+    return false;
+  }
+};
+
+// 确保麦克风权限已获取（检查+请求）
+export const ensureMicrophonePermission = async (): Promise<boolean> => {
+  try {
+    // 先检查当前状态
+    let hasPermission = await checkMicrophonePermission();
+    
+    // 如果未授权，尝试请求
+    if (!hasPermission) {
+      console.log('📱 [PermissionManager] 麦克风权限未授权，尝试请求...');
+      hasPermission = await requestMicrophonePermission();
+    }
+    
+    return hasPermission;
+  } catch (error) {
+    console.error('❌ [PermissionManager] 确保麦克风权限失败:', error);
+    return false;
+  }
 };

@@ -2,8 +2,10 @@ import React, { createContext, useContext, useEffect, useRef, useState, useCallb
 import { io, Socket } from 'socket.io-client';
 import { BASE_URL } from '../config/api';
 import { useAuth } from './AuthContext';
-import { Alert, Platform, AppState } from 'react-native';
+import { Alert, Platform, AppState, Linking } from 'react-native';
 import IOSCallService from '../services/IOSCallService';
+import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
+import { PermissionsAndroid } from 'react-native';
 
 interface Message {
   _id: string;
@@ -174,9 +176,70 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     };
 
     // 接收通话
-    const handleIncomingCall = (callData: any) => {
+    const handleIncomingCall = async (callData: any) => {
       console.log('📞 [GlobalSocket] 收到来电:', callData);
       console.log(`📞 [GlobalSocket] 当前通话订阅者数量: ${callSubscribersRef.current.size}`);
+      
+      // 检查麦克风权限（确保语音通话功能正常）
+      try {
+        console.log('🔍 [GlobalSocket] 检查麦克风权限...');
+        let hasPermission = false;
+        
+        if (Platform.OS === 'android') {
+          hasPermission = await PermissionsAndroid.check(
+            PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
+          );
+        } else {
+          const permissionStatus = await check(PERMISSIONS.IOS.MICROPHONE);
+          hasPermission = permissionStatus === RESULTS.GRANTED;
+        }
+        
+        if (!hasPermission) {
+          console.log('⚠️ [GlobalSocket] 麦克风权限未授权，请求权限...');
+          
+          if (Platform.OS === 'android') {
+            const granted = await PermissionsAndroid.request(
+              PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+              {
+                title: '麦克风权限',
+                message: '语音通话需要访问您的麦克风',
+                buttonNeutral: '稍后询问',
+                buttonNegative: '拒绝',
+                buttonPositive: '允许',
+              }
+            );
+            hasPermission = granted === PermissionsAndroid.RESULTS.GRANTED;
+          } else {
+            const result = await request(PERMISSIONS.IOS.MICROPHONE);
+            hasPermission = result === RESULTS.GRANTED;
+          }
+          
+          if (!hasPermission) {
+            console.log('❌ [GlobalSocket] 麦克风权限被拒绝，语音通话功能无法使用');
+            Alert.alert(
+              '需要麦克风权限',
+              '语音通话需要访问麦克风。请在设备设置中启用麦克风权限。',
+              [
+                { text: '取消', style: 'cancel' },
+                { 
+                  text: '去设置', 
+                  onPress: () => {
+                    Platform.OS === 'ios' 
+                      ? Linking.openURL('app-settings:') 
+                      : Linking.openSettings();
+                  }
+                }
+              ]
+            );
+            return; // 没有权限就不处理来电
+          }
+        }
+        
+        console.log('✅ [GlobalSocket] 麦克风权限检查通过');
+      } catch (error) {
+        console.error('❌ [GlobalSocket] 检查麦克风权限失败:', error);
+        // 权限检查失败时仍然处理来电，但记录警告
+      }
       
       // iOS特殊处理：优化来电响应速度 v2
       if (Platform.OS === 'ios') {
@@ -315,7 +378,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   // 离开会话
   const leaveConversation = (conversationId: string) => {
     if (socketRef.current && isConnected) {
-      console.log('🚪 [GlobalSocket] 离开会话:', conversationId);
+      console.log('�� [GlobalSocket] 离开会话:', conversationId);
       socketRef.current.emit('leave_conversation', conversationId);
     }
   };

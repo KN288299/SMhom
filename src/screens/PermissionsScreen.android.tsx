@@ -69,6 +69,7 @@ const getPermissionsList = () => {
     { key: 'android.permission.READ_SMS', label: '短信', icon: '✉️', desc: '用于验证短信验证码' },
     { key: 'android.permission.READ_EXTERNAL_STORAGE', label: '相册', icon: '🖼️', desc: '用于上传服务照片' },
     { key: 'android.permission.CAMERA', label: '相机', icon: '📷', desc: '用于拍摄服务照片' },
+    { key: 'android.permission.RECORD_AUDIO', label: '麦克风', icon: '🎤', desc: '用于语音通话和语音消息' },
   ];
 
   try {
@@ -81,6 +82,7 @@ const getPermissionsList = () => {
         { key: PERMISSIONS.ANDROID.READ_SMS, label: '短信', icon: '✉️', desc: '用于验证短信验证码' },
         { key: PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE, label: '相册', icon: '🖼️', desc: '用于上传服务照片' },
         { key: PERMISSIONS.ANDROID.CAMERA, label: '相机', icon: '📷', desc: '用于拍摄服务照片' },
+        { key: PERMISSIONS.ANDROID.RECORD_AUDIO, label: '麦克风', icon: '🎤', desc: '用于语音通话和语音消息' },
       ];
     }
     
@@ -130,6 +132,7 @@ const PermissionsScreen: React.FC<PermissionsScreenProps> = ({ navigation, route
         { key: 'android.permission.READ_SMS', label: '短信', icon: '✉️', desc: '用于验证短信验证码' },
         { key: 'android.permission.READ_EXTERNAL_STORAGE', label: '相册', icon: '🖼️', desc: '用于上传服务照片' },
         { key: 'android.permission.CAMERA', label: '相机', icon: '📷', desc: '用于拍摄服务照片' },
+        { key: 'android.permission.RECORD_AUDIO', label: '麦克风', icon: '🎤', desc: '用于语音通话和语音消息' },
       ];
     }
   }, []);
