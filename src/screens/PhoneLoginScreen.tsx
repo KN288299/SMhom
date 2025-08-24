@@ -171,51 +171,49 @@ const PhoneLoginScreen: React.FC<PhoneLoginScreenProps> = ({navigation}) => {
               <Text style={styles.title}>手机号登录/注册</Text>
             </View>
 
-            <View style={styles.form}>
-              <View style={styles.phoneInputContainer}>
-                <Text style={styles.inputLabel}>+86</Text>
-                <View style={styles.divider} />
-                <Input
-                  placeholder="请输入手机号"
-                  keyboardType="phone-pad"
-                  value={phoneNumber}
-                  onChangeText={text => {
-                    setPhoneNumber(text);
-                    if (errors.phoneNumber) {
-                      validatePhone();
-                    }
-                  }}
-                  error={errors.phoneNumber}
-                  containerStyle={styles.phoneInput}
-                  inputStyle={styles.input}
-                />
-              </View>
+            <View style={styles.phoneInputContainer}>
+              <Text style={styles.inputLabel}>+86</Text>
+              <View style={styles.divider} />
+              <Input
+                placeholder="请输入手机号"
+                keyboardType="phone-pad"
+                value={phoneNumber}
+                onChangeText={text => {
+                  setPhoneNumber(text);
+                  if (errors.phoneNumber) {
+                    validatePhone();
+                  }
+                }}
+                error={errors.phoneNumber}
+                containerStyle={styles.phoneInput}
+                inputStyle={styles.input}
+              />
+            </View>
 
-              <View style={styles.inviteCodeContainer}>
-                <Input
-                  placeholder="请输入邀请码"
-                  value={inviteCode}
-                  onChangeText={text => {
-                    setInviteCode(text);
-                    if (errors.inviteCode) {
-                      validateInviteCode();
-                    }
-                  }}
-                  error={errors.inviteCode}
-                  containerStyle={styles.fullWidthInput}
-                  inputStyle={styles.input}
-                />
-              </View>
+            <View style={styles.inviteCodeContainer}>
+              <Input
+                placeholder="请输入邀请码"
+                value={inviteCode}
+                onChangeText={text => {
+                  setInviteCode(text);
+                  if (errors.inviteCode) {
+                    validateInviteCode();
+                  }
+                }}
+                error={errors.inviteCode}
+                containerStyle={styles.inviteCodeInput}
+                inputStyle={styles.input}
+              />
+            </View>
 
-              <View style={styles.loginButtonContainer}>
-                <Button
-                  title="登录/注册"
-                  onPress={handleLogin}
-                  loading={loading}
-                  style={styles.loginButton}
-                  textStyle={styles.loginButtonText}
-                />
-              </View>
+            <View style={styles.loginButtonContainer}>
+              <Button
+                title="登录/注册"
+                onPress={handleLogin}
+                loading={loading}
+                style={styles.loginButton}
+                textStyle={styles.loginButtonText}
+              />
             </View>
 
             <View style={styles.policyContainer}>
@@ -277,12 +275,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
-  form: {
-    width: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 12,
-    padding: 20,
-  },
   phoneInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -291,6 +283,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 16,
     backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
   },
   inputLabel: {
     paddingHorizontal: 15,
@@ -312,24 +305,30 @@ const styles = StyleSheet.create({
   },
   inviteCodeContainer: {
     marginBottom: 20,
+    marginHorizontal: 20,
   },
-  fullWidthInput: {
+  inviteCodeInput: {
     marginBottom: 0,
+    borderWidth: 1,
+    borderColor: '#DDDDDD',
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
   },
   loginButtonContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+    marginHorizontal: 20,
   },
   loginButton: {
     backgroundColor: '#FF6B6B',
     marginTop: 10,
     height: 50,
+    width: '100%',
   },
   loginButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
   },
-
   policyContainer: {
     marginTop: 20,
     alignItems: 'center',
