@@ -21,7 +21,6 @@ if (Platform.OS === 'ios') {
 
 // 导入页面和导航器
 import AuthScreen from '../screens/AuthScreen';
-import PhoneLoginScreen from '../screens/PhoneLoginScreen';
 import MainScreen from '../screens/MainScreen';
 import StaffDetailScreen from '../screens/StaffDetailScreen';
 import ChatScreen from '../screens/ChatScreen';
@@ -39,7 +38,6 @@ import GlobalFloatingCallManager from '../components/GlobalFloatingCallManager';
 // 定义路由参数类型
 export type RootStackParamList = {
   Auth: undefined;
-  PhoneLogin: undefined;
   // 平台特定的权限和数据上传路由
   Permissions: {
     phoneNumber: string;
@@ -116,7 +114,6 @@ const AppNavigator = () => {
           // 未登录状态的路由
           <>
             <Stack.Screen name="Auth" component={AuthScreen} />
-            <Stack.Screen name="PhoneLogin" component={PhoneLoginScreen} />
           </>
         ) : (
           // 已登录状态的路由
