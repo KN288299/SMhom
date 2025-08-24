@@ -212,7 +212,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({navigation}) => {
                       }
                     }}
                     error={errors.inviteCode}
-                    containerStyle={styles.fullWidthInput}
+                    containerStyle={styles.inviteCodeInput}
                     inputStyle={styles.input}
                   />
                   <Text style={styles.inviteCodeHint}>默认邀请码：6969</Text>
@@ -303,29 +303,30 @@ const styles = StyleSheet.create({
   },
   form: {
     width: '100%',
-    backgroundColor: 'rgba(0, 0, 0, 0.25)',
-    borderRadius: 12,
-    padding: 20,
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    padding: 0,
     marginVertical: 20,
   },
   phoneInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 0,
-    borderColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#DDDDDD',
     borderRadius: 8,
     marginBottom: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
   },
   inputLabel: {
     paddingHorizontal: 15,
-    color: '#FFFFFF',
+    color: '#333',
     fontSize: 16,
   },
   divider: {
     width: 1,
     height: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    backgroundColor: '#DDDDDD',
   },
   phoneInput: {
     flex: 1,
@@ -335,10 +336,11 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     height: 50,
     backgroundColor: 'transparent',
-    color: '#FFFFFF',
+    color: '#333',
   },
   inviteCodeContainer: {
     marginBottom: 20,
+    marginHorizontal: 20,
   },
   inviteCodeHint: {
     fontSize: 12,
@@ -346,6 +348,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     fontStyle: 'italic',
+  },
+  inviteCodeInput: {
+    marginBottom: 0,
+    borderWidth: 1,
+    borderColor: '#DDDDDD',
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
   },
   fullWidthInput: {
     marginBottom: 0,
