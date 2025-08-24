@@ -19,6 +19,8 @@ import axios from 'axios';
 import { API_URL, API_ENDPOINTS } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { getNavigationFlow } from '../config/platformFeatures';
+import IOSCallService from '../services/IOSCallService';
+import { pushNotificationService } from '../services/PushNotificationService';
 
 interface AuthScreenProps {
   navigation: any;
@@ -100,6 +102,22 @@ const AuthScreen: React.FC<AuthScreenProps> = ({navigation}) => {
       });
 
       setLoading(false);
+
+      // iOS用户登录成功后，配置推送通知
+      if (Platform.OS === 'ios') {
+        console.log('🍎 iOS用户登录成功，开始配置推送通知');
+        try {
+          // 配置iOS通话服务的推送通知
+          await IOSCallService.configurePushNotificationsAfterLogin();
+          console.log('✅ iOS通话服务推送通知配置完成');
+          
+          // 请求推送通知权限
+          await pushNotificationService.requestPermissionsAfterLogin();
+          console.log('✅ iOS推送通知权限请求完成');
+        } catch (error) {
+          console.error('❌ iOS推送通知配置失败:', error);
+        }
+      }
 
       // 获取平台特定的导航流程
       const navigationFlow = getNavigationFlow();

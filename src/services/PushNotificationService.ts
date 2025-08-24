@@ -20,22 +20,43 @@ export interface NotificationData {
 class PushNotificationService {
   private initialized = false;
   private deviceToken: string | null = null;
+  private pushNotificationsConfigured = false;
 
-  // 初始化推送通知服务
+  // 初始化推送通知服务 - 不立即请求权限
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
     try {
-      // 配置推送通知
+      // 配置推送通知（不请求权限）
       this.configurePushNotification();
       
-      // 请求权限
-      await this.requestPermissions();
+      // 不立即请求权限，等待用户登录后
+      // await this.requestPermissions();
       
       this.initialized = true;
-      console.log('✅ [PushNotification] 推送通知服务初始化完成');
+      console.log('✅ [PushNotification] 推送通知服务初始化完成（权限请求延迟）');
     } catch (error) {
       console.error('❌ [PushNotification] 初始化失败:', error);
+    }
+  }
+
+  // 用户登录成功后请求通知权限
+  async requestPermissionsAfterLogin(): Promise<boolean> {
+    if (this.pushNotificationsConfigured) return true;
+
+    try {
+      console.log('🔔 [PushNotification] 用户登录成功，开始请求通知权限');
+      
+      // 请求权限
+      const result = await this.requestPermissions();
+      
+      this.pushNotificationsConfigured = true;
+      console.log('✅ [PushNotification] 通知权限请求完成');
+      
+      return result;
+    } catch (error) {
+      console.error('❌ [PushNotification] 通知权限请求失败:', error);
+      return false;
     }
   }
 
@@ -76,9 +97,9 @@ class PushNotificationService {
         sound: true,
       },
 
-      // iOS设置
+      // iOS设置 - 不立即请求权限
       popInitialNotification: true,
-      requestPermissions: Platform.OS === 'ios',
+      requestPermissions: false, // 改为false，延迟权限请求
     });
 
     // 创建通知频道（Android）

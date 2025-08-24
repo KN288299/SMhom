@@ -15,22 +15,37 @@ class IOSCallService {
   private initialized = false;
   private currentCallId: string | null = null;
   private appStateListener: any = null;
+  private pushNotificationsConfigured = false;
 
-  // 初始化iOS通话服务
+  // 初始化iOS通话服务 - 不立即配置推送通知
   async initialize(): Promise<void> {
     if (this.initialized || Platform.OS !== 'ios') return;
 
     try {
-      // 配置iOS推送通知
-      this.configurePushNotifications();
-      
-      // 监听应用状态变化
+      // 只设置应用状态监听，不立即配置推送通知
       this.setupAppStateListener();
       
       this.initialized = true;
-      console.log('✅ [IOSCallService] iOS通话服务初始化完成');
+      console.log('✅ [IOSCallService] iOS通话服务初始化完成（推送通知延迟配置）');
     } catch (error) {
       console.error('❌ [IOSCallService] 初始化失败:', error);
+    }
+  }
+
+  // 用户登录成功后配置推送通知
+  async configurePushNotificationsAfterLogin(): Promise<void> {
+    if (this.pushNotificationsConfigured || Platform.OS !== 'ios') return;
+
+    try {
+      console.log('🍎 [IOSCallService] 用户登录成功，开始配置iOS推送通知');
+      
+      // 配置iOS推送通知
+      this.configurePushNotifications();
+      
+      this.pushNotificationsConfigured = true;
+      console.log('✅ [IOSCallService] iOS推送通知配置完成');
+    } catch (error) {
+      console.error('❌ [IOSCallService] iOS推送通知配置失败:', error);
     }
   }
 
