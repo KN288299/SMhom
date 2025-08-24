@@ -892,13 +892,10 @@ const ChatScreen: React.FC = () => {
     );
   }, [userInfo, formatMediaUrl, handleViewLocation]);
 
-  // 优化keyExtractor - 修复重复key问题
-  const keyExtractor = useCallback((item: Message, index: number) => {
-    // 如果_id为空或重复，使用index作为后备
-    if (!item._id) {
-      return `message-${index}-${item.timestamp.getTime()}`;
-    }
-    return `${item._id}-${index}`;
+  // 优化keyExtractor - 使用稳定的消息ID，避免因index变化导致整列表重挂载
+  const keyExtractor = useCallback((item: Message) => {
+    // 所有消息均保证有稳定的 _id（本地临时消息也会生成），直接返回
+    return item._id;
   }, []);
 
   // 优化getItemLayout（简化版）
