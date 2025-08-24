@@ -219,6 +219,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({navigation}) => {
                   <View style={styles.divider} />
                   <Input
                     placeholder="请输入手机号"
+                    placeholderTextColor="#DDDDDD"
                     keyboardType="phone-pad"
                     value={phoneNumber}
                     onChangeText={text => {
@@ -236,6 +237,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({navigation}) => {
                 <View style={styles.inviteCodeContainer}>
                   <Input
                     placeholder="请输入邀请码"
+                    placeholderTextColor="#DDDDDD"
                     value={inviteCode}
                     onChangeText={text => {
                       setInviteCode(text);
@@ -335,7 +337,7 @@ const styles = StyleSheet.create({
   },
   form: {
     width: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
     borderRadius: 12,
     padding: 20,
     marginVertical: 20,
@@ -343,21 +345,21 @@ const styles = StyleSheet.create({
   phoneInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#DDDDDD',
+    borderWidth: 0,
+    borderColor: 'transparent',
     borderRadius: 8,
     marginBottom: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   inputLabel: {
     paddingHorizontal: 15,
-    color: '#333',
+    color: '#FFFFFF',
     fontSize: 16,
   },
   divider: {
     width: 1,
     height: 30,
-    backgroundColor: '#DDDDDD',
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
   },
   phoneInput: {
     flex: 1,
@@ -366,13 +368,15 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 0,
     height: 50,
+    backgroundColor: 'transparent',
+    color: '#FFFFFF',
   },
   inviteCodeContainer: {
     marginBottom: 20,
   },
   inviteCodeHint: {
     fontSize: 12,
-    color: '#666666',
+    color: '#CCCCCC',
     textAlign: 'center',
     marginTop: 8,
     fontStyle: 'italic',
