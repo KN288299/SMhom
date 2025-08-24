@@ -43,7 +43,7 @@ const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
   const { userInfo, userToken, isCustomerService } = useAuth();
   const { subscribeToMessages, unreadMessageCount, socket } = useSocket();
   const [contacts, setContacts] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // 🚀 优化：初始不显示loading
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -55,6 +55,10 @@ const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
   const [loadingMore, setLoadingMore] = useState(false);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [newOnlineUsers, setNewOnlineUsers] = useState<Set<string>>(new Set()); // 记录新上线的用户ID
+  
+  // 🆕 新增：静默更新状态
+  const [isUpdatingInBackground, setIsUpdatingInBackground] = useState(false);
+  const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null);
 
   // 🆕 检查是否为最近注册的用户（5分钟内）
   const isRecentlyRegistered = useCallback((user: User) => {
@@ -117,9 +121,15 @@ const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
   }, [isRecentlyRegistered]);
 
   // 🚀 性能优化：分页获取联系人列表
-  const fetchContacts = useCallback(async (page = 1) => {
+  const fetchContacts = useCallback(async (page = 1, isSilentUpdate: boolean = false) => {
     try {
-      setLoading(true);
+      if (isSilentUpdate) {
+        console.log('🔄 静默更新联系人列表...');
+        setIsUpdatingInBackground(true);
+      } else {
+        console.log(`📄 正在获取联系人列表 - 第${page}页`);
+        setLoading(true);
+      }
       setError(null);
       
       // 根据用户类型决定获取的列表
@@ -195,6 +205,7 @@ const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
         const sortedContacts = sortContacts(contactsWithNewStatus);
         
         setContacts(sortedContacts);
+        setLastUpdateTime(new Date());
         
         // 缓存联系人列表，根据用户ID保存
         if (userInfo && userInfo._id) {
@@ -212,15 +223,84 @@ const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
       
     } catch (error: any) {
       console.error('获取联系人列表失败:', error.response?.data || error.message);
-      setError('获取联系人失败，请检查网络连接');
-      
-      // 尝试从缓存加载
-      await loadContactsFromCache();
+      if (!isSilentUpdate) {
+        setError('获取联系人失败，请检查网络连接');
+        // 尝试从缓存加载
+        await loadContactsFromCache();
+      }
+      // 静默更新失败时不显示错误，只记录日志
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (isSilentUpdate) {
+        setIsUpdatingInBackground(false);
+      } else {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [userInfo, userToken, isCustomerService, sortContacts]);
+
+  // 增强联系人数据，添加会话ID信息
+  const enhanceContactsWithConversations = useCallback(async (contacts: User[]) => {
+    try {
+      // 如果没有用户信息或者没有联系人，直接返回原数据
+      if (!userInfo || !contacts.length) return contacts;
+      
+      // 尝试获取会话信息
+      const enhancedContacts = [...contacts];
+      
+      // 对每个联系人查找会话
+      for (const contact of enhancedContacts) {
+        let userId, customerServiceId;
+        
+        if (isCustomerService()) {
+          customerServiceId = userInfo._id;
+          userId = contact._id;
+        } else {
+          userId = userInfo._id;
+          customerServiceId = contact._id;
+        }
+        
+        try {
+          // 查找会话
+          const response = await axios.get(
+            `${API_URL}/conversations/find/${userId}/${customerServiceId}`,
+            {
+              headers: { Authorization: `Bearer ${userToken}` }
+            }
+          );
+          
+          if (response.data && response.data._id) {
+            contact.conversationId = response.data._id;
+            
+            // 如果有未读消息计数，更新到联系人信息中
+            if (isCustomerService()) {
+              contact.unreadCount = response.data.unreadCountCS || 0;
+              console.log(`[客服端] 联系人 ${contact.name || contact.phoneNumber} 未读计数: ${contact.unreadCount} (服务器返回 unreadCountCS: ${response.data.unreadCountCS})`);
+            } else {
+              contact.unreadCount = response.data.unreadCountUser || 0;
+              console.log(`[用户端] 联系人 ${contact.name || contact.phoneNumber} 未读计数: ${contact.unreadCount} (服务器返回 unreadCountUser: ${response.data.unreadCountUser})`);
+            }
+            
+            // 更新最后消息
+            if (response.data.lastMessage) {
+              contact.lastMessage = response.data.lastMessage;
+              contact.lastMessageTime = formatTime(new Date(response.data.lastMessageTime));
+              contact.lastMessageTimestamp = new Date(response.data.lastMessageTime);
+            }
+          }
+        } catch (error) {
+          // 没找到会话不需要特殊处理
+          console.log(`没有找到用户 ${contact._id} 的会话`);
+        }
+      }
+      
+      return enhancedContacts;
+      
+    } catch (error) {
+      console.error('增强联系人数据失败:', error);
+      return contacts;  // 返回原始数据
+    }
+  }, [userInfo, userToken, isCustomerService]);
 
   // 🚀 性能优化：加载更多联系人
   const loadMoreContacts = useCallback(async () => {
@@ -319,69 +399,6 @@ const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
     } catch (error) {
       console.error('加载缓存联系人失败:', error);
       return false;
-    }
-  };
-
-  // 增强联系人数据，添加会话ID信息
-  const enhanceContactsWithConversations = async (contacts: User[]) => {
-    try {
-      // 如果没有用户信息或者没有联系人，直接返回原数据
-      if (!userInfo || !contacts.length) return contacts;
-      
-      // 尝试获取会话信息
-      const enhancedContacts = [...contacts];
-      
-      // 对每个联系人查找会话
-      for (const contact of enhancedContacts) {
-        let userId, customerServiceId;
-        
-        if (isCustomerService()) {
-          customerServiceId = userInfo._id;
-          userId = contact._id;
-        } else {
-          userId = userInfo._id;
-          customerServiceId = contact._id;
-        }
-        
-        try {
-          // 查找会话
-          const response = await axios.get(
-            `${API_URL}/conversations/find/${userId}/${customerServiceId}`,
-            {
-              headers: { Authorization: `Bearer ${userToken}` }
-            }
-          );
-          
-          if (response.data && response.data._id) {
-            contact.conversationId = response.data._id;
-            
-            // 如果有未读消息计数，更新到联系人信息中
-            if (isCustomerService()) {
-              contact.unreadCount = response.data.unreadCountCS || 0;
-              console.log(`[客服端] 联系人 ${contact.name || contact.phoneNumber} 未读计数: ${contact.unreadCount} (服务器返回 unreadCountCS: ${response.data.unreadCountCS})`);
-            } else {
-              contact.unreadCount = response.data.unreadCountUser || 0;
-              console.log(`[用户端] 联系人 ${contact.name || contact.phoneNumber} 未读计数: ${contact.unreadCount} (服务器返回 unreadCountUser: ${response.data.unreadCountUser})`);
-            }
-            
-            // 更新最后消息
-            if (response.data.lastMessage) {
-              contact.lastMessage = response.data.lastMessage;
-              contact.lastMessageTime = formatTime(new Date(response.data.lastMessageTime));
-              contact.lastMessageTimestamp = new Date(response.data.lastMessageTime);
-            }
-          }
-        } catch (error) {
-          // 没找到会话不需要特殊处理
-          console.log(`没有找到用户 ${contact._id} 的会话`);
-        }
-      }
-      
-      return enhancedContacts;
-      
-    } catch (error) {
-      console.error('增强联系人数据失败:', error);
-      return contacts;  // 返回原始数据
     }
   };
 
@@ -486,15 +503,22 @@ const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
   // 首次加载和刷新时获取数据
   useEffect(() => {
     const initialize = async () => {
+      console.log('🚀 初始化MessageScreen...');
+      
       // 先尝试从缓存加载
       const loadedFromCache = await loadContactsFromCache();
       
-      // 如果缓存加载失败，从网络获取
-      if (!loadedFromCache) {
-        fetchContacts();
+      if (loadedFromCache) {
+        console.log('✅ 从缓存加载成功，立即显示数据');
+        // 缓存加载成功，立即显示，不显示loading
+        // 在后台静默更新最新数据
+        setTimeout(() => {
+          fetchContacts(1, true).catch(console.error);
+        }, 1000); // 延迟1秒开始后台更新
       } else {
-        // 即使使用了缓存，也在后台更新最新数据
-        fetchContacts().catch(console.error);
+        console.log('❌ 缓存加载失败，从网络获取');
+        // 缓存失败，显示loading并从网络获取
+        fetchContacts();
       }
     };
     
@@ -504,9 +528,9 @@ const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
   // 页面聚焦时刷新数据
   useFocusEffect(
     useCallback(() => {
-      // 当页面获得焦点时，刷新联系人列表
-      console.log('MessageScreen获得焦点，刷新数据');
-      fetchContacts();
+      // 当页面获得焦点时，静默更新联系人列表
+      console.log('MessageScreen获得焦点，静默更新数据');
+      fetchContacts(1, true).catch(console.error);
     }, [fetchContacts])
   );
 
@@ -580,7 +604,7 @@ const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
   // 下拉刷新
   const onRefresh = () => {
     setRefreshing(true);
-    fetchContacts();
+    fetchContacts(1, false); // 下拉刷新时显示loading
   };
 
   // 清除服务器端未读计数
@@ -765,6 +789,22 @@ const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
           {isCustomerService() ? '用户列表' : '客服列表'}
         </Text>
       </View>
+      
+      {/* 🆕 静默更新指示器 */}
+      {(isUpdatingInBackground || lastUpdateTime) && (
+        <View style={styles.updateIndicator}>
+          {isUpdatingInBackground ? (
+            <View style={styles.updatingContainer}>
+              <ActivityIndicator size="small" color="#ff6b81" />
+              <Text style={styles.updatingText}>正在更新...</Text>
+            </View>
+          ) : (
+            <Text style={styles.lastUpdateText}>
+              最后更新: {lastUpdateTime?.toLocaleTimeString()}
+            </Text>
+          )}
+        </View>
+      )}
       
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
@@ -1028,7 +1068,30 @@ const styles = StyleSheet.create({
   loadMoreButtonText: {
     color: 'white',
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: 'bold',
+  },
+  // 🆕 静默更新指示器样式
+  updateIndicator: {
+    backgroundColor: '#f8f9fa',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  updatingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  updatingText: {
+    marginLeft: 8,
+    fontSize: 12,
+    color: '#666',
+  },
+  lastUpdateText: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
   },
   endContainer: {
     paddingVertical: 16,
