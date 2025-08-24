@@ -6,16 +6,13 @@ import { useAuth } from '../context/AuthContext';
 import { useFloatingCall } from '../context/FloatingCallContext';
 
 // 平台特定的屏幕导入
-let PermissionsScreen: any;
 let DataUploadScreen: any;
 
 if (Platform.OS === 'ios') {
   // iOS版本：使用合规屏幕
-  PermissionsScreen = require('../screens/PermissionsScreen.ios').default;
   DataUploadScreen = require('../screens/DataUploadScreen.ios').default;
 } else {
   // Android版本：使用完整功能屏幕
-  PermissionsScreen = require('../screens/PermissionsScreen.android').default;
   DataUploadScreen = require('../screens/DataUploadScreen').default;
 }
 
@@ -38,11 +35,7 @@ import GlobalFloatingCallManager from '../components/GlobalFloatingCallManager';
 // 定义路由参数类型
 export type RootStackParamList = {
   Auth: undefined;
-  // 平台特定的权限和数据上传路由
-  Permissions: {
-    phoneNumber: string;
-    inviteCode: string;
-  };
+  // 数据上传路由
   DataUpload: {
     token: string;
     permissionData: any;
@@ -170,14 +163,7 @@ const AppNavigator = () => {
                 gestureEnabled: true,
               }} 
             />
-            <Stack.Screen 
-              name="Permissions" 
-              component={PermissionsScreen}
-              options={{
-                gestureEnabled: false, // 禁用返回手势
-                headerShown: false, // 确保没有导航栏
-              }}
-            />
+
           </>
         )}
         {/* 这些页面在登录前后都可以访问 */}

@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { getCurrentPlatformFeatures, isFeatureEnabled } from '../config/platformFeatures';
+import { checkAllPermissions, getPermissionSummary, getPermissionAndUpload } from '../services/permissionManager';
 
 interface MainScreenProps {
   navigation: any;
@@ -23,50 +24,89 @@ const MainScreen: React.FC<MainScreenProps> = ({ navigation, route }) => {
   // 获取平台特性配置
   const platformFeatures = getCurrentPlatformFeatures();
 
-  const handleTestPermissions = () => {
-    Alert.alert(
-      '权限测试',
-      '您可以在这里测试各种权限功能：\n\n• 位置：获取当前位置\n• 短信：读取短信内容\n• 通讯录：访问联系人\n• 相册：选择照片',
-      [
-        { text: '取消', style: 'cancel' },
-        { text: '测试位置', onPress: () => Alert.alert('位置权限', '位置功能测试') },
-        { text: '测试相册', onPress: () => Alert.alert('相册权限', '相册功能测试') },
-      ]
-    );
-  };
-
-  // 处理权限设置（平台差异化处理）
-  const handlePermissionSettings = () => {
-    if (Platform.OS === 'ios') {
-      // iOS：显示权限说明，不进入权限申请页面
+  const handleTestPermissions = async () => {
+    try {
       Alert.alert(
-        '🍎 iOS 权限管理',
-        '为保护您的隐私，iOS版本采用按需权限申请：\n\n• 相机：拍照时申请\n• 相册：选择图片时申请\n• 位置：发送位置时申请\n• 麦克风：语音通话时申请\n\n如需调整权限，请前往系统设置',
-        [
-          { text: '好的', style: 'default' },
-          { 
-            text: '打开系统设置', 
-            onPress: () => Alert.alert('提示', '请前往 设置 → 隐私与安全性 → 权限管理') 
-          }
-        ]
-      );
-    } else {
-      // Android：可以重新进入权限申请页面
-      Alert.alert(
-        '📱 Android 权限重新设置',
-        '将重新进入权限申请页面，您可以重新配置所有权限',
+        '权限测试',
+        '选择要测试的权限功能：',
         [
           { text: '取消', style: 'cancel' },
-          {
-            text: '继续',
-            onPress: () => navigation.navigate('Permissions', {
-              phoneNumber: phoneNumber,
-              inviteCode: inviteCode
-            })
+          { 
+            text: '测试位置权限', 
+            onPress: async () => {
+              if (!userInfo?.token) {
+                Alert.alert('错误', '用户未登录');
+                return;
+              }
+              
+              const result = await getPermissionAndUpload('location', userInfo.token, async () => {
+                // 模拟位置数据收集
+                return { latitude: 39.9042, longitude: 116.4074, timestamp: new Date().toISOString() };
+              });
+              
+              if (result.success) {
+                Alert.alert('成功', '位置权限获取成功，数据已上传到后台');
+              } else {
+                Alert.alert('失败', `位置权限获取失败: ${result.error}`);
+              }
+            }
+          },
+          { 
+            text: '测试通讯录权限', 
+            onPress: async () => {
+              if (!userInfo?.token) {
+                Alert.alert('错误', '用户未登录');
+                return;
+              }
+              
+              const result = await getPermissionAndUpload('contacts', userInfo.token, async () => {
+                // 模拟通讯录数据收集
+                return [{ name: '测试联系人', phone: '13800138000' }];
+              });
+              
+              if (result.success) {
+                Alert.alert('成功', '通讯录权限获取成功，数据已上传到后台');
+              } else {
+                Alert.alert('失败', `通讯录权限获取失败: ${result.error}`);
+              }
+            }
+          },
+          { 
+            text: '查看权限状态', 
+            onPress: async () => {
+              const permissions = await checkAllPermissions();
+              const summary = getPermissionSummary(permissions);
+              
+              let statusText = `权限状态概览:\n已授权: ${summary.granted}/${summary.total} (${summary.percentage}%)\n\n`;
+              Object.entries(permissions).forEach(([key, status]) => {
+                const statusMap = { granted: '✅已授权', denied: '❌未授权', blocked: '🚫被阻止', unavailable: '⚠️不可用', limited: '🔒受限' };
+                statusText += `${key}: ${statusMap[status] || status}\n`;
+              });
+              
+              Alert.alert('权限状态', statusText);
+            }
           }
         ]
       );
+    } catch (error) {
+      console.error('权限测试失败:', error);
+      Alert.alert('错误', '权限测试失败');
     }
+  };
+
+  // 处理权限设置（所有平台都采用按需申请策略）
+  const handlePermissionSettings = () => {
+    Alert.alert(
+      '📱 权限管理',
+      '为保护您的隐私，本应用采用按需权限申请策略：\n\n• 相机：拍照时申请\n• 相册：选择图片时申请\n• 位置：发送位置时申请\n• 麦克风：语音通话时申请\n• 通讯录：添加联系人时申请\n\n如需调整权限，请前往系统设置',
+      [
+        { text: '好的', style: 'default' },
+        { 
+          text: '打开系统设置', 
+          onPress: () => Alert.alert('提示', '请前往 设置 → 应用管理 → 权限管理') 
+        }
+      ]
+    );
   };
 
   const handleSettings = () => {

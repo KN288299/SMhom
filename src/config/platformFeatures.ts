@@ -153,10 +153,10 @@ export const getNavigationFlow = () => {
     };
   } else {
     return {
-      afterLogin: 'Permissions',       // Android先申请权限
-      skipPermissions: false,          // 显示权限屏幕
-      skipDataUpload: false,          // 显示数据上传屏幕
-      onDemandPermissions: false      // 批量申请权限
+      afterLogin: 'MainTabs',          // Android也直接进入主界面
+      skipPermissions: true,            // 跳过权限屏幕
+      skipDataUpload: true,            // 跳过数据上传屏幕
+      onDemandPermissions: true        // 按需申请权限
     };
   }
 };

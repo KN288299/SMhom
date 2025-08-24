@@ -124,34 +124,12 @@ const AuthScreen: React.FC<AuthScreenProps> = ({navigation}) => {
       console.log('🚀 平台导航流程:', navigationFlow);
       console.log('📱 平台:', Platform.OS);
 
-      if (isCustomerService) {
-        // 客服用户：所有平台都直接进入主页
-        console.log('👨‍💼 客服用户，直接进入主页');
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'MainTabs' }],
-        });
-      } else {
-        // 普通用户：根据平台配置选择导航目标
-        console.log('👤 普通用户，根据平台配置导航');
-        console.log('🎯 目标页面:', navigationFlow.afterLogin);
-
-        if (navigationFlow.afterLogin === 'MainTabs') {
-          // iOS：直接进入主页
-          console.log('🍎 iOS用户，跳过权限申请，直接进入主页');
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'MainTabs' }],
-          });
-        } else {
-          // Android：进入权限申请页面
-          console.log('📱 Android用户，进入权限申请页面');
-          navigation.navigate('Permissions', {
-            phoneNumber,
-            inviteCode,
-          });
-        }
-      }
+      // 所有用户都直接进入主页，不再区分平台
+      console.log('🚀 用户登录成功，直接进入主页');
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'MainTabs' }],
+      });
     } catch (error: any) {
       setLoading(false);
 
