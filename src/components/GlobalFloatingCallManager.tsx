@@ -22,6 +22,9 @@ const GlobalFloatingCallManager: React.FC = () => {
       floatingCall.onEndCall();
     }
     
+    // 🔧 修复：确保PlatformCallManager状态完全重置
+    console.log('🔧 [GlobalFloatingCallManager] 触发状态重置，确保下次来电正常显示');
+    
     // 强制隐藏悬浮窗并清理所有资源
     console.log('🔴 [GlobalFloatingCallManager] 强制隐藏悬浮窗并清理资源');
     forceHideFloatingCall();

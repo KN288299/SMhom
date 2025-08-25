@@ -82,6 +82,11 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const handledIncomingCallIdsRef = useRef<Set<string>>(new Set());
   // 来电去重TTL（过长会导致紧接着的下一次来电被吞掉；设置为8秒更安全）
   const INCOMING_DEDUP_TTL_MS = 8 * 1000;
+  // 暂存回放：当无订阅者时暂存incoming_call，订阅者就位后回放
+  const PENDING_REPLAY_TTL_MS = 8 * 1000;
+  const pendingIncomingCallRef = useRef<{ data: any; timestamp: number } | null>(null);
+  // 取消事件去重，避免onAny兜底与专用监听重复触发
+  const processedCancelledCallIdsRef = useRef<Set<string>>(new Set());
   
   // 消息订阅者列表
   const messageSubscribersRef = useRef<Set<(message: Message) => void>>(new Set());
@@ -226,6 +231,14 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         }
       }
       
+      // 如果当前没有通话订阅者，暂存此次来电用于稍后回放
+      if (callSubscribersRef.current.size === 0) {
+        pendingIncomingCallRef.current = { data: callData, timestamp: Date.now() };
+        console.log('⏳ [GlobalSocket] 暂存incoming_call等待订阅者:', callData?.callId);
+      } else {
+        pendingIncomingCallRef.current = null;
+      }
+
       // 通知所有通话订阅者
       let index = 0;
       callSubscribersRef.current.forEach(callback => {
@@ -242,10 +255,25 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
     // 转发call_cancelled事件给所有通话订阅者
     const handleCallCancelled = (callData: any) => {
+      const callId = callData?.callId;
       console.log('📞 [GlobalSocket] 收到call_cancelled:', callData);
+      // 取消事件去重，避免重复处理
+      if (callId) {
+        if (processedCancelledCallIdsRef.current.has(callId)) {
+          console.log('🛑 [GlobalSocket] 重复call_cancelled已忽略:', callId);
+          return;
+        }
+        processedCancelledCallIdsRef.current.add(callId);
+        setTimeout(() => processedCancelledCallIdsRef.current.delete(callId), INCOMING_DEDUP_TTL_MS);
+      }
       // 清理已处理集合，允许未来新的同ID通话（如果服务端会复用ID则保留也可）
-      if (callData?.callId && handledIncomingCallIdsRef.current.has(callData.callId)) {
-        handledIncomingCallIdsRef.current.delete(callData.callId);
+      if (callId && handledIncomingCallIdsRef.current.has(callId)) {
+        handledIncomingCallIdsRef.current.delete(callId);
+      }
+      // 若存在待回放的来电且ID匹配，则清理暂存
+      if (pendingIncomingCallRef.current?.data?.callId && pendingIncomingCallRef.current.data.callId === callId) {
+        pendingIncomingCallRef.current = null;
+        console.log('🧹 [GlobalSocket] 清理暂存incoming_call，因来电已取消:', callId);
       }
       
       // 通知所有通话订阅者（包括GlobalNavigator）
@@ -311,7 +339,18 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     // 监听所有事件（仅用于调试日志，避免重复调用业务处理导致二次弹窗）
     socket.onAny((eventName, ...args) => {
       if (eventName === 'incoming_call' || eventName === 'call_cancelled') {
-        console.log(`🔔 [GlobalSocket] onAny捕获事件 ${eventName}:`, args?.[0]?.callId || '');
+        const payload = args?.[0];
+        console.log(`🔔 [GlobalSocket] onAny捕获事件 ${eventName}:`, payload?.callId || '');
+        // 兜底派发，避免监听器在重绑窗口期漏掉事件
+        try {
+          if (eventName === 'incoming_call') {
+            handleIncomingCall(payload);
+          } else if (eventName === 'call_cancelled') {
+            handleCallCancelled(payload);
+          }
+        } catch (e) {
+          console.warn('onAny兜底处理失败:', e);
+        }
       }
     });
 

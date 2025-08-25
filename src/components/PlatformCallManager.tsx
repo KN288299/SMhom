@@ -43,6 +43,34 @@ const PlatformCallManager: React.FC = () => {
     }, PLATFORM_HANDLED_TTL_MS);
   }, []);
 
+  // 🔧 修复：统一的状态重置函数，确保第二次来电能正常显示
+  const resetIncomingCallState = useCallback((callId?: string, reason?: string) => {
+    console.log('🔧 [PlatformCallManager] 统一重置来电状态:', { callId, reason });
+    
+    // 强制重置来电显示状态
+    setIsIncomingCall(false);
+    setIncomingCallInfo(null);
+    
+    // 清理去重集合
+    if (callId) {
+      handledCallIdsRef.current.delete(callId);
+      // 同步释放全局Socket去重
+      releaseIncomingCallDedup(callId);
+      console.log('🧹 [PlatformCallManager] 已清理去重集合:', callId);
+    } else {
+      // 如果没有callId，清理所有去重记录（兜底处理）
+      console.log('🧹 [PlatformCallManager] 兜底清理：清理所有去重记录');
+      handledCallIdsRef.current.clear();
+    }
+    
+    // iOS特殊处理
+    if (Platform.OS === 'ios') {
+      IOSCallService.cancelCurrentCall();
+    }
+    
+    console.log('✅ [PlatformCallManager] 状态重置完成，下次来电应该能正常显示');
+  }, [releaseIncomingCallDedup]);
+
   // 同步状态到 ref
   useEffect(() => {
     isIncomingCallRef.current = isIncomingCall;
@@ -65,18 +93,9 @@ const PlatformCallManager: React.FC = () => {
       setIncomingCallInfo(null);
     }
     
-    // 清理去重集合，避免后续同ID来电被忽略
-    if (callId) {
-      handledCallIdsRef.current.delete(callId);
-      // 同步释放全局Socket去重
-      releaseIncomingCallDedup(callId);
-    }
-    
-    // iOS特殊处理
-    if (Platform.OS === 'ios') {
-      IOSCallService.cancelCurrentCall();
-    }
-  }, [releaseIncomingCallDedup]);
+    // 🔧 修复：使用统一的重置函数
+    resetIncomingCallState(callId, '来电被取消');
+  }, [resetIncomingCallState]);
 
   // 处理来电
   const handleIncomingCall = useCallback((callData: CallData) => {
@@ -138,18 +157,10 @@ const PlatformCallManager: React.FC = () => {
       setIsIncomingCall(false);
       setIncomingCallInfo(null);
     }
-    // 清理去重集合，避免下一次来电被忽略
-    if (callId) {
-      handledCallIdsRef.current.delete(callId);
-      // 同步释放全局Socket去重
-      releaseIncomingCallDedup(callId);
-    }
     
-    // iOS特殊处理
-    if (Platform.OS === 'ios') {
-      IOSCallService.cancelCurrentCall();
-    }
-  }, [releaseIncomingCallDedup]);
+    // 🔧 修复：使用统一的重置函数
+    resetIncomingCallState(callId, '通话被拒绝');
+  }, [resetIncomingCallState]);
 
   // 处理通话结束（对方主动挂断）
   const handleCallEnded = useCallback((data: any) => {
@@ -169,18 +180,10 @@ const PlatformCallManager: React.FC = () => {
       setIsIncomingCall(false);
       setIncomingCallInfo(null);
     }
-    // 清理去重集合，避免下一次来电被忽略
-    if (callId) {
-      handledCallIdsRef.current.delete(callId);
-      // 同步释放全局Socket去重
-      releaseIncomingCallDedup(callId);
-    }
     
-    // iOS特殊处理
-    if (Platform.OS === 'ios') {
-      IOSCallService.cancelCurrentCall();
-    }
-  }, [forceHideFloatingCall, releaseIncomingCallDedup]);
+    // 🔧 修复：使用统一的重置函数
+    resetIncomingCallState(callId, '通话已结束');
+  }, [forceHideFloatingCall, resetIncomingCallState]);
 
   // 接听来电
   const handleAcceptCall = () => {
@@ -240,7 +243,10 @@ const PlatformCallManager: React.FC = () => {
     if (!userInfo) return;
 
     console.log('🔗 [PlatformCallManager] 设置全局来电监听');
-    const unsubscribe = subscribeToIncomingCalls(handleIncomingCall);
+    const unsubscribe = subscribeToIncomingCalls((data) => {
+      // 统一入口：兼容直接转发和onAny兜底的事件
+      handleIncomingCall(data);
+    });
 
     return () => {
       console.log('🧹 [PlatformCallManager] 清理全局来电监听');
