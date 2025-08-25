@@ -1,10 +1,11 @@
 import InCallManager from 'react-native-incall-manager';
-import { Platform } from 'react-native';
+import { Platform, Vibration } from 'react-native';
 
 class AudioManager {
   private static instance: AudioManager;
   private isSpeakerOn: boolean = false;
   private isCallActive: boolean = false;
+  private vibrationIntervalId: NodeJS.Timeout | null = null;
 
   private constructor() {}
 
@@ -66,6 +67,8 @@ class AudioManager {
     try {
       // 确保停止所有铃声
       this.stopRingback();
+      this.stopRingtone();
+      this.stopVibration();
       
       // 停止音频会话
       InCallManager.stop();
@@ -153,6 +156,70 @@ class AudioManager {
   }
   
   /**
+   * 开始来电铃声（被叫端）
+   */
+  public startRingtone(): void {
+    try {
+      InCallManager.startRingtone('_BUNDLE_');
+      console.log('开始播放来电铃声');
+    } catch (error) {
+      console.error('播放来电铃声失败:', error);
+    }
+  }
+
+  /**
+   * 停止来电铃声（被叫端）
+   */
+  public stopRingtone(): void {
+    try {
+      InCallManager.stopRingtone();
+      console.log('停止来电铃声');
+    } catch (error) {
+      console.error('停止来电铃声音频失败:', error);
+    }
+  }
+
+  /**
+   * 开始震动提示
+   */
+  public startVibration(): void {
+    try {
+      // Android 支持可重复的自定义节奏；iOS 对重复支持有限，这里用定时触发兜底
+      if (Platform.OS === 'android') {
+        Vibration.vibrate([500, 1000], true);
+      } else {
+        // iOS：每1.6秒触发一次短震
+        Vibration.vibrate();
+        if (this.vibrationIntervalId) {
+          clearInterval(this.vibrationIntervalId);
+        }
+        this.vibrationIntervalId = setInterval(() => {
+          Vibration.vibrate();
+        }, 1600);
+      }
+      console.log('开始震动提示');
+    } catch (error) {
+      console.error('启动震动失败:', error);
+    }
+  }
+
+  /**
+   * 停止震动提示
+   */
+  public stopVibration(): void {
+    try {
+      Vibration.cancel();
+      if (this.vibrationIntervalId) {
+        clearInterval(this.vibrationIntervalId);
+        this.vibrationIntervalId = null;
+      }
+      console.log('停止震动提示');
+    } catch (error) {
+      console.error('停止震动失败:', error);
+    }
+  }
+  
+  /**
    * 停止所有音频（铃声和通话）
    * 在组件卸载或通话结束时调用
    */
@@ -160,6 +227,8 @@ class AudioManager {
     try {
       // 停止铃声
       this.stopRingback();
+      this.stopRingtone();
+      this.stopVibration();
       
       // 停止音频会话
       this.stop();

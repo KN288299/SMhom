@@ -77,6 +77,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   // 去重：记录已处理的incoming_call的callId，避免重复弹窗/重复流程
   const handledIncomingCallIdsRef = useRef<Set<string>>(new Set());
+  // 来电去重TTL：缩短为60秒，避免复用callId导致后续来电被长期忽略
+  const INCOMING_DEDUP_TTL_MS = 60 * 1000;
   
   // 消息订阅者列表
   const messageSubscribersRef = useRef<Set<(message: Message) => void>>(new Set());
@@ -186,8 +188,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       }
       if (callData?.callId) {
         handledIncomingCallIdsRef.current.add(callData.callId);
-        // 5分钟后自动过期，防止集合无限增长
-        setTimeout(() => handledIncomingCallIdsRef.current.delete(callData.callId), 5 * 60 * 1000);
+        // TTL到期后自动过期，防止集合无限增长
+        setTimeout(() => handledIncomingCallIdsRef.current.delete(callData.callId), INCOMING_DEDUP_TTL_MS);
       }
       
       // 注意：不要在此处请求麦克风权限，先显示来电界面；
@@ -254,6 +256,33 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       });
     };
 
+    // 清理去重集合：通话被拒绝
+    const handleCallRejected = (data: any) => {
+      const { callId } = data || {};
+      console.log('📞 [GlobalSocket] 收到call_rejected，清理去重集合:', callId);
+      if (callId && handledIncomingCallIdsRef.current.has(callId)) {
+        handledIncomingCallIdsRef.current.delete(callId);
+      }
+    };
+
+    // 清理去重集合：通话已结束
+    const handleCallEnded = (data: any) => {
+      const { callId } = data || {};
+      console.log('📞 [GlobalSocket] 收到call_ended，清理去重集合:', callId);
+      if (callId && handledIncomingCallIdsRef.current.has(callId)) {
+        handledIncomingCallIdsRef.current.delete(callId);
+      }
+    };
+
+    // 清理去重集合：通话已接听（防止服务端复用callId或call_ended丢失导致后续来电被忽略）
+    const handleCallAccepted = (data: any) => {
+      const { callId } = data || {};
+      console.log('📞 [GlobalSocket] 收到call_accepted，清理去重集合:', callId);
+      if (callId && handledIncomingCallIdsRef.current.has(callId)) {
+        handledIncomingCallIdsRef.current.delete(callId);
+      }
+    };
+
     // 绑定事件
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
@@ -263,6 +292,9 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     socket.on('incoming_call', handleIncomingCall);
     socket.on('call_cancelled', handleCallCancelled);
     socket.on('offline_messages_delivered', handleOfflineMessagesDelivered);
+    socket.on('call_rejected', handleCallRejected);
+    socket.on('call_ended', handleCallEnded);
+    socket.on('call_accepted', handleCallAccepted);
     
     console.log('🔗 [GlobalSocket] 已绑定所有Socket事件，包括incoming_call');
     console.log('🔗 [GlobalSocket] handleIncomingCall函数类型:', typeof handleIncomingCall);
@@ -291,6 +323,9 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       socket.off('incoming_call', handleIncomingCall);
       socket.off('call_cancelled', handleCallCancelled);
       socket.off('offline_messages_delivered', handleOfflineMessagesDelivered);
+      socket.off('call_rejected', handleCallRejected);
+      socket.off('call_ended', handleCallEnded);
+      socket.off('call_accepted', handleCallAccepted);
       socket.offAny(); // 清理onAny监听器
       socket.disconnect();
       socketRef.current = null;

@@ -30,15 +30,16 @@ const PlatformCallManager: React.FC = () => {
   const incomingCallInfoRef = useRef(incomingCallInfo);
   // 记录已处理/正在处理的来电，防止重复弹出
   const handledCallIdsRef = useRef<Set<string>>(new Set());
+  const PLATFORM_HANDLED_TTL_MS = 60 * 1000;
 
   // 标记某个callId已被处理，带TTL自动过期
   const markCallHandled = useCallback((callId?: string) => {
     if (!callId) return;
     handledCallIdsRef.current.add(callId);
-    // 5分钟后清理，防止集合无限增长
+    // TTL后清理，防止集合无限增长
     setTimeout(() => {
       handledCallIdsRef.current.delete(callId);
-    }, 5 * 60 * 1000);
+    }, PLATFORM_HANDLED_TTL_MS);
   }, []);
 
   // 同步状态到 ref
@@ -61,6 +62,11 @@ const PlatformCallManager: React.FC = () => {
       console.log('🔄 [PlatformCallManager] 关闭来电界面 - 拨打者已挂断');
       setIsIncomingCall(false);
       setIncomingCallInfo(null);
+    }
+    
+    // 清理去重集合，避免后续同ID来电被忽略
+    if (callId) {
+      handledCallIdsRef.current.delete(callId);
     }
     
     // iOS特殊处理
@@ -129,6 +135,10 @@ const PlatformCallManager: React.FC = () => {
       setIsIncomingCall(false);
       setIncomingCallInfo(null);
     }
+    // 清理去重集合，避免下一次来电被忽略
+    if (callId) {
+      handledCallIdsRef.current.delete(callId);
+    }
     
     // iOS特殊处理
     if (Platform.OS === 'ios') {
@@ -153,6 +163,10 @@ const PlatformCallManager: React.FC = () => {
       console.log('🔄 [PlatformCallManager] 关闭来电界面 - 通话已结束');
       setIsIncomingCall(false);
       setIncomingCallInfo(null);
+    }
+    // 清理去重集合，避免下一次来电被忽略
+    if (callId) {
+      handledCallIdsRef.current.delete(callId);
     }
     
     // iOS特殊处理
@@ -204,6 +218,10 @@ const PlatformCallManager: React.FC = () => {
     
     setIsIncomingCall(false);
     setIncomingCallInfo(null);
+    // 立即释放本地去重标记，允许同一callId（如后端复用极短时间内ID）再次弹出
+    if (incomingCallInfo?.callId) {
+      handledCallIdsRef.current.delete(incomingCallInfo.callId);
+    }
   };
 
   // 订阅全局来电事件
@@ -227,13 +245,16 @@ const PlatformCallManager: React.FC = () => {
     
     socket.on('call_rejected', handleCallRejected);
     socket.on('call_ended', handleCallEnded);
+    // 直接监听取消事件，作为兜底，避免遗漏转发
+    socket.on('call_cancelled', handleCallCancelled);
 
     return () => {
       console.log('🧹 [PlatformCallManager] 清理通话状态监听');
       socket.off('call_rejected', handleCallRejected);
       socket.off('call_ended', handleCallEnded);
+      socket.off('call_cancelled', handleCallCancelled);
     };
-  }, [socket, userInfo, handleCallRejected, handleCallEnded]);
+  }, [socket, userInfo, handleCallRejected, handleCallEnded, handleCallCancelled]);
 
   // 监听应用状态变化（iOS特殊处理）
   useEffect(() => {

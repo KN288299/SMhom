@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { DEFAULT_AVATAR } from '../utils/DefaultAvatar';
+import AudioManager from '../utils/AudioManager';
 
 interface IncomingCallScreenProps {
   contactName: string;
@@ -36,6 +37,13 @@ const IncomingCallScreen: React.FC<IncomingCallScreenProps> = ({
   useEffect(() => {
     console.log('IncomingCallScreen - 组件挂载');
     console.log('IncomingCallScreen - 联系人头像:', contactAvatar);
+    // 开始应用内来电铃声与震动
+    try {
+      AudioManager.startRingtone();
+      AudioManager.startVibration();
+    } catch (e) {
+      console.warn('IncomingCallScreen - 启动铃声/震动失败:', e);
+    }
     
     const pulse = Animated.sequence([
       Animated.timing(pulseAnim, {
@@ -59,18 +67,30 @@ const IncomingCallScreen: React.FC<IncomingCallScreenProps> = ({
     return () => {
       console.log('IncomingCallScreen - 组件卸载');
       pulseAnim.stopAnimation();
+      try {
+        AudioManager.stopRingtone();
+        AudioManager.stopVibration();
+      } catch (e) {
+        console.warn('IncomingCallScreen - 停止铃声/震动失败:', e);
+      }
     };
   }, [pulseAnim]);
 
   // 处理接听按钮点击
   const handleAccept = () => {
     console.log('IncomingCallScreen - 接听按钮点击');
+    // 停止来电铃声与震动
+    AudioManager.stopRingtone();
+    AudioManager.stopVibration();
     onAccept();
   };
   
   // 处理拒绝按钮点击
   const handleReject = () => {
     console.log('IncomingCallScreen - 拒绝按钮点击');
+    // 停止来电铃声与震动
+    AudioManager.stopRingtone();
+    AudioManager.stopVibration();
     onReject();
   };
 
