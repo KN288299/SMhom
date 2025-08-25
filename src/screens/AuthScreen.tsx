@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
     borderColor: '#DDDDDD',
     borderRadius: 8,
     marginBottom: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     marginHorizontal: 20,
   },
   inputLabel: {
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#DDDDDD',
     borderRadius: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
   },
   fullWidthInput: {
     marginBottom: 0,
