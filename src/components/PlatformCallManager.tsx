@@ -19,7 +19,7 @@ interface CallData {
 
 const PlatformCallManager: React.FC = () => {
   const { userInfo } = useAuth();
-  const { subscribeToIncomingCalls, rejectCall, socket } = useSocket();
+  const { subscribeToIncomingCalls, rejectCall, socket, releaseIncomingCallDedup } = useSocket();
   const { hideFloatingCall, forceHideFloatingCall } = useFloatingCall();
   const [isIncomingCall, setIsIncomingCall] = useState(false);
   const [incomingCallInfo, setIncomingCallInfo] = useState<CallData | null>(null);
@@ -30,7 +30,8 @@ const PlatformCallManager: React.FC = () => {
   const incomingCallInfoRef = useRef(incomingCallInfo);
   // 记录已处理/正在处理的来电，防止重复弹出
   const handledCallIdsRef = useRef<Set<string>>(new Set());
-  const PLATFORM_HANDLED_TTL_MS = 60 * 1000;
+  // 缩短本地去重TTL，避免同一callId短时间复用导致下一次来电被忽略
+  const PLATFORM_HANDLED_TTL_MS = 8 * 1000;
 
   // 标记某个callId已被处理，带TTL自动过期
   const markCallHandled = useCallback((callId?: string) => {
@@ -67,13 +68,15 @@ const PlatformCallManager: React.FC = () => {
     // 清理去重集合，避免后续同ID来电被忽略
     if (callId) {
       handledCallIdsRef.current.delete(callId);
+      // 同步释放全局Socket去重
+      releaseIncomingCallDedup(callId);
     }
     
     // iOS特殊处理
     if (Platform.OS === 'ios') {
       IOSCallService.cancelCurrentCall();
     }
-  }, []);
+  }, [releaseIncomingCallDedup]);
 
   // 处理来电
   const handleIncomingCall = useCallback((callData: CallData) => {
@@ -138,13 +141,15 @@ const PlatformCallManager: React.FC = () => {
     // 清理去重集合，避免下一次来电被忽略
     if (callId) {
       handledCallIdsRef.current.delete(callId);
+      // 同步释放全局Socket去重
+      releaseIncomingCallDedup(callId);
     }
     
     // iOS特殊处理
     if (Platform.OS === 'ios') {
       IOSCallService.cancelCurrentCall();
     }
-  }, []);
+  }, [releaseIncomingCallDedup]);
 
   // 处理通话结束（对方主动挂断）
   const handleCallEnded = useCallback((data: any) => {
@@ -167,13 +172,15 @@ const PlatformCallManager: React.FC = () => {
     // 清理去重集合，避免下一次来电被忽略
     if (callId) {
       handledCallIdsRef.current.delete(callId);
+      // 同步释放全局Socket去重
+      releaseIncomingCallDedup(callId);
     }
     
     // iOS特殊处理
     if (Platform.OS === 'ios') {
       IOSCallService.cancelCurrentCall();
     }
-  }, [forceHideFloatingCall]);
+  }, [forceHideFloatingCall, releaseIncomingCallDedup]);
 
   // 接听来电
   const handleAcceptCall = () => {
@@ -186,6 +193,8 @@ const PlatformCallManager: React.FC = () => {
     // 标记本次callId为已处理，避免权限弹窗返回后再次收到重复incoming_call
     if (incomingCallInfo?.callId) {
       markCallHandled(incomingCallInfo.callId);
+      // 接听后立即释放全局incoming_call去重，避免下一次来电被吞
+      releaseIncomingCallDedup(incomingCallInfo.callId);
     }
     
     // 导航到通话页面
@@ -221,6 +230,8 @@ const PlatformCallManager: React.FC = () => {
     // 立即释放本地去重标记，允许同一callId（如后端复用极短时间内ID）再次弹出
     if (incomingCallInfo?.callId) {
       handledCallIdsRef.current.delete(incomingCallInfo.callId);
+      // 同步释放全局Socket去重
+      releaseIncomingCallDedup(incomingCallInfo.callId);
     }
   };
 

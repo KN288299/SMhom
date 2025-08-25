@@ -47,6 +47,8 @@ interface SocketContextType {
   subscribeToMessages: (callback: (message: Message) => void) => () => void;
   subscribeToIncomingCalls: (callback: (callData: any) => void) => () => void;
   rejectCall: (callId: string, recipientId: string, conversationId?: string) => void;
+  // 主动释放 incoming_call 去重（用于接听/拒绝后立即允许新的来电）
+  releaseIncomingCallDedup: (callId: string) => void;
   unreadMessageCount: number;
   addUnreadMessage: () => void;
   clearUnreadMessages: () => void;
@@ -61,6 +63,7 @@ export const SocketContext = createContext<SocketContextType>({
   subscribeToMessages: () => () => {},
   subscribeToIncomingCalls: () => () => {},
   rejectCall: () => {},
+  releaseIncomingCallDedup: () => {},
   unreadMessageCount: 0,
   addUnreadMessage: () => {},
   clearUnreadMessages: () => {},
@@ -77,8 +80,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   // 去重：记录已处理的incoming_call的callId，避免重复弹窗/重复流程
   const handledIncomingCallIdsRef = useRef<Set<string>>(new Set());
-  // 来电去重TTL：缩短为60秒，避免复用callId导致后续来电被长期忽略
-  const INCOMING_DEDUP_TTL_MS = 60 * 1000;
+  // 来电去重TTL（过长会导致紧接着的下一次来电被吞掉；设置为8秒更安全）
+  const INCOMING_DEDUP_TTL_MS = 8 * 1000;
   
   // 消息订阅者列表
   const messageSubscribersRef = useRef<Set<(message: Message) => void>>(new Set());
@@ -409,6 +412,19 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     }
   };
 
+  // 主动释放 incoming_call 去重（当本端接听/拒绝后立即释放，避免后端复用callId导致下一次来电被忽略）
+  const releaseIncomingCallDedup = useCallback((callId: string) => {
+    try {
+      if (!callId) return;
+      if (handledIncomingCallIdsRef.current.has(callId)) {
+        handledIncomingCallIdsRef.current.delete(callId);
+        console.log('🧹 [GlobalSocket] 主动释放incoming_call去重:', callId);
+      }
+    } catch (e) {
+      console.warn('释放incoming_call去重失败:', e);
+    }
+  }, []);
+
   const value: SocketContextType = {
     socket: socketRef.current,
     isConnected,
@@ -418,6 +434,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     subscribeToMessages,
     subscribeToIncomingCalls,
     rejectCall,
+    releaseIncomingCallDedup,
     unreadMessageCount,
     addUnreadMessage,
     clearUnreadMessages,
