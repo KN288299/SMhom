@@ -53,6 +53,7 @@ const VoiceCallScreen: React.FC = () => {
   
   // 从路由参数中获取联系人信息
   const { contactId, contactName, isIncoming = false, callId: routeCallId } = route.params || {};
+  const isIncomingRef = useRef<boolean>(isIncoming);
   
   // 通话状态
   const [callStatus, setCallStatus] = useState<'connecting' | 'ringing' | 'connected' | 'ended'>(
@@ -82,10 +83,28 @@ const VoiceCallScreen: React.FC = () => {
   useEffect(() => {
     isEnteringFloatingModeRef.current = isEnteringFloatingMode;
   }, [isEnteringFloatingMode]);
+
+  // 调试配置：强制仅走TURN中继 + 固定TURN服务器（需要时设为false恢复自动）
+  const DEBUG_FORCE_TURN_RELAY = true;
+  const TURN_ONLY_ICE_SERVERS = [
+    {
+      urls: [
+        'turns:turn.uu68.icu:5349?transport=tcp',
+        'turns:turn.uu68.icu:5349?transport=udp',
+        'turn:turn.uu68.icu:3478?transport=tcp',
+        'turn:turn.uu68.icu:3478?transport=udp',
+      ],
+      username: 'webrtc',
+      credential: 'P@ssw0rdStrong1!',
+    },
+  ];
   
   useEffect(() => {
     isEndingCallRef.current = isEndingCall;
   }, [isEndingCall]);
+  useEffect(() => {
+    isIncomingRef.current = isIncoming;
+  }, [isIncoming]);
   
   useEffect(() => {
     callStatusRef.current = callStatus;
@@ -502,6 +521,11 @@ const VoiceCallScreen: React.FC = () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      // 清理ICE统计轮询
+      if (iceStatsIntervalRef.current) {
+        clearInterval(iceStatsIntervalRef.current);
+        iceStatsIntervalRef.current = null;
+      }
       // 清理ICE缓冲状态
       remoteDescriptionSetRef.current = false;
       pendingRemoteIceCandidatesRef.current = [];
@@ -512,9 +536,13 @@ const VoiceCallScreen: React.FC = () => {
   const setupSocketListeners = () => {
     if (!socketRef.current) return;
     
-    // 接收呼叫应答
+    // 接收呼叫应答（仅拨打方处理，避免双向同时创建offer引发协商冲突）
     socketRef.current.on('call_accepted', async (data: any) => {
       console.log('对方已接受通话');
+      if (isIncomingRef.current) {
+        console.log('我是被叫端，忽略call_accepted中的发起offer逻辑，等待对端offer');
+        return;
+      }
       
       // 停止铃声
       AudioManager.stopRingback();
@@ -889,10 +917,16 @@ const VoiceCallScreen: React.FC = () => {
         });
       }
 
-      // iOS下使用'all'策略，允许直连和中继，让WebRTC自动选择最优路径
+      // 若开启调试强制TURN中继，则覆盖为固定TURN列表
+      if (DEBUG_FORCE_TURN_RELAY) {
+        console.log('🧪 [ICE] 调试模式：强制仅使用 TURN 中继');
+        effectiveIceServers = TURN_ONLY_ICE_SERVERS;
+      }
+
+      // 策略：调试时仅 relay，其余为 all
       const rtcConfig = {
         iceServers: effectiveIceServers,
-        iceTransportPolicy: 'all' as 'relay' | 'all',
+        iceTransportPolicy: (DEBUG_FORCE_TURN_RELAY ? 'relay' : 'all') as 'relay' | 'all',
         iceCandidatePoolSize: 10,
         bundlePolicy: 'balanced' as 'balanced' | 'max-compat' | 'max-bundle',
         rtcpMuxPolicy: 'require' as 'negotiate' | 'require',
@@ -1032,6 +1066,8 @@ const VoiceCallScreen: React.FC = () => {
         if (!timerRef.current) {
           startCallTimer();
         }
+        // 连接成功后检查选中候选对
+        logSelectedCandidatePair();
       } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
         console.log('WebRTC连接已断开或失败');
         setWebrtcConnected(false);
@@ -1058,6 +1094,8 @@ const VoiceCallScreen: React.FC = () => {
         if (!timerRef.current) {
           startCallTimer();
         }
+        // 连接成功后检查选中候选对
+        logSelectedCandidatePair();
       } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
         console.log('ICE连接已断开或失败');
         setWebrtcConnected(false);
@@ -1078,6 +1116,53 @@ const VoiceCallScreen: React.FC = () => {
     throw error;
   }
 };
+
+  // 定时记录/检查选中候选对（relay/host/srflx）
+  const iceStatsIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const logSelectedCandidatePair = async () => {
+    try {
+      const pc: any = peerConnectionRef.current;
+      if (!pc || typeof pc.getStats !== 'function') return;
+      const stats = await pc.getStats();
+      let logged = false;
+      // stats 可能是 Map，也可能是对象，统一按 Map 处理
+      const reportList: any[] = [];
+      if (typeof stats.forEach === 'function') {
+        stats.forEach((r: any) => reportList.push(r));
+      } else if (Array.isArray(stats)) {
+        reportList.push(...stats);
+      }
+      const pairs = reportList.filter((r) => r.type === 'candidate-pair');
+      for (const r of pairs) {
+        if (r.state === 'succeeded' || r.selected === true) {
+          const local = reportList.find((x) => x.id === r.localCandidateId);
+          const remote = reportList.find((x) => x.id === r.remoteCandidateId);
+          console.log('🎯 [ICE] 已选候选对:', {
+            localType: local?.candidateType,
+            localProtocol: local?.protocol,
+            localIp: local?.ip || local?.address,
+            remoteType: remote?.candidateType,
+            remoteProtocol: remote?.protocol,
+            relayProtocol: remote?.relayProtocol,
+            remoteIp: remote?.ip || remote?.address,
+          });
+          logged = true;
+          break;
+        }
+      }
+      if (!logged) {
+        console.log('ℹ️ [ICE] 暂未找到已选候选对，稍后重试');
+      }
+      // 若尚无间隔轮询，则启动，观察是否被切换
+      if (!iceStatsIntervalRef.current) {
+        iceStatsIntervalRef.current = setInterval(() => {
+          logSelectedCandidatePair();
+        }, 3000);
+      }
+    } catch (e) {
+      console.warn('统计已选候选对失败:', e);
+    }
+  };
   
   // 发起呼叫
   const initiateCall = () => {

@@ -75,6 +75,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  // 去重：记录已处理的incoming_call的callId，避免重复弹窗/重复流程
+  const handledIncomingCallIdsRef = useRef<Set<string>>(new Set());
   
   // 消息订阅者列表
   const messageSubscribersRef = useRef<Set<(message: Message) => void>>(new Set());
@@ -177,6 +179,16 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     const handleIncomingCall = async (callData: any) => {
       console.log('📞 [GlobalSocket] 收到来电:', callData);
       console.log(`📞 [GlobalSocket] 当前通话订阅者数量: ${callSubscribersRef.current.size}`);
+      // 来电去重：同一callId在短时间内只处理一次
+      if (callData?.callId && handledIncomingCallIdsRef.current.has(callData.callId)) {
+        console.log('🛑 [GlobalSocket] 重复incoming_call已忽略，callId:', callData.callId);
+        return;
+      }
+      if (callData?.callId) {
+        handledIncomingCallIdsRef.current.add(callData.callId);
+        // 5分钟后自动过期，防止集合无限增长
+        setTimeout(() => handledIncomingCallIdsRef.current.delete(callData.callId), 5 * 60 * 1000);
+      }
       
       // 注意：不要在此处请求麦克风权限，先显示来电界面；
       // 权限将由接听后进入的 VoiceCallScreen 内进行检查与请求。
@@ -226,6 +238,10 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     // 转发call_cancelled事件给所有通话订阅者
     const handleCallCancelled = (callData: any) => {
       console.log('📞 [GlobalSocket] 收到call_cancelled:', callData);
+      // 清理已处理集合，允许未来新的同ID通话（如果服务端会复用ID则保留也可）
+      if (callData?.callId && handledIncomingCallIdsRef.current.has(callData.callId)) {
+        handledIncomingCallIdsRef.current.delete(callData.callId);
+      }
       
       // 通知所有通话订阅者（包括GlobalNavigator）
       callSubscribersRef.current.forEach(callback => {
@@ -257,24 +273,10 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       console.log('🔍 [GlobalSocket] incoming_call监听器数量:', listeners.length);
     }, 100);
     
-    // 监听所有事件（调试用，同时作为备用处理方案）
+    // 监听所有事件（仅用于调试日志，避免重复调用业务处理导致二次弹窗）
     socket.onAny((eventName, ...args) => {
-      if (eventName === 'incoming_call') {
-        console.log(`🔔 [GlobalSocket] 收到任意事件 ${eventName}:`, args);
-        console.log('🔧 [GlobalSocket] 使用onAny备用处理来电事件');
-        
-        // 备用处理方案：直接调用handleIncomingCall
-        if (args[0]) {
-          handleIncomingCall(args[0]);
-        }
-      } else if (eventName === 'call_cancelled') {
-        console.log(`🔔 [GlobalSocket] 收到任意事件 ${eventName}:`, args);
-        console.log('🔧 [GlobalSocket] 使用onAny备用处理call_cancelled事件');
-        
-        // 备用处理方案：直接调用handleCallCancelled
-        if (args[0]) {
-          handleCallCancelled(args[0]);
-        }
+      if (eventName === 'incoming_call' || eventName === 'call_cancelled') {
+        console.log(`🔔 [GlobalSocket] onAny捕获事件 ${eventName}:`, args?.[0]?.callId || '');
       }
     });
 

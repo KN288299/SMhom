@@ -28,6 +28,18 @@ const PlatformCallManager: React.FC = () => {
   // 使用 ref 存储最新状态
   const isIncomingCallRef = useRef(isIncomingCall);
   const incomingCallInfoRef = useRef(incomingCallInfo);
+  // 记录已处理/正在处理的来电，防止重复弹出
+  const handledCallIdsRef = useRef<Set<string>>(new Set());
+
+  // 标记某个callId已被处理，带TTL自动过期
+  const markCallHandled = useCallback((callId?: string) => {
+    if (!callId) return;
+    handledCallIdsRef.current.add(callId);
+    // 5分钟后清理，防止集合无限增长
+    setTimeout(() => {
+      handledCallIdsRef.current.delete(callId);
+    }, 5 * 60 * 1000);
+  }, []);
 
   // 同步状态到 ref
   useEffect(() => {
@@ -69,6 +81,12 @@ const PlatformCallManager: React.FC = () => {
       return;
     }
     
+    // 去重：同一callId若已处理，直接忽略
+    if (handledCallIdsRef.current.has(callData.callId)) {
+      console.log('🛑 [PlatformCallManager] 重复的incoming_call，已忽略。callId:', callData.callId);
+      return;
+    }
+
     // 平台特定的来电处理
     if (Platform.OS === 'ios') {
       console.log('🍎 [PlatformCallManager] iOS设备，使用优化的来电处理');
@@ -78,16 +96,19 @@ const PlatformCallManager: React.FC = () => {
       if (appState === 'active') {
         // iOS前台时立即显示，跳过所有延迟处理
         console.log('⚡ [PlatformCallManager] iOS前台，立即显示来电界面（快速路径）');
+        markCallHandled(callData.callId); // 标记已处理，防止授权返回时重复
         setIsIncomingCall(true);
         setIncomingCallInfo(callData);
       } else {
         // iOS后台时使用通话服务处理
         console.log('🍎 [PlatformCallManager] iOS后台，使用iOS通话服务');
+        markCallHandled(callData.callId); // 标记已处理，防止回到前台后重复
         IOSCallService.showIncomingCallNotification(callData);
       }
     } else {
       // Android设备，使用原有的全局来电显示
       console.log('🤖 [PlatformCallManager] Android设备，显示全局来电界面');
+      markCallHandled(callData.callId);
       setIsIncomingCall(true);
       setIncomingCallInfo(callData);
     }
@@ -144,6 +165,14 @@ const PlatformCallManager: React.FC = () => {
   const handleAcceptCall = () => {
     console.log('✅ [PlatformCallManager] 接听全局来电');
     setIsIncomingCall(false);
+    // 清理可能存在的iOS本地来电通知（若权限弹窗期间触发了后台通知）
+    if (Platform.OS === 'ios') {
+      IOSCallService.cancelCurrentCall();
+    }
+    // 标记本次callId为已处理，避免权限弹窗返回后再次收到重复incoming_call
+    if (incomingCallInfo?.callId) {
+      markCallHandled(incomingCallInfo.callId);
+    }
     
     // 导航到通话页面
     navigation.navigate('VoiceCall', {
@@ -163,6 +192,14 @@ const PlatformCallManager: React.FC = () => {
     // 发送拒绝信号
     if (incomingCallInfo?.callId && incomingCallInfo?.callerId) {
       rejectCall(incomingCallInfo.callId, incomingCallInfo.callerId, incomingCallInfo.conversationId);
+    }
+    // 清理iOS本地来电通知
+    if (Platform.OS === 'ios') {
+      IOSCallService.cancelCurrentCall();
+    }
+    // 标记为已处理
+    if (incomingCallInfo?.callId) {
+      markCallHandled(incomingCallInfo.callId);
     }
     
     setIsIncomingCall(false);
