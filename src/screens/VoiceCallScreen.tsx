@@ -367,9 +367,9 @@ const VoiceCallScreen: React.FC = () => {
 
             // 当Promise settle时清理
             const originalResolve = resolve;
-            resolve = () => { cleanup(); originalResolve(); } as any;
+            resolve = (() => { cleanup(); originalResolve(); }) as any;
             const originalReject = reject;
-            reject = (e: any) => { cleanup(); originalReject(e); } as any;
+            reject = ((e: any) => { cleanup(); originalReject(e); }) as any;
           });
           console.log('全局Socket已就绪');
         }
