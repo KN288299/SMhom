@@ -333,19 +333,49 @@ const VoiceCallScreen: React.FC = () => {
         AudioManager.setSpeakerOn(false);
         setIsSpeakerOn(false);
         
-        // 使用全局Socket连接
+        // 等待全局Socket连接就绪，避免冷启动竞态
         if (!globalSocket || !isConnected) {
-          console.error('全局Socket未连接');
-          Alert.alert(
-            '连接失败',
-            '网络连接不可用，请检查网络后重试。',
-            [{ text: '确定', onPress: () => safeGoBack() }]
-          );
-          return;
+          console.log('全局Socket未连接，等待连接就绪...');
+          setCallStatus('connecting');
+          await new Promise<void>((resolve, reject) => {
+            let settled = false;
+            const timeoutId = setTimeout(() => {
+              if (settled) return;
+              settled = true;
+              reject(new Error('等待Socket连接超时'));
+            }, 8000);
+
+            const tryResolve = () => {
+              if (settled) return;
+              if ((global as any).socketRef?.current && !(global as any).socketRef.current.disconnected) {
+                clearTimeout(timeoutId);
+                settled = true;
+                resolve();
+              }
+            };
+
+            // 轮询检查，因为此处只有引用而未直接访问事件
+            const intervalId = setInterval(() => {
+              tryResolve();
+            }, 150);
+
+            // 最终清理
+            const cleanup = () => {
+              clearInterval(intervalId);
+              clearTimeout(timeoutId);
+            };
+
+            // 当Promise settle时清理
+            const originalResolve = resolve;
+            resolve = () => { cleanup(); originalResolve(); } as any;
+            const originalReject = reject;
+            reject = (e: any) => { cleanup(); originalReject(e); } as any;
+          });
+          console.log('全局Socket已就绪');
         }
         
         // 设置Socket引用为全局Socket
-        socketRef.current = globalSocket;
+        socketRef.current = (global as any).socketRef?.current || globalSocket;
         console.log('使用全局Socket连接进行通话');
         
         // 先初始化WebRTC，再注册Socket监听，最后再触发接听/拨打，确保iOS在收到offer时已有PeerConnection与监听
