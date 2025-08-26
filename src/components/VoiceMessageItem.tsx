@@ -14,6 +14,7 @@ interface VoiceMessageItemProps {
   isMe: boolean;
   timestamp: Date;
   contactAvatar?: string | null;
+  userAvatar?: string | null;
 }
 
 const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({ 
@@ -21,7 +22,8 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
   duration = '00:00', 
   isMe,
   timestamp,
-  contactAvatar
+  contactAvatar,
+  userAvatar
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPosition, setCurrentPosition] = useState('00:00');
@@ -322,8 +324,10 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
 
   // 渲染头像
   const renderAvatar = () => {
-    if (contactAvatar) {
-      return <Image source={{ uri: contactAvatar }} style={styles.avatar} />;
+    // 根据消息发送者显示对应的头像
+    const avatarUrl = isMe ? userAvatar : contactAvatar;
+    if (avatarUrl) {
+      return <Image source={{ uri: avatarUrl }} style={styles.avatar} />;
     } else {
       return <Image source={DEFAULT_AVATAR} style={styles.avatar} />;
     }
@@ -480,6 +484,7 @@ export default memo(VoiceMessageItem, (prevProps, nextProps) => {
     prevProps.duration === nextProps.duration &&
     prevProps.timestamp.getTime() === nextProps.timestamp.getTime() &&
     prevProps.isMe === nextProps.isMe &&
-    prevProps.contactAvatar === nextProps.contactAvatar
+    prevProps.contactAvatar === nextProps.contactAvatar &&
+    prevProps.userAvatar === nextProps.userAvatar
   );
 }); 

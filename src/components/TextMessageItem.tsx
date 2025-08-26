@@ -18,6 +18,7 @@ interface TextMessageItemProps {
   timestamp: Date;
   isMe: boolean;
   contactAvatar?: string | null;
+  userAvatar?: string | null;
 }
 
 const TextMessageItem: React.FC<TextMessageItemProps> = ({
@@ -25,11 +26,14 @@ const TextMessageItem: React.FC<TextMessageItemProps> = ({
   timestamp,
   isMe,
   contactAvatar,
+  userAvatar,
 }) => {
   // 渲染头像
   const renderAvatar = () => {
-    if (contactAvatar) {
-      return <Image source={{ uri: contactAvatar }} style={styles.avatar} />;
+    // 根据消息发送者显示对应的头像
+    const avatarUrl = isMe ? userAvatar : contactAvatar;
+    if (avatarUrl) {
+      return <Image source={{ uri: avatarUrl }} style={styles.avatar} />;
     } else {
       return <Image source={DEFAULT_AVATAR} style={styles.avatar} />;
     }
@@ -157,6 +161,7 @@ export default memo(TextMessageItem, (prevProps, nextProps) => {
     prevProps.content === nextProps.content &&
     prevProps.timestamp.getTime() === nextProps.timestamp.getTime() &&
     prevProps.isMe === nextProps.isMe &&
-    prevProps.contactAvatar === nextProps.contactAvatar
+    prevProps.contactAvatar === nextProps.contactAvatar &&
+    prevProps.userAvatar === nextProps.userAvatar
   );
 }); 

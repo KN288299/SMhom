@@ -49,6 +49,7 @@ interface MessageRendererProps {
   onViewLocation?: (location: { latitude: number; longitude: number; locationName?: string; address?: string }) => void;
   formatMediaUrl: (url: string) => string;
   contactAvatar?: string | null;
+  userAvatar?: string | null;
 }
 
 const MessageRenderer: React.FC<MessageRendererProps> = ({
@@ -59,6 +60,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
   onViewLocation,
   formatMediaUrl,
   contactAvatar,
+  userAvatar,
 }) => {
   const isMe = item.senderId === userInfo?._id;
   
@@ -109,6 +111,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
           isMe={isMe}
           timestamp={item.timestamp}
           contactAvatar={contactAvatar}
+          userAvatar={userAvatar}
         />
       );
     }
@@ -128,6 +131,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
           isMe={isMe}
           onPress={onOpenFullscreenImage}
           contactAvatar={contactAvatar}
+          userAvatar={userAvatar}
         />
       );
     }
@@ -137,25 +141,27 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
   if (item.messageType === 'video' || item.contentType === 'video') {
     // 如果是上传中的视频
     if (item.isUploading) {
-      return (
-        <VideoMessageItem
-          // iOS 自发视频上传中：内部会优先用 localFileUri
-          videoUrl={formatMediaUrl(item.videoUrl || item.fileUrl || item.localFileUri || '')}
-          timestamp={item.timestamp}
-          isMe={isMe}
-          videoDuration={item.videoDuration}
-          // 允许在上传中预览本地视频（仅iOS有localFileUri时），否则禁用
-          onPress={(url) => {
-            const canPreviewLocal = !!(item.localFileUri && (item.localFileUri.startsWith('file://') || item.localFileUri.startsWith('ph://') || item.localFileUri.startsWith('assets-library://')));
-            if (canPreviewLocal) {
-              onOpenFullscreenVideo(item.localFileUri!);
-            }
-          }}
-          isUploading={true}
-          uploadProgress={item.uploadProgress || 0}
-          localFileUri={item.localFileUri}
-        />
-      );
+              return (
+          <VideoMessageItem
+            // iOS 自发视频上传中：内部会优先用 localFileUri
+            videoUrl={formatMediaUrl(item.videoUrl || item.fileUrl || item.localFileUri || '')}
+            timestamp={item.timestamp}
+            isMe={isMe}
+            videoDuration={item.videoDuration}
+            // 允许在上传中预览本地视频（仅iOS有localFileUri时），否则禁用
+            onPress={(url) => {
+              const canPreviewLocal = !!(item.localFileUri && (item.localFileUri.startsWith('file://') || item.localFileUri.startsWith('ph://') || item.localFileUri.startsWith('assets-library://')));
+              if (canPreviewLocal) {
+                onOpenFullscreenVideo(item.localFileUri!);
+              }
+            }}
+            isUploading={true}
+            uploadProgress={item.uploadProgress || 0}
+            localFileUri={item.localFileUri}
+            contactAvatar={contactAvatar}
+            userAvatar={userAvatar}
+          />
+        );
     }
     
     // 已上传完成的视频
@@ -164,27 +170,29 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
     if (videoUrl) {
       const fullVideoUrl = formatMediaUrl(videoUrl);
       // 调试日志已清理 - 视频消息URL
-      return (
-        <VideoMessageItem
-          videoUrl={fullVideoUrl}
-          timestamp={item.timestamp}
-          isMe={isMe}
-          videoDuration={item.videoDuration}
-          onPress={(url) => {
-            // iOS: 如果有本地文件路径，优先使用本地播放（特别是自己发送的视频）
-            if (Platform.OS === 'ios' && item.localFileUri && 
-                (item.localFileUri.startsWith('file://') || 
-                 item.localFileUri.startsWith('ph://') || 
-                 item.localFileUri.startsWith('assets-library://'))) {
-              onOpenFullscreenVideo(item.localFileUri);
-            } else {
-              // 使用应用内视频播放器
-              onOpenFullscreenVideo(url);
-            }
-          }}
-          localFileUri={item.localFileUri}
-        />
-      );
+              return (
+          <VideoMessageItem
+            videoUrl={fullVideoUrl}
+            timestamp={item.timestamp}
+            isMe={isMe}
+            videoDuration={item.videoDuration}
+            onPress={(url) => {
+              // iOS: 如果有本地文件路径，优先使用本地播放（特别是自己发送的视频）
+              if (Platform.OS === 'ios' && item.localFileUri && 
+                  (item.localFileUri.startsWith('file://') || 
+                   item.localFileUri.startsWith('ph://') || 
+                   item.localFileUri.startsWith('assets-library://'))) {
+                onOpenFullscreenVideo(item.localFileUri);
+              } else {
+                // 使用应用内视频播放器
+                onOpenFullscreenVideo(url);
+              }
+            }}
+            localFileUri={item.localFileUri}
+            contactAvatar={contactAvatar}
+            userAvatar={userAvatar}
+          />
+        );
     }
   }
   
@@ -217,6 +225,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
       timestamp={item.timestamp}
       isMe={isMe}
       contactAvatar={contactAvatar}
+      userAvatar={userAvatar}
     />
   );
 };

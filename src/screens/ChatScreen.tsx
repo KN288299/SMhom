@@ -889,6 +889,7 @@ const ChatScreen: React.FC = () => {
         onViewLocation={handleViewLocation}
         formatMediaUrl={formatMediaUrl}
         contactAvatar={contactAvatar}
+        userAvatar={userInfo?.avatar}
       />
     );
   }, [userInfo, formatMediaUrl, handleViewLocation, contactAvatar]);

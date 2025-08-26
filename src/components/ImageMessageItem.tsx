@@ -53,6 +53,7 @@ interface ImageMessageItemProps {
   isMe: boolean;
   onPress: (url: string) => void;
   contactAvatar?: string | null;
+  userAvatar?: string | null;
 }
 
 const ImageMessageItem: React.FC<ImageMessageItemProps> = ({ 
@@ -60,7 +61,8 @@ const ImageMessageItem: React.FC<ImageMessageItemProps> = ({
   timestamp, 
   isMe, 
   onPress,
-  contactAvatar
+  contactAvatar,
+  userAvatar
 }) => {
   const [imageWidth, setImageWidth] = useState(CONSTANTS.DEFAULT_IMAGE_WIDTH);
   const [imageHeight, setImageHeight] = useState(CONSTANTS.DEFAULT_IMAGE_HEIGHT);
@@ -111,8 +113,10 @@ const ImageMessageItem: React.FC<ImageMessageItemProps> = ({
   
   // 渲染头像
   const renderAvatar = () => {
-    if (contactAvatar) {
-      return <Image source={{ uri: contactAvatar }} style={styles.avatar} />;
+    // 根据消息发送者显示对应的头像
+    const avatarUrl = isMe ? userAvatar : contactAvatar;
+    if (avatarUrl) {
+      return <Image source={{ uri: avatarUrl }} style={styles.avatar} />;
     } else {
       return <Image source={DEFAULT_AVATAR} style={styles.avatar} />;
     }
@@ -250,6 +254,7 @@ export default memo(ImageMessageItem, (prevProps, nextProps) => {
     prevProps.imageUrl === nextProps.imageUrl &&
     prevProps.timestamp.getTime() === nextProps.timestamp.getTime() &&
     prevProps.isMe === nextProps.isMe &&
-    prevProps.contactAvatar === nextProps.contactAvatar
+    prevProps.contactAvatar === nextProps.contactAvatar &&
+    prevProps.userAvatar === nextProps.userAvatar
   );
 }); 

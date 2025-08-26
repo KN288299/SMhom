@@ -40,6 +40,7 @@ interface VideoMessageItemProps {
   // iOS 自发视频的本地路径，用于缩略图/播放回退
   localFileUri?: string;
   contactAvatar?: string | null;
+  userAvatar?: string | null;
 }
 
 const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
@@ -52,6 +53,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
   uploadProgress = 0,
   localFileUri,
   contactAvatar,
+  userAvatar,
 }) => {
   const [videoWidth, setVideoWidth] = useState(CONSTANTS.DEFAULT_VIDEO_WIDTH);
   const [videoHeight, setVideoHeight] = useState(CONSTANTS.DEFAULT_VIDEO_HEIGHT);
@@ -62,8 +64,10 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
 
   // 渲染头像
   const renderAvatar = () => {
-    if (contactAvatar) {
-      return <Image source={{ uri: contactAvatar }} style={styles.avatar} />;
+    // 根据消息发送者显示对应的头像
+    const avatarUrl = isMe ? userAvatar : contactAvatar;
+    if (avatarUrl) {
+      return <Image source={{ uri: avatarUrl }} style={styles.avatar} />;
     } else {
       return <Image source={DEFAULT_AVATAR} style={styles.avatar} />;
     }
@@ -530,6 +534,7 @@ export default memo(VideoMessageItem, (prevProps, nextProps) => {
     prevProps.videoDuration === nextProps.videoDuration &&
     prevProps.isUploading === nextProps.isUploading &&
     prevProps.uploadProgress === nextProps.uploadProgress &&
-    prevProps.contactAvatar === nextProps.contactAvatar
+    prevProps.contactAvatar === nextProps.contactAvatar &&
+    prevProps.userAvatar === nextProps.userAvatar
   );
 }); 
