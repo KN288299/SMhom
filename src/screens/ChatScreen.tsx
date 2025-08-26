@@ -2114,7 +2114,7 @@ const ChatScreen: React.FC = () => {
 
   
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={isIOS ? [] : ['bottom']}>
       <View style={styles.container}>
         <StatusBar backgroundColor="#fff" barStyle="dark-content" />
       
