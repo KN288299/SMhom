@@ -880,7 +880,10 @@ const ChatScreen: React.FC = () => {
 
   // 渲染消息项 - 使用useCallback优化性能
   const renderMessageItem = useCallback(({ item }: { item: Message }) => {
-      return (
+    // 格式化用户头像URL，确保客服端也能正确显示自己的头像
+    const formattedUserAvatar = userInfo?.avatar ? formatMediaUrl(userInfo.avatar) : null;
+    
+    return (
       <MessageRenderer
         item={item}
         userInfo={userInfo}
@@ -889,7 +892,7 @@ const ChatScreen: React.FC = () => {
         onViewLocation={handleViewLocation}
         formatMediaUrl={formatMediaUrl}
         contactAvatar={contactAvatar}
-        userAvatar={userInfo?.avatar}
+        userAvatar={formattedUserAvatar}
       />
     );
   }, [userInfo, formatMediaUrl, handleViewLocation, contactAvatar]);

@@ -41,6 +41,7 @@ interface VideoMessageItemProps {
   localFileUri?: string;
   contactAvatar?: string | null;
   userAvatar?: string | null;
+  isRead?: boolean;
 }
 
 const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
@@ -54,6 +55,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
   localFileUri,
   contactAvatar,
   userAvatar,
+  isRead,
 }) => {
   const [videoWidth, setVideoWidth] = useState(CONSTANTS.DEFAULT_VIDEO_WIDTH);
   const [videoHeight, setVideoHeight] = useState(CONSTANTS.DEFAULT_VIDEO_HEIGHT);
@@ -364,12 +366,15 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
               )}
             </View>
           </TouchableOpacity>
-          <Text style={[
-            styles.messageTime, 
-            isMe ? styles.myMessageTime : styles.otherMessageTime
-          ]}>
-            {isUploading ? '上传中...' : formatMessageTime(timestamp)}
-          </Text>
+          {/* 时间显示已移除，保留上传状态 */}
+          {isUploading && (
+            <Text style={[
+              styles.uploadStatus,
+              isMe ? styles.myUploadStatus : styles.otherUploadStatus
+            ]}>
+              上传中...
+            </Text>
+          )}
         </View>
       </View>
 
@@ -507,19 +512,22 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
-  messageTime: {
+  // 时间显示样式已移除，替换为上传状态样式
+  uploadStatus: {
     fontSize: 10,
-    color: '#999',
     marginLeft: 8,
     marginRight: 8,
     alignSelf: 'flex-end',
     marginBottom: 2,
   },
-  myMessageTime: {
+  myUploadStatus: {
     textAlign: 'right',
+    color: '#fff',
+    opacity: 0.8,
   },
-  otherMessageTime: {
+  otherUploadStatus: {
     textAlign: 'left',
+    color: '#666',
   },
 });
 

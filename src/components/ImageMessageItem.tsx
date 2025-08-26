@@ -54,6 +54,7 @@ interface ImageMessageItemProps {
   onPress: (url: string) => void;
   contactAvatar?: string | null;
   userAvatar?: string | null;
+  isRead?: boolean;
 }
 
 const ImageMessageItem: React.FC<ImageMessageItemProps> = ({ 
@@ -62,7 +63,8 @@ const ImageMessageItem: React.FC<ImageMessageItemProps> = ({
   isMe, 
   onPress,
   contactAvatar,
-  userAvatar
+  userAvatar,
+  isRead
 }) => {
   const [imageWidth, setImageWidth] = useState(CONSTANTS.DEFAULT_IMAGE_WIDTH);
   const [imageHeight, setImageHeight] = useState(CONSTANTS.DEFAULT_IMAGE_HEIGHT);
@@ -169,9 +171,7 @@ const ImageMessageItem: React.FC<ImageMessageItemProps> = ({
               />
             </Animated.View>
           </TouchableOpacity>
-          <Text style={[styles.messageTime, isMe ? styles.myMessageTime : styles.otherMessageTime]}>
-            {formatMessageTime(timestamp)}
-          </Text>
+          {/* 时间显示已移除 */}
         </View>
       </View>
 

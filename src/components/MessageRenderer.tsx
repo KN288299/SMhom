@@ -112,6 +112,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
           timestamp={item.timestamp}
           contactAvatar={contactAvatar}
           userAvatar={userAvatar}
+          isRead={item.isRead}
         />
       );
     }
@@ -132,6 +133,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
           onPress={onOpenFullscreenImage}
           contactAvatar={contactAvatar}
           userAvatar={userAvatar}
+          isRead={item.isRead}
         />
       );
     }
@@ -160,6 +162,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
             localFileUri={item.localFileUri}
             contactAvatar={contactAvatar}
             userAvatar={userAvatar}
+            isRead={item.isRead}
           />
         );
     }
@@ -191,6 +194,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
             localFileUri={item.localFileUri}
             contactAvatar={contactAvatar}
             userAvatar={userAvatar}
+            isRead={item.isRead}
           />
         );
     }
@@ -226,6 +230,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
       isMe={isMe}
       contactAvatar={contactAvatar}
       userAvatar={userAvatar}
+      isRead={item.isRead}
     />
   );
 };

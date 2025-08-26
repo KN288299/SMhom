@@ -318,10 +318,7 @@ const LocationMessageItem: React.FC<LocationMessageItemProps> = ({
         </View>
       </TouchableOpacity>
 
-      {/* 时间戳 */}
-      <Text style={[styles.timestamp, isMe ? styles.myTimestamp : styles.otherTimestamp]}>
-        {formatTime(timestamp)}
-      </Text>
+      {/* 时间显示已移除 */}
     </View>
   );
 };

@@ -15,6 +15,7 @@ interface VoiceMessageItemProps {
   timestamp: Date;
   contactAvatar?: string | null;
   userAvatar?: string | null;
+  isRead?: boolean;
 }
 
 const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({ 
@@ -23,7 +24,8 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
   isMe,
   timestamp,
   contactAvatar,
-  userAvatar
+  userAvatar,
+  isRead
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPosition, setCurrentPosition] = useState('00:00');
@@ -371,9 +373,7 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
               </Text>
             </View>
           </TouchableOpacity>
-          <Text style={[styles.timestamp, isMe ? styles.myTimestamp : styles.otherTimestamp]}>
-            {new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
+          {/* 时间显示已移除 */}
         </View>
       </View>
 

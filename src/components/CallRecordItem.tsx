@@ -59,9 +59,7 @@ const CallRecordItem: React.FC<CallRecordItemProps> = ({
           </Text>
         </View>
       </View>
-      <Text style={[styles.timestamp, isMe ? styles.myTimestamp : styles.otherTimestamp]}>
-        {new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-      </Text>
+      {/* 时间显示已移除 */}
     </View>
   );
 };

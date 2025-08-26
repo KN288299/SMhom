@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { iOSMessageStyles, isIOS, getPlatformStyles } from '../styles/iOSStyles';
 import { DEFAULT_AVATAR } from '../utils/DefaultAvatar';
+import ReadStatusIndicator from './ReadStatusIndicator';
 
 // 工具函数
 const formatMessageTime = (timestamp: Date): string => {
@@ -19,6 +20,7 @@ interface TextMessageItemProps {
   isMe: boolean;
   contactAvatar?: string | null;
   userAvatar?: string | null;
+  isRead?: boolean;
 }
 
 const TextMessageItem: React.FC<TextMessageItemProps> = ({
@@ -27,6 +29,7 @@ const TextMessageItem: React.FC<TextMessageItemProps> = ({
   isMe,
   contactAvatar,
   userAvatar,
+  isRead = false,
 }) => {
   // 渲染头像
   const renderAvatar = () => {
@@ -65,15 +68,14 @@ const TextMessageItem: React.FC<TextMessageItemProps> = ({
             ]}>
               {content}
             </Text>
+            {/* 已读状态指示器 */}
+            <ReadStatusIndicator 
+              isRead={isRead} 
+              isMe={isMe}
+              style={styles.readStatus}
+            />
           </View>
-          <Text style={[
-            getPlatformStyles(
-              isMe ? iOSMessageStyles.myMessageTime : iOSMessageStyles.otherMessageTime,
-              isMe ? styles.myMessageTime : styles.otherMessageTime
-            )
-          ]}>
-            {formatMessageTime(timestamp)}
-          </Text>
+          {/* 时间显示已移除 */}
         </View>
       </View>
 
@@ -152,6 +154,11 @@ const styles = StyleSheet.create({
   otherMessageTime: {
     textAlign: 'left',
   },
+  readStatus: {
+    position: 'absolute',
+    bottom: 4,
+    right: 8,
+  },
 });
 
 // 使用memo优化，避免不必要的重新渲染
@@ -161,6 +168,7 @@ export default memo(TextMessageItem, (prevProps, nextProps) => {
     prevProps.timestamp.getTime() === nextProps.timestamp.getTime() &&
     prevProps.isMe === nextProps.isMe &&
     prevProps.contactAvatar === nextProps.contactAvatar &&
-    prevProps.userAvatar === nextProps.userAvatar
+    prevProps.userAvatar === nextProps.userAvatar &&
+    prevProps.isRead === nextProps.isRead
   );
 }); 
