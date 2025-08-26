@@ -376,7 +376,10 @@ export const iOSMainHeaderStyles = StyleSheet.create({
 export const iOSMessageStyles = StyleSheet.create({
   messageContainer: {
     marginVertical: 3, // 减少消息间距
+    paddingHorizontal: 16,
     width: '100%', // 允许容器全宽
+    flexDirection: 'row',
+    alignItems: 'flex-end',
   },
   
   messageBubble: {
