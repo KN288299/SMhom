@@ -409,7 +409,6 @@ const styles = StyleSheet.create({
     borderRadius: 17.5,
   },
   messageContent: {
-    flex: 1,
     maxWidth: '70%',
   },
   voiceMessageWithTime: {
