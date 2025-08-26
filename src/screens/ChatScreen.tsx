@@ -1341,12 +1341,13 @@ const ChatScreen: React.FC = () => {
             return;
           }
           
-          // 处理视频
+          // 直接发送视频：不显示预览
           setSelectedVideo(selectedAsset);
           if (selectedAsset.uri) {
             setSelectedVideoUri(selectedAsset.uri);
           }
-          setShowVideoPreview(true);
+          // 立即触发发送
+          confirmSendVideo();
         } else {
           // 检查图片大小限制
           if (selectedAsset.fileSize && selectedAsset.fileSize > 50 * 1024 * 1024) { // 50MB
@@ -1556,8 +1557,10 @@ const ChatScreen: React.FC = () => {
   };
   
   // 🔧 第一次媒体发送失败修复：确认发送视频
-  const confirmSendVideo = async () => {
-    if (!selectedVideo || !selectedVideoUri) {
+  const confirmSendVideo = async (options?: { asset?: Asset | null; uri?: string | null }) => {
+    const effectiveAsset = options?.asset ?? selectedVideo;
+    const effectiveUri = options?.uri ?? selectedVideoUri;
+    if (!effectiveAsset || !effectiveUri) {
       setShowVideoPreview(false);
       return;
     }
@@ -1576,8 +1579,8 @@ const ChatScreen: React.FC = () => {
       content: '视频消息',
       timestamp: new Date(),
       messageType: 'video',
-      videoUrl: selectedVideoUri,
-      localFileUri: Platform.OS === 'ios' ? selectedVideoUri : undefined,
+      videoUrl: effectiveUri,
+      localFileUri: Platform.OS === 'ios' ? effectiveUri : undefined,
       isUploading: true,
       uploadProgress: 0
     };
@@ -1614,26 +1617,26 @@ const ChatScreen: React.FC = () => {
       
       // 计算视频时长（如果可用）
       let videoDuration = '未知';
-      if (selectedVideo.duration) {
-        const durationInSec = selectedVideo.duration;
+      if (effectiveAsset.duration) {
+        const durationInSec = effectiveAsset.duration;
         const minutes = Math.floor(durationInSec / 60);
         const seconds = Math.floor(durationInSec % 60);
         videoDuration = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
       }
       
       console.log('📹 [视频发送] 视频信息:', {
-        uri: selectedVideoUri,
+        uri: effectiveUri,
         duration: videoDuration,
-        width: selectedVideo.width || 0,
-        height: selectedVideo.height || 0,
-        fileSize: selectedVideo.fileSize
+        width: effectiveAsset.width || 0,
+        height: effectiveAsset.height || 0,
+        fileSize: effectiveAsset.fileSize
       });
       
       // 🔧 使用MediaUploadService进行可靠上传
       const MediaUploadService = require('../services/MediaUploadService').default;
       
       const uploadResult = await MediaUploadService.uploadVideo(
-        selectedVideoUri,
+        effectiveUri,
         {
           token: userToken,
           onProgress: (progress: number) => {
