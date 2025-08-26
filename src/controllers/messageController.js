@@ -484,5 +484,7 @@ module.exports = {
   getMessages,
   markMessageAsRead,
   markAllAsRead,
-  uploadVoiceMessage
+  uploadVoiceMessage,
+  softDeleteMessage,
+  recallMessage
 }; 
