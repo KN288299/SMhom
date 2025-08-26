@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import Video from 'react-native-video';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { saveImageToGallery } from '../utils/saveImage';
+import { saveImageToGallery, saveVideoToGallery } from '../utils/saveImage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -183,9 +183,17 @@ const FullscreenModals: React.FC<FullscreenModalsProps> = ({
                       
                       <TouchableOpacity 
                         style={styles.videoControlButton}
-                        onPress={() => {}}
+                        onPress={async () => {
+                          if (!fullscreenVideoUrl) return;
+                          try {
+                            await saveVideoToGallery(fullscreenVideoUrl);
+                            console.log('✅ 视频已保存到相册');
+                          } catch (e) {
+                            console.log('❌ 保存视频失败:', e);
+                          }
+                        }}
                       >
-                        <View style={{width: 24}} />
+                        <Icon name="download" size={24} color="#fff" />
                       </TouchableOpacity>
                     </View>
                   </View>

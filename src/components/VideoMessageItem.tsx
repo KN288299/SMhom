@@ -9,6 +9,9 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
+import Video from 'react-native-video';
+import MessageActionSheet from './MessageActionSheet';
+import { saveVideoToGallery } from '../utils/saveImage';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { createThumbnail } from 'react-native-create-thumbnail';
 import { BASE_URL } from '../config/api';
@@ -22,6 +25,7 @@ const CONSTANTS = {
   MAX_VIDEO_SIZE: 320,
   FADE_DURATION: 200,
   BUBBLE_PADDING: 6, // 气泡内边距
+  SHORT_VIDEO_THRESHOLD_SECONDS: 10,
 };
 
 // 工具函数
@@ -63,6 +67,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
   const [loading, setLoading] = useState(true);
   const [thumbnailError, setThumbnailError] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [showActionSheet, setShowActionSheet] = useState(false);
 
   // 渲染头像
   const renderAvatar = () => {
@@ -271,6 +276,51 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
     };
   }, [videoUrl, isUploading, fadeAnim]);
 
+  // 解析时长字符串为秒，支持 mm:ss / hh:mm:ss / 数字 / 带“秒”或“s”
+  const parseDurationToSeconds = (duration?: string): number => {
+    if (!duration) return 0;
+    const str = String(duration).trim();
+    // 尝试中文单位
+    const hourMatch = str.match(/(\d+)\s*(小时|h)/i);
+    const minMatch = str.match(/(\d+)\s*(分|min)/i);
+    const secMatch = str.match(/(\d+)\s*(秒|s)/i);
+    if (hourMatch || minMatch || secMatch) {
+      const h = hourMatch ? parseInt(hourMatch[1], 10) : 0;
+      const m = minMatch ? parseInt(minMatch[1], 10) : 0;
+      const s = secMatch ? parseInt(secMatch[1], 10) : 0;
+      return h * 3600 + m * 60 + s;
+    }
+    if (str.includes(':')) {
+      const parts = str.split(':').map(p => parseInt(p, 10) || 0);
+      return parts.reduce((acc, val) => acc * 60 + val, 0);
+    }
+    const num = parseInt(str.replace(/[^0-9]/g, ''), 10);
+    return isNaN(num) ? 0 : num;
+  };
+
+  const durationSeconds = parseDurationToSeconds(videoDuration);
+  const shouldAutoplayInBubble = !isMe && durationSeconds > 0 && durationSeconds <= CONSTANTS.SHORT_VIDEO_THRESHOLD_SECONDS;
+
+  const handleLongPress = () => {
+    setShowActionSheet(true);
+  };
+
+  const getActions = () => [
+    {
+      label: '保存视频',
+      onPress: async () => {
+        try {
+          const target = videoUrl || localFileUri || '';
+          if (!target) return;
+          await saveVideoToGallery(target);
+          console.log('✅ 视频已保存到相册');
+        } catch (e) {
+          console.log('❌ 保存视频失败:', e);
+        }
+      },
+    },
+  ];
+
   return (
     <View style={[
       styles.messageContainer, 
@@ -306,6 +356,8 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
                 onPress(videoUrl);
               }
             }}
+            onLongPress={handleLongPress}
+            delayLongPress={500}
             activeOpacity={0.8}
             disabled={isUploading ? !(Platform.OS === 'ios' && !!localFileUri) : !videoUrl}
           >
@@ -322,6 +374,24 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
                   <Text style={styles.uploadProgressText}>{`${uploadProgress}%`}</Text>
                   <ActivityIndicator size="small" color="#fff" style={styles.uploadingIndicator} />
                 </View>
+              ) : shouldAutoplayInBubble ? (
+                <>
+                  <Video
+                    source={{ uri: videoUrl }}
+                    style={{ width: '100%', height: '100%' }}
+                    resizeMode="cover"
+                    repeat
+                    muted
+                    paused={false}
+                    controls={false}
+                    ignoreSilentSwitch="obey"
+                  />
+                  <View style={styles.videoDurationContainer}>
+                    <Text style={styles.videoDurationText}>
+                      {videoDuration || `${durationSeconds}s`}
+                    </Text>
+                  </View>
+                </>
               ) : (
                 <>
                   {thumbnailUrl && !thumbnailError ? (
@@ -384,6 +454,13 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
           {renderAvatar()}
         </View>
       )}
+      {/* 长按操作菜单 */}
+      <MessageActionSheet
+        visible={showActionSheet}
+        onClose={() => setShowActionSheet(false)}
+        actions={getActions()}
+        title="消息操作"
+      />
     </View>
   );
 };
