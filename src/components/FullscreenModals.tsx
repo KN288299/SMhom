@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import Video from 'react-native-video';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { saveImageToGallery } from '../utils/saveImage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -65,6 +66,17 @@ const FullscreenModals: React.FC<FullscreenModalsProps> = ({
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
+  const handleSaveImage = useCallback(async () => {
+    if (!fullscreenImageUrl) return;
+    try {
+      await saveImageToGallery(fullscreenImageUrl);
+      // 轻量反馈：暂不引入 Toast 依赖，这里可用 Alert 或交给调用方
+      console.log('✅ 图片已保存到相册');
+    } catch (e) {
+      console.log('❌ 保存图片失败:', e);
+    }
+  }, [fullscreenImageUrl]);
+
   return (
     <>
       {/* 全屏图片查看器 */}
@@ -91,6 +103,12 @@ const FullscreenModals: React.FC<FullscreenModalsProps> = ({
             onPress={onCloseFullscreenImage}
           >
             <Icon name="close-circle" size={36} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.saveButton}
+            onPress={handleSaveImage}
+          >
+            <Icon name="download" size={28} color="#fff" />
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
@@ -203,6 +221,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: 25,
+  },
+  saveButton: {
+    position: 'absolute',
+    top: 40,
+    right: 80,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 22,
   },
   
   // 全屏视频样式

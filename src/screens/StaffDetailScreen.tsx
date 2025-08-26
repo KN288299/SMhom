@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,8 @@ import { NavigatorScreenParams } from '@react-navigation/native';
 import { TabParamList } from '../navigation/TabNavigator';
 import { getStaffDetail, StaffMember } from '../services/staffService';
 import { ArrowBackIcon } from '../assets/icons';
+import Icon from 'react-native-vector-icons/Ionicons';
+import { saveImageToGallery } from '../utils/saveImage';
 
 type StaffDetailRouteProps = {
   StaffDetail: {
@@ -95,6 +97,17 @@ const StaffDetailScreen: React.FC = () => {
   const closeFullScreenView = () => {
     setIsFullScreenView(false);
   };
+
+  const handleSaveCurrentImage = useCallback(async () => {
+    const uri = selectedPhoto || staffData?.image;
+    if (!uri) return;
+    try {
+      await saveImageToGallery(uri);
+      console.log('✅ 图片已保存到相册');
+    } catch (e) {
+      console.log('❌ 保存图片失败:', e);
+    }
+  }, [selectedPhoto, staffData]);
 
   // 处理联系客服-约她按钮点击
   const handleContactPress = () => {
@@ -238,6 +251,12 @@ const StaffDetailScreen: React.FC = () => {
             onPress={closeFullScreenView}
           >
             <Text style={styles.closeButtonText}>×</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.fullScreenSaveButton}
+            onPress={handleSaveCurrentImage}
+          >
+            <Icon name="download" size={24} color="#fff" />
           </TouchableOpacity>
           
           <Image
@@ -469,6 +488,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 40,
     right: 20,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullScreenSaveButton: {
+    position: 'absolute',
+    top: 40,
+    right: 70,
     zIndex: 10,
     width: 40,
     height: 40,
