@@ -104,9 +104,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   avatar: {
-    width: 35,
-    height: 35,
-    borderRadius: 17.5,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
   },
   messageContent: {
     maxWidth: '70%',
@@ -116,10 +116,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   messageBubble: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 18,
-    minWidth: 40,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
+    minWidth: 50,
     maxWidth: '100%',
   },
   myBubble: {
@@ -129,8 +129,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   messageText: {
-    fontSize: 16,
-    lineHeight: 20,
+    fontSize: 18,
+    lineHeight: 24,
   },
   myMessageText: {
     color: '#000',

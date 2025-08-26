@@ -16,12 +16,12 @@ import { DEFAULT_AVATAR } from '../utils/DefaultAvatar';
 
 // 常量定义
 const CONSTANTS = {
-  DEFAULT_VIDEO_WIDTH: 200,
-  DEFAULT_VIDEO_HEIGHT: 150,
-  MIN_VIDEO_SIZE: 100,
-  MAX_VIDEO_SIZE: 280,
+  DEFAULT_VIDEO_WIDTH: 240,
+  DEFAULT_VIDEO_HEIGHT: 180,
+  MIN_VIDEO_SIZE: 120,
+  MAX_VIDEO_SIZE: 320,
   FADE_DURATION: 200,
-  BUBBLE_PADDING: 4, // 气泡内边距
+  BUBBLE_PADDING: 6, // 气泡内边距
 };
 
 // 工具函数
@@ -400,9 +400,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   avatar: {
-    width: 35,
-    height: 35,
-    borderRadius: 17.5,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
   },
   messageContent: {
     maxWidth: '70%',
@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   messageBubble: {
-    borderRadius: 18,
+    borderRadius: 20,
     maxWidth: '80%',
     justifyContent: 'center',
     alignItems: 'center',

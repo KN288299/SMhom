@@ -404,9 +404,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   avatar: {
-    width: 35,
-    height: 35,
-    borderRadius: 17.5,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
   },
   messageContent: {
     maxWidth: '70%',
@@ -418,11 +418,11 @@ const styles = StyleSheet.create({
   voiceMessage: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 18,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minWidth: 100,
-    maxWidth: 200,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minWidth: 120,
+    maxWidth: 240,
   },
   myVoiceMessage: {
     backgroundColor: '#ff6b81',

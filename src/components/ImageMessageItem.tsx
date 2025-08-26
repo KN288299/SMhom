@@ -12,10 +12,10 @@ import { DEFAULT_AVATAR } from '../utils/DefaultAvatar';
 
 // 常量定义
 const CONSTANTS = {
-  MAX_IMAGE_SIZE: 240,
-  MIN_IMAGE_SIZE: 120,
-  DEFAULT_IMAGE_WIDTH: 200,
-  DEFAULT_IMAGE_HEIGHT: 150,
+  MAX_IMAGE_SIZE: 280,
+  MIN_IMAGE_SIZE: 140,
+  DEFAULT_IMAGE_WIDTH: 240,
+  DEFAULT_IMAGE_HEIGHT: 180,
   FADE_DURATION: 200,
 };
 
@@ -202,9 +202,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   avatar: {
-    width: 35,
-    height: 35,
-    borderRadius: 17.5,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
   },
   messageContent: {
     maxWidth: '70%',
