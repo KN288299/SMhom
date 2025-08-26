@@ -242,7 +242,31 @@ const audioStorage = multer.diskStorage({
     cb(null, dir);
   },
   filename: function (req, file, cb) {
-    const fileName = `voice-message-${uuidv4()}.mp3`;
+    // 根据 MIME 类型与原始扩展名安全选择保存扩展名
+    let ext = '.m4a';
+    const originalExt = path.extname(file.originalname).toLowerCase();
+    const type = (file.mimetype || '').toLowerCase();
+
+    if (type === 'audio/mpeg' || type === 'audio/mp3') {
+      ext = '.mp3';
+    } else if (
+      type === 'audio/mp4' ||
+      type === 'audio/m4a' ||
+      type === 'audio/x-m4a' ||
+      type === 'audio/aac'
+    ) {
+      ext = '.m4a';
+    } else if (type === 'audio/wav' || type === 'audio/x-wav') {
+      ext = '.wav';
+    } else if (originalExt === '.mp3') {
+      ext = '.mp3';
+    } else if (originalExt === '.wav') {
+      ext = '.wav';
+    } else {
+      ext = '.m4a';
+    }
+
+    const fileName = `voice-message-${uuidv4()}${ext}`;
     cb(null, fileName);
   }
 });

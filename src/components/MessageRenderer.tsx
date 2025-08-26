@@ -145,12 +145,12 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
     }
   }
   
-  // 如果是视频消息
+    // 如果是视频消息
   if (item.messageType === 'video' || item.contentType === 'video') {
     // 如果是上传中的视频
     if (item.isUploading) {
-              return (
-          <VideoMessageItem
+      return (
+        <VideoMessageItem
             // iOS 自发视频上传中：内部会优先用 localFileUri
             videoUrl={formatMediaUrl(item.videoUrl || item.fileUrl || item.localFileUri || '')}
             timestamp={item.timestamp}
@@ -173,14 +173,14 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
         );
     }
     
-    // 已上传完成的视频
+        // 已上传完成的视频
     // 优先使用videoUrl，如果不存在则尝试使用fileUrl
     const videoUrl = item.videoUrl || item.fileUrl || '';
     if (videoUrl) {
       const fullVideoUrl = formatMediaUrl(videoUrl);
       // 调试日志已清理 - 视频消息URL
-              return (
-          <VideoMessageItem
+      return (
+        <VideoMessageItem
             videoUrl={fullVideoUrl}
             timestamp={item.timestamp}
             isMe={isMe}

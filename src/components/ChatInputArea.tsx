@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 4, // 减少垂直内边距，让输入框更贴近键盘
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#eee',

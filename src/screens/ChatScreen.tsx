@@ -211,6 +211,7 @@ const ChatScreen: React.FC = () => {
 
   // 轻微上移量（单位：pt）。要求“往上移一点点”，取 4pt。
   const slightLift = 4;
+  // iOS键盘显示时减少底部间距，键盘隐藏时保持原有间距
   const bottomPadding = isIOS ? (isKeyboardVisible ? 0 : Math.max(insets.bottom, 0) + slightLift) : 0;
   const route = useRoute<RouteProp<RootStackParamList, 'Chat'>>();
   const { contactId, contactName, conversationId: routeConversationId, contactAvatar: routeContactAvatar } = route.params;
@@ -1373,8 +1374,8 @@ const ChatScreen: React.FC = () => {
           if (selectedAsset.uri) {
             setSelectedVideoUri(selectedAsset.uri);
           }
-          // 立即触发发送
-          confirmSendVideo();
+          // 立即触发发送（传入asset与uri，避免异步状态未就绪导致早退）
+          confirmSendVideo({ asset: selectedAsset, uri: selectedAsset.uri || null });
         } else {
           // 检查图片大小限制
           if (selectedAsset.fileSize && selectedAsset.fileSize > 50 * 1024 * 1024) { // 50MB
@@ -2197,8 +2198,8 @@ const ChatScreen: React.FC = () => {
       
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? IOS_CHAT_HEADER_HEIGHT : 0}
+        behavior={Platform.OS === 'ios' ? 'height' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         onStartShouldSetResponder={() => {
           if (showMoreOptions) {
             setShowMoreOptions(false);

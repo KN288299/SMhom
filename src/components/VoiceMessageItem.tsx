@@ -87,17 +87,17 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
         try {
           const res = await fetch(url, { method: 'HEAD' });
           const ct = res.headers.get('Content-Type') || res.headers.get('content-type') || '';
-          let ext = '.mp3';
+          let ext = '.m4a';
           if (ct.includes('m4a') || ct.includes('aac') || ct.includes('mp4')) ext = '.m4a';
           else if (ct.includes('wav')) ext = '.wav';
           else if (ct.includes('mpeg') || ct.includes('mp3')) ext = '.mp3';
           return `${rawName}${ext}`;
         } catch {}
-        // 回退：根据URL关键字或平台经验判断（安卓多为mp3）
+        // 回退：优先使用统一容器 m4a，除非URL明确包含mp3
         const guessMp3 = url.toLowerCase().includes('mp3');
-        return `${rawName}${guessMp3 ? '.mp3' : '.mp3'}`;
+        return `${rawName}${guessMp3 ? '.mp3' : '.m4a'}`;
       } catch {
-        return `voice_${Date.now()}.mp3`;
+        return `voice_${Date.now()}.m4a`;
       }
     };
     try {

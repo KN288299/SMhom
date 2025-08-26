@@ -287,21 +287,18 @@ export const useVoiceRecorder = ({
       let audioPath: string | undefined;
       const timestamp = Date.now();
       
-      // 🎵 音频格式优化：
-      // iOS: 使用m4a格式，但确保服务器端能转换为mp3
-      // Android: 继续使用mp3格式
-      // 注意：后续需要确保VoiceMessageItem能正确播放两种格式
-      const fileExtension = Platform.OS === 'ios' ? '.m4a' : '.mp3';
+      // 🎵 音频格式统一：iOS 与 Android 统一使用 m4a(aac) 容器，跨端更稳定
+      const fileExtension = '.m4a';
       const fileName = `voice_message_${timestamp}${fileExtension}`;
 
       if (Platform.OS === 'android') {
-        // Android：使用缓存目录，mp3格式兼容性最好
+        // Android：使用缓存目录，m4a 格式
         audioPath = `${RNFS.CachesDirectoryPath}/${fileName}`;
         const dirExists = await RNFS.exists(RNFS.CachesDirectoryPath);
         if (!dirExists) {
           await RNFS.mkdir(RNFS.CachesDirectoryPath);
         }
-        console.log('📱 Android录音路径 (MP3):', audioPath);
+        console.log('📱 Android录音路径 (M4A):', audioPath);
       } else {
         // iOS：使用Document目录，需带 file:// 前缀
         audioPath = `file://${RNFS.DocumentDirectoryPath}/${fileName}`;
@@ -362,6 +359,7 @@ export const useVoiceRecorder = ({
             AVSampleRateKeyIOS: 44100,
           } as any);
         } else {
+          // Android：很多设备底层编码为 AAC，容器为 m4a(mp4)。保持路径后缀为 .m4a
           result = await audioRecorderPlayerRef.current.startRecorder(audioPath);
         }
       } catch (startErr: any) {

@@ -111,7 +111,7 @@ export const iOSChatStyles = StyleSheet.create({
   inputContainer: {
     backgroundColor: '#F2F2F7', // iOS系统背景色
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 4, // 减少垂直内边距，让输入框更贴近键盘
     paddingBottom: 0, // 完全移除底部间距，让SafeAreaView处理
     borderTopWidth: 0.5,
     borderTopColor: '#c6c6c8',
@@ -123,7 +123,7 @@ export const iOSChatStyles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 22,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 6, // 减少垂直内边距，让输入框更贴近键盘
     minHeight: IOS_INPUT_HEIGHT,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 0.5 },

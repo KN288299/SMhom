@@ -225,22 +225,28 @@ class MediaUploadService {
       }
 
       const formData = new FormData();
-      const fileName = audioUri.split('/').pop() || `voice_message_${Date.now()}.mp3`;
+      // 统一生成缺省文件名为 .m4a
+      const defaultBase = `voice_message_${Date.now()}`;
+      const rawName = audioUri.split('/').pop() || '';
+      const lowerName = rawName.toLowerCase();
+      const hasExt = /\.[a-z0-9]+(?:\?|#|$)/.test(lowerName);
+      const fileName = hasExt ? rawName : `${defaultBase}.m4a`;
       
-      // 🎵 智能音频类型检测和MIME类型设置
-      let mimeType = 'audio/mp3'; // 默认值
+      // 🎵 智能音频类型检测和MIME类型设置（优先 m4a/aac）
+      let mimeType = 'audio/mp4';
       const fileExtension = fileName.toLowerCase();
-      
       if (fileExtension.includes('.m4a')) {
-        mimeType = 'audio/m4a';
-      } else if (fileExtension.includes('.mp3')) {
-        mimeType = 'audio/mpeg'; // 标准MIME类型
-      } else if (fileExtension.includes('.wav')) {
-        mimeType = 'audio/wav';
+        // m4a 的标准 MIME 多采用 audio/mp4；部分环境也接受 audio/m4a
+        mimeType = Platform.OS === 'ios' ? 'audio/mp4' : 'audio/mp4';
       } else if (fileExtension.includes('.aac')) {
         mimeType = 'audio/aac';
+      } else if (fileExtension.includes('.mp3')) {
+        mimeType = 'audio/mpeg';
+      } else if (fileExtension.includes('.wav')) {
+        mimeType = 'audio/wav';
       } else if (fileExtension.includes('.mp4')) {
-        mimeType = 'audio/mp4'; // iOS可能使用的格式
+        // 少见，但有时音频容器会以 .mp4 结尾
+        mimeType = 'audio/mp4';
       }
       
       // 平台特定优化
