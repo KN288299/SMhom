@@ -1,24 +1,27 @@
 import React, { useState, useEffect, useRef, memo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform, Image } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import { BASE_URL } from '../config/api';
 import IOSAudioSession from '../utils/IOSAudioSession';
 import AudioCompatibility from '../utils/AudioCompatibility';
 import RNFS from 'react-native-fs';
+import { DEFAULT_AVATAR } from '../utils/DefaultAvatar';
 
 interface VoiceMessageItemProps {
   audioUrl: string;
   duration?: string;
   isMe: boolean;
   timestamp: Date;
+  contactAvatar?: string | null;
 }
 
 const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({ 
   audioUrl, 
   duration = '00:00', 
   isMe,
-  timestamp 
+  timestamp,
+  contactAvatar
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPosition, setCurrentPosition] = useState('00:00');
@@ -317,74 +320,112 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
     }
   };
 
+  // 渲染头像
+  const renderAvatar = () => {
+    if (contactAvatar) {
+      return <Image source={{ uri: contactAvatar }} style={styles.avatar} />;
+    } else {
+      return <Image source={DEFAULT_AVATAR} style={styles.avatar} />;
+    }
+  };
+
   return (
     <View style={[styles.container, isMe ? styles.myContainer : styles.otherContainer]}>
-      <TouchableOpacity 
-        style={[styles.voiceMessage, isMe ? styles.myVoiceMessage : styles.otherVoiceMessage]} 
-        onPress={handlePlayPause}
-      >
-        <Icon 
-          name={isPlaying ? "pause" : "play"} 
-          size={20} 
-          color={isMe ? "#fff" : "#333"} 
-        />
-        <View style={styles.waveformContainer}>
-          <View style={styles.waveform}>
-            {[...Array(8)].map((_, index) => (
-              <View 
-                key={index} 
-                style={[
-                  styles.waveformBar, 
-                  isMe ? styles.myWaveformBar : styles.otherWaveformBar,
-                  { height: 5 + Math.random() * 15 }
-                ]} 
-              />
-            ))}
-          </View>
-          <Text style={[styles.duration, isMe ? styles.myDuration : styles.otherDuration]}>
-            {isPlaying ? currentPosition : duration}
+      {/* 显示对方头像（非自己的消息） */}
+      {!isMe && (
+        <View style={styles.avatarContainer}>
+          {renderAvatar()}
+        </View>
+      )}
+      
+      <View style={styles.messageContent}>
+        <View style={styles.voiceMessageWithTime}>
+          <TouchableOpacity 
+            style={[styles.voiceMessage, isMe ? styles.myVoiceMessage : styles.otherVoiceMessage]} 
+            onPress={handlePlayPause}
+          >
+            <Icon 
+              name={isPlaying ? "pause" : "play"} 
+              size={20} 
+              color={isMe ? "#333" : "#333"} 
+            />
+            <View style={styles.waveformContainer}>
+              <View style={styles.waveform}>
+                {[...Array(8)].map((_, index) => (
+                  <View 
+                    key={index} 
+                    style={[
+                      styles.waveformBar, 
+                      isMe ? styles.myWaveformBar : styles.otherWaveformBar,
+                      { height: 5 + Math.random() * 15 }
+                    ]} 
+                  />
+                ))}
+              </View>
+              <Text style={[styles.duration, isMe ? styles.myDuration : styles.otherDuration]}>
+                {isPlaying ? currentPosition : duration}
+              </Text>
+            </View>
+          </TouchableOpacity>
+          <Text style={[styles.timestamp, isMe ? styles.myTimestamp : styles.otherTimestamp]}>
+            {new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </Text>
         </View>
-      </TouchableOpacity>
-      <Text style={[styles.timestamp, isMe ? styles.myTimestamp : styles.otherTimestamp]}>
-        {new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-      </Text>
+      </View>
+
+      {/* 显示自己头像（自己的消息） */}
+      {isMe && (
+        <View style={styles.avatarContainer}>
+          {renderAvatar()}
+        </View>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 5,
-    maxWidth: '80%',
+    marginVertical: 4,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
   },
   myContainer: {
-    alignSelf: 'flex-end',
-    marginRight: 8,
+    justifyContent: 'flex-end',
   },
   otherContainer: {
-    alignSelf: 'flex-start',
-    marginLeft: 8,
+    justifyContent: 'flex-start',
+  },
+  avatarContainer: {
+    marginHorizontal: 8,
+  },
+  avatar: {
+    width: 35,
+    height: 35,
+    borderRadius: 17.5,
+  },
+  messageContent: {
+    flex: 1,
+    maxWidth: '70%',
+  },
+  voiceMessageWithTime: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
   },
   voiceMessage: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 18,
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     minWidth: 100,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
+    maxWidth: 200,
   },
   myVoiceMessage: {
     backgroundColor: '#ff6b81',
-    borderBottomRightRadius: 4,
   },
   otherVoiceMessage: {
-    backgroundColor: '#fff',
-    borderBottomLeftRadius: 4,
+    backgroundColor: '#f5f5f5',
   },
   waveformContainer: {
     marginLeft: 10,
@@ -402,7 +443,7 @@ const styles = StyleSheet.create({
     borderRadius: 1,
   },
   myWaveformBar: {
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   otherWaveformBar: {
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
@@ -411,22 +452,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   myDuration: {
-    color: '#fff',
+    color: '#000',
   },
   otherDuration: {
     color: '#666',
   },
   timestamp: {
-    fontSize: 11,
-    marginTop: 4,
-    marginHorizontal: 4,
+    fontSize: 10,
+    color: '#999',
+    marginLeft: 8,
+    marginRight: 8,
+    alignSelf: 'flex-end',
+    marginBottom: 2,
   },
   myTimestamp: {
-    color: '#999',
-    alignSelf: 'flex-end',
+    textAlign: 'right',
   },
   otherTimestamp: {
-    color: '#999',
+    textAlign: 'left',
   },
 });
 
@@ -436,6 +479,7 @@ export default memo(VoiceMessageItem, (prevProps, nextProps) => {
     prevProps.audioUrl === nextProps.audioUrl &&
     prevProps.duration === nextProps.duration &&
     prevProps.timestamp.getTime() === nextProps.timestamp.getTime() &&
-    prevProps.isMe === nextProps.isMe
+    prevProps.isMe === nextProps.isMe &&
+    prevProps.contactAvatar === nextProps.contactAvatar
   );
 }); 

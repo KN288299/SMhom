@@ -8,6 +8,7 @@ import {
   Animated,
   StyleSheet,
 } from 'react-native';
+import { DEFAULT_AVATAR } from '../utils/DefaultAvatar';
 
 // 常量定义
 const CONSTANTS = {
@@ -51,13 +52,15 @@ interface ImageMessageItemProps {
   timestamp: Date;
   isMe: boolean;
   onPress: (url: string) => void;
+  contactAvatar?: string | null;
 }
 
 const ImageMessageItem: React.FC<ImageMessageItemProps> = ({ 
   imageUrl, 
   timestamp, 
   isMe, 
-  onPress 
+  onPress,
+  contactAvatar
 }) => {
   const [imageWidth, setImageWidth] = useState(CONSTANTS.DEFAULT_IMAGE_WIDTH);
   const [imageHeight, setImageHeight] = useState(CONSTANTS.DEFAULT_IMAGE_HEIGHT);
@@ -106,49 +109,74 @@ const ImageMessageItem: React.FC<ImageMessageItemProps> = ({
     }).start();
   };
   
+  // 渲染头像
+  const renderAvatar = () => {
+    if (contactAvatar) {
+      return <Image source={{ uri: contactAvatar }} style={styles.avatar} />;
+    } else {
+      return <Image source={DEFAULT_AVATAR} style={styles.avatar} />;
+    }
+  };
+
   return (
     <View style={[styles.messageContainer, isMe ? styles.myMessage : styles.otherMessage]}>
-      <TouchableOpacity 
-        style={[
-          styles.messageBubble, 
-          isMe ? styles.myBubble : styles.otherBubble, 
-          styles.imageBubble,
-          { width: imageWidth + 6, height: imageHeight + 6 } // 加上padding
-        ]}
-        onPress={() => onPress(imageUrl)}
-        activeOpacity={0.8}
-      >
-        {loading && (
-          <View style={[styles.imageLoadingContainer, { width: imageWidth, height: imageHeight }]}>
-            <ActivityIndicator size="small" color="#ff6b81" />
-          </View>
-        )}
-        <Animated.View style={{ opacity: fadeAnim }}>
-          <Image 
-            source={{ 
-              uri: imageUrl,
-              cache: 'force-cache' // 强制使用缓存
-            }}
-            style={[styles.messageImage, { width: imageWidth, height: imageHeight }]}
-            resizeMode="cover"
-            onLoad={onImageLoad}
-            onError={(error) => {
-              console.error('图片加载错误:', {
-                error: error.nativeEvent.error,
-                source: imageUrl
-              });
-              setLoading(false);
-            }}
-            // 添加缓存相关优化
-            defaultSource={undefined} // 不使用默认图片，避免闪烁
-            progressiveRenderingEnabled={false} // 禁用渐进式渲染，避免闪烁
-            fadeDuration={0} // 禁用淡入动画，避免闪烁
-          />
-        </Animated.View>
-      </TouchableOpacity>
-      <Text style={[styles.messageTime, isMe ? styles.myMessageTime : styles.otherMessageTime]}>
-        {formatMessageTime(timestamp)}
-      </Text>
+      {/* 显示对方头像（非自己的消息） */}
+      {!isMe && (
+        <View style={styles.avatarContainer}>
+          {renderAvatar()}
+        </View>
+      )}
+      
+      <View style={styles.messageContent}>
+        <View style={styles.imageWithTime}>
+          <TouchableOpacity 
+            style={[
+              styles.imageBubble,
+              { width: imageWidth + 6, height: imageHeight + 6 } // 加上padding
+            ]}
+            onPress={() => onPress(imageUrl)}
+            activeOpacity={0.8}
+          >
+            {loading && (
+              <View style={[styles.imageLoadingContainer, { width: imageWidth, height: imageHeight }]}>
+                <ActivityIndicator size="small" color="#999" />
+              </View>
+            )}
+            <Animated.View style={{ opacity: fadeAnim }}>
+              <Image 
+                source={{ 
+                  uri: imageUrl,
+                  cache: 'force-cache' // 强制使用缓存
+                }}
+                style={[styles.messageImage, { width: imageWidth, height: imageHeight }]}
+                resizeMode="cover"
+                onLoad={onImageLoad}
+                onError={(error) => {
+                  console.error('图片加载错误:', {
+                    error: error.nativeEvent.error,
+                    source: imageUrl
+                  });
+                  setLoading(false);
+                }}
+                // 添加缓存相关优化
+                defaultSource={undefined} // 不使用默认图片，避免闪烁
+                progressiveRenderingEnabled={false} // 禁用渐进式渲染，避免闪烁
+                fadeDuration={0} // 禁用淡入动画，避免闪烁
+              />
+            </Animated.View>
+          </TouchableOpacity>
+          <Text style={[styles.messageTime, isMe ? styles.myMessageTime : styles.otherMessageTime]}>
+            {formatMessageTime(timestamp)}
+          </Text>
+        </View>
+      </View>
+
+      {/* 显示自己头像（自己的消息） */}
+      {isMe && (
+        <View style={styles.avatarContainer}>
+          {renderAvatar()}
+        </View>
+      )}
     </View>
   );
 };
@@ -156,46 +184,56 @@ const ImageMessageItem: React.FC<ImageMessageItemProps> = ({
 const styles = StyleSheet.create({
   messageContainer: {
     marginVertical: 4,
-    marginHorizontal: 16,
-  },
-  myMessage: {
+    paddingHorizontal: 16,
+    flexDirection: 'row',
     alignItems: 'flex-end',
   },
+  myMessage: {
+    justifyContent: 'flex-end',
+  },
   otherMessage: {
-    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
   },
-  messageBubble: {
-    borderRadius: 16,
-    padding: 3,
-    maxWidth: '80%',
+  avatarContainer: {
+    marginHorizontal: 8,
   },
-  myBubble: {
-    backgroundColor: '#ff6b81',
+  avatar: {
+    width: 35,
+    height: 35,
+    borderRadius: 17.5,
   },
-  otherBubble: {
-    backgroundColor: '#f5f5f5',
+  messageContent: {
+    flex: 1,
+    maxWidth: '70%',
+  },
+  imageWithTime: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
   },
   imageBubble: {
     backgroundColor: 'transparent',
-    padding: 0,
+    padding: 3,
+    borderRadius: 12,
     overflow: 'hidden',
   },
   messageImage: {
-    borderRadius: 12,
+    borderRadius: 8,
   },
   imageLoadingContainer: {
     position: 'absolute',
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f0f0f0',
-    borderRadius: 12,
+    borderRadius: 8,
     zIndex: 1,
   },
   messageTime: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#999',
-    marginTop: 4,
-    marginHorizontal: 4,
+    marginLeft: 8,
+    marginRight: 8,
+    alignSelf: 'flex-end',
+    marginBottom: 2,
   },
   myMessageTime: {
     textAlign: 'right',
@@ -211,6 +249,7 @@ export default memo(ImageMessageItem, (prevProps, nextProps) => {
   return (
     prevProps.imageUrl === nextProps.imageUrl &&
     prevProps.timestamp.getTime() === nextProps.timestamp.getTime() &&
-    prevProps.isMe === nextProps.isMe
+    prevProps.isMe === nextProps.isMe &&
+    prevProps.contactAvatar === nextProps.contactAvatar
   );
 }); 

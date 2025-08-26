@@ -48,36 +48,45 @@ const TextMessageItem: React.FC<TextMessageItemProps> = ({
       )}
       
       <View style={styles.messageContent}>
-        <View style={[
-          getPlatformStyles(iOSMessageStyles.messageBubble, styles.messageBubble),
-          isMe ? getPlatformStyles(iOSMessageStyles.myBubble, styles.myBubble) : getPlatformStyles(iOSMessageStyles.otherBubble, styles.otherBubble)
-        ]}>
+        <View style={styles.messageBubbleWithTime}>
+          <View style={[
+            getPlatformStyles(iOSMessageStyles.messageBubble, styles.messageBubble),
+            isMe ? getPlatformStyles(iOSMessageStyles.myBubble, styles.myBubble) : getPlatformStyles(iOSMessageStyles.otherBubble, styles.otherBubble)
+          ]}>
+            <Text style={[
+              getPlatformStyles(
+                isMe ? iOSMessageStyles.myMessageText : iOSMessageStyles.otherMessageText,
+                isMe ? styles.myMessageText : styles.otherMessageText
+              )
+            ]}>
+              {content}
+            </Text>
+          </View>
           <Text style={[
             getPlatformStyles(
-              isMe ? iOSMessageStyles.myMessageText : iOSMessageStyles.otherMessageText,
-              isMe ? styles.myMessageText : styles.otherMessageText
+              isMe ? iOSMessageStyles.myMessageTime : iOSMessageStyles.otherMessageTime,
+              isMe ? styles.myMessageTime : styles.otherMessageTime
             )
           ]}>
-            {content}
+            {formatMessageTime(timestamp)}
           </Text>
         </View>
-        <Text style={[
-          getPlatformStyles(
-            isMe ? iOSMessageStyles.myMessageTime : iOSMessageStyles.otherMessageTime,
-            isMe ? styles.myMessageTime : styles.otherMessageTime
-          )
-        ]}>
-          {formatMessageTime(timestamp)}
-        </Text>
       </View>
+
+      {/* 显示自己头像（自己的消息） */}
+      {isMe && (
+        <View style={styles.avatarContainer}>
+          {renderAvatar()}
+        </View>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   messageContainer: {
-    marginVertical: 2,
-    paddingHorizontal: 12,
+    marginVertical: 4,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'flex-end',
   },
@@ -88,44 +97,51 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   avatarContainer: {
-    marginRight: 8,
-    marginBottom: 4,
+    marginHorizontal: 8,
   },
   avatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 35,
+    height: 35,
+    borderRadius: 17.5,
   },
   messageContent: {
     flex: 1,
-    maxWidth: '75%',
+    maxWidth: '70%',
+  },
+  messageBubbleWithTime: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
   },
   messageBubble: {
-    paddingHorizontal: 16, // 增加水平内边距
-    paddingVertical: 12,   // 增加垂直内边距
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 18,
-    minWidth: 60,
+    minWidth: 40,
+    maxWidth: '100%',
   },
   myBubble: {
     backgroundColor: '#ff6b81',
   },
   otherBubble: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#f5f5f5',
   },
   messageText: {
-    fontSize: 18, // 增大消息文字字体
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 20,
   },
   myMessageText: {
-    color: '#fff',
+    color: '#000',
   },
   otherMessageText: {
-    color: '#333',
+    color: '#000',
   },
   messageTime: {
     fontSize: 10,
     color: '#999',
-    marginTop: 2,
+    marginLeft: 8,
+    marginRight: 8,
+    alignSelf: 'flex-end',
+    marginBottom: 2,
   },
   myMessageTime: {
     textAlign: 'right',

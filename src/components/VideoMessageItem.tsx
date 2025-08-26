@@ -12,6 +12,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { createThumbnail } from 'react-native-create-thumbnail';
 import { BASE_URL } from '../config/api';
+import { DEFAULT_AVATAR } from '../utils/DefaultAvatar';
 
 // 常量定义
 const CONSTANTS = {
@@ -38,6 +39,7 @@ interface VideoMessageItemProps {
   uploadProgress?: number;
   // iOS 自发视频的本地路径，用于缩略图/播放回退
   localFileUri?: string;
+  contactAvatar?: string | null;
 }
 
 const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
@@ -49,6 +51,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
   isUploading = false,
   uploadProgress = 0,
   localFileUri,
+  contactAvatar,
 }) => {
   const [videoWidth, setVideoWidth] = useState(CONSTANTS.DEFAULT_VIDEO_WIDTH);
   const [videoHeight, setVideoHeight] = useState(CONSTANTS.DEFAULT_VIDEO_HEIGHT);
@@ -56,6 +59,15 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
   const [loading, setLoading] = useState(true);
   const [thumbnailError, setThumbnailError] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // 渲染头像
+  const renderAvatar = () => {
+    if (contactAvatar) {
+      return <Image source={{ uri: contactAvatar }} style={styles.avatar} />;
+    } else {
+      return <Image source={DEFAULT_AVATAR} style={styles.avatar} />;
+    }
+  };
 
   // 生成视频缩略图
   useEffect(() => {
@@ -254,105 +266,147 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
   }, [videoUrl, isUploading, fadeAnim]);
 
   return (
-    <View style={[styles.messageContainer, isMe ? styles.myMessage : styles.otherMessage]}>
-      <TouchableOpacity 
-        style={[
-          styles.messageBubble, 
-          isMe ? styles.myBubble : styles.otherBubble, 
-          styles.videoBubble,
-          { 
-            width: videoWidth + (CONSTANTS.BUBBLE_PADDING * 2), 
-            height: videoHeight + (CONSTANTS.BUBBLE_PADDING * 2) 
-          }
-        ]}
-        onPress={() => {
-          if (isUploading) {
-            if (Platform.OS === 'ios' && localFileUri) {
-              onPress(localFileUri);
-            }
-            return;
-          }
-          if (videoUrl) {
-            onPress(videoUrl);
-          }
-        }}
-        activeOpacity={0.8}
-        disabled={isUploading ? !(Platform.OS === 'ios' && !!localFileUri) : !videoUrl}
-      >
-        <View style={[styles.videoContainer, { width: videoWidth, height: videoHeight }]}>
-          {loading && !isUploading ? (
-            <View style={styles.videoLoadingContainer}>
-              <ActivityIndicator size="large" color="#fff" />
-            </View>
-          ) : isUploading ? (
-            <View style={styles.videoUploadingContainer}>
-              <View style={styles.uploadProgressContainer}>
-                <View style={[styles.uploadProgressBar, { width: `${uploadProgress}%` }]} />
-              </View>
-              <Text style={styles.uploadProgressText}>{`${uploadProgress}%`}</Text>
-              <ActivityIndicator size="small" color="#fff" style={styles.uploadingIndicator} />
-            </View>
-          ) : (
-            <>
-              {thumbnailUrl && !thumbnailError ? (
-                <Animated.View style={{ 
-                  opacity: fadeAnim, 
-                  width: '100%', 
-                  height: '100%',
-                  borderRadius: 12,
-                  overflow: 'hidden'
-                }}>
-                  <Image 
-                    source={{ 
-                      uri: thumbnailUrl,
-                      cache: 'force-cache' // 强制使用缓存
-                    }}
-                    style={{ 
+    <View style={[
+      styles.messageContainer, 
+      isMe ? styles.myMessage : styles.otherMessage
+    ]}>
+      {/* 显示对方头像（非自己的消息） */}
+      {!isMe && (
+        <View style={styles.avatarContainer}>
+          {renderAvatar()}
+        </View>
+      )}
+      
+      <View style={styles.messageContent}>
+        <View style={styles.videoWithTime}>
+          <TouchableOpacity 
+            style={[
+              styles.messageBubble, 
+              isMe ? styles.myBubble : styles.otherBubble, 
+              styles.videoBubble,
+              { 
+                width: videoWidth + (CONSTANTS.BUBBLE_PADDING * 2), 
+                height: videoHeight + (CONSTANTS.BUBBLE_PADDING * 2) 
+              }
+            ]}
+            onPress={() => {
+              if (isUploading) {
+                if (Platform.OS === 'ios' && localFileUri) {
+                  onPress(localFileUri);
+                }
+                return;
+              }
+              if (videoUrl) {
+                onPress(videoUrl);
+              }
+            }}
+            activeOpacity={0.8}
+            disabled={isUploading ? !(Platform.OS === 'ios' && !!localFileUri) : !videoUrl}
+          >
+            <View style={[styles.videoContainer, { width: videoWidth, height: videoHeight }]}>
+              {loading && !isUploading ? (
+                <View style={styles.videoLoadingContainer}>
+                  <ActivityIndicator size="large" color="#fff" />
+                </View>
+              ) : isUploading ? (
+                <View style={styles.videoUploadingContainer}>
+                  <View style={styles.uploadProgressContainer}>
+                    <View style={[styles.uploadProgressBar, { width: `${uploadProgress}%` }]} />
+                  </View>
+                  <Text style={styles.uploadProgressText}>{`${uploadProgress}%`}</Text>
+                  <ActivityIndicator size="small" color="#fff" style={styles.uploadingIndicator} />
+                </View>
+              ) : (
+                <>
+                  {thumbnailUrl && !thumbnailError ? (
+                    <Animated.View style={{ 
+                      opacity: fadeAnim, 
                       width: '100%', 
                       height: '100%',
-                      borderRadius: 12
-                    }}
-                    resizeMode="cover"
-                    // 添加缓存相关优化
-                    defaultSource={undefined} // 不使用默认图片，避免闪烁
-                    progressiveRenderingEnabled={false} // 禁用渐进式渲染，避免闪烁
-                    fadeDuration={0} // 禁用淡入动画，避免闪烁
-                  />
-                </Animated.View>
-              ) : (
-                <View style={styles.videoPlaceholder}>
-                  <Text style={styles.videoPlaceholderText}>视频</Text>
-                </View>
+                      borderRadius: 12,
+                      overflow: 'hidden'
+                    }}>
+                      <Image 
+                        source={{ 
+                          uri: thumbnailUrl,
+                          cache: 'force-cache' // 强制使用缓存
+                        }}
+                        style={{ 
+                          width: '100%', 
+                          height: '100%',
+                          borderRadius: 12
+                        }}
+                        resizeMode="cover"
+                        // 添加缓存相关优化
+                        defaultSource={undefined} // 不使用默认图片，避免闪烁
+                        progressiveRenderingEnabled={false} // 禁用渐进式渲染，避免闪烁
+                        fadeDuration={0} // 禁用淡入动画，避免闪烁
+                      />
+                    </Animated.View>
+                  ) : (
+                    <View style={styles.videoPlaceholder}>
+                      <Text style={styles.videoPlaceholderText}>视频</Text>
+                    </View>
+                  )}
+                  <View style={styles.videoPlayIconContainer}>
+                    <Icon name="play-circle" size={40} color="#fff" />
+                  </View>
+                  <View style={styles.videoDurationContainer}>
+                    <Text style={styles.videoDurationText}>
+                      {videoDuration || '视频'}
+                    </Text>
+                  </View>
+                </>
               )}
-              <View style={styles.videoPlayIconContainer}>
-                <Icon name="play-circle" size={40} color="#fff" />
-              </View>
-              <View style={styles.videoDurationContainer}>
-                <Text style={styles.videoDurationText}>
-                  {videoDuration || '视频'}
-                </Text>
-              </View>
-            </>
-          )}
+            </View>
+          </TouchableOpacity>
+          <Text style={[
+            styles.messageTime, 
+            isMe ? styles.myMessageTime : styles.otherMessageTime
+          ]}>
+            {isUploading ? '上传中...' : formatMessageTime(timestamp)}
+          </Text>
         </View>
-      </TouchableOpacity>
-      <Text style={[styles.messageTime, isMe ? styles.myMessageTime : styles.otherMessageTime]}>
-        {isUploading ? '上传中...' : formatMessageTime(timestamp)}
-      </Text>
+      </View>
+
+      {/* 显示自己头像（自己的消息） */}
+      {isMe && (
+        <View style={styles.avatarContainer}>
+          {renderAvatar()}
+        </View>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   messageContainer: {
-    marginVertical: 2,
-    paddingHorizontal: 12,
-  },
-  myMessage: {
+    marginVertical: 4,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
     alignItems: 'flex-end',
   },
+  myMessage: {
+    justifyContent: 'flex-end',
+  },
   otherMessage: {
-    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+  },
+  avatarContainer: {
+    marginHorizontal: 8,
+  },
+  avatar: {
+    width: 35,
+    height: 35,
+    borderRadius: 17.5,
+  },
+  messageContent: {
+    flex: 1,
+    maxWidth: '70%',
+  },
+  videoWithTime: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
   },
   messageBubble: {
     borderRadius: 18,
@@ -453,7 +507,10 @@ const styles = StyleSheet.create({
   messageTime: {
     fontSize: 10,
     color: '#999',
-    marginTop: 2,
+    marginLeft: 8,
+    marginRight: 8,
+    alignSelf: 'flex-end',
+    marginBottom: 2,
   },
   myMessageTime: {
     textAlign: 'right',
@@ -472,6 +529,7 @@ export default memo(VideoMessageItem, (prevProps, nextProps) => {
     prevProps.isMe === nextProps.isMe &&
     prevProps.videoDuration === nextProps.videoDuration &&
     prevProps.isUploading === nextProps.isUploading &&
-    prevProps.uploadProgress === nextProps.uploadProgress
+    prevProps.uploadProgress === nextProps.uploadProgress &&
+    prevProps.contactAvatar === nextProps.contactAvatar
   );
 }); 

@@ -108,6 +108,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
           duration={item.voiceDuration || '00:00'}
           isMe={isMe}
           timestamp={item.timestamp}
+          contactAvatar={contactAvatar}
         />
       );
     }
@@ -126,6 +127,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
           timestamp={item.timestamp}
           isMe={isMe}
           onPress={onOpenFullscreenImage}
+          contactAvatar={contactAvatar}
         />
       );
     }
