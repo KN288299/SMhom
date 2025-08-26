@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, Platform } from 'react-native';
-import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef, NavigatorScreenParams } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { useFloatingCall } from '../context/FloatingCallContext';
@@ -21,7 +21,7 @@ import AuthScreen from '../screens/AuthScreen';
 import MainScreen from '../screens/MainScreen';
 import StaffDetailScreen from '../screens/StaffDetailScreen';
 import ChatScreen from '../screens/ChatScreen';
-import MainTabNavigator from './TabNavigator';
+import MainTabNavigator, { TabParamList } from './TabNavigator';
 import YuZuTangScreen from '../screens/YuZuTangScreen';
 import AudioTestScreen from '../screens/AudioTestScreen';
 import VoiceCallScreen from '../screens/VoiceCallScreen';
@@ -41,7 +41,7 @@ export type RootStackParamList = {
     permissionData: any;
   };
   Main: undefined;
-  MainTabs: undefined;
+  MainTabs: NavigatorScreenParams<TabParamList>;
   Home: undefined;
   Order: undefined;
   StaffDetail: { staffId: string };
@@ -49,6 +49,7 @@ export type RootStackParamList = {
     contactId: string;
     contactName: string;
     conversationId?: string;
+    contactAvatar?: string | null;
   };
   VoiceCall: {
     contactId: string;

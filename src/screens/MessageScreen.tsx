@@ -687,7 +687,8 @@ const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
     navigation.navigate('Chat', { 
       contactId: contact._id, 
       contactName: contact.name || contact.phoneNumber,
-      conversationId: contact.conversationId // 如果有会话ID，直接传递
+      conversationId: contact.conversationId, // 如果有会话ID，直接传递
+      contactAvatar: contact.avatar ? BASE_URL + contact.avatar : null // 传递联系人头像
     });
     
     // 如果已知会话ID，预加载消息
@@ -746,19 +747,18 @@ const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
         onPress={() => handleContactPress(item)}
       >
         <View style={styles.avatarContainer}>
-          {avatarUrl ? (
-            <Image 
-              source={{ uri: avatarUrl }} 
-              style={styles.avatar}
-              onError={() => console.error('头像加载失败:', avatarUrl)}
-            />
-          ) : (
-            <View style={[styles.avatar, styles.defaultAvatar]}>
-              <Text style={styles.avatarText}>
-                {(item.name || item.phoneNumber || '').charAt(0).toUpperCase()}
-              </Text>
-            </View>
-          )}
+          <Image 
+            source={
+              avatarUrl 
+                ? { uri: avatarUrl }
+                : require('../assets/images/moren.png') // 使用默认头像
+            }
+            style={styles.avatar}
+            onError={() => {
+              console.error('头像加载失败:', avatarUrl);
+              // 头像加载失败时的处理可以在这里添加
+            }}
+          />
           {/* 新用户指示器 */}
           {isNewUser && (
             <View style={styles.newUserIndicator}>
@@ -930,16 +930,6 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-  },
-  defaultAvatar: {
-    backgroundColor: '#ff6b81',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    color: 'white',
-    fontSize: 22,
-    fontWeight: 'bold',
   },
   contactInfo: {
     flex: 1,

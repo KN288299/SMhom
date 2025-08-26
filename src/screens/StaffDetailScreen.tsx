@@ -13,6 +13,10 @@ import {
   StatusBar
 } from 'react-native';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
+import { NavigatorScreenParams } from '@react-navigation/native';
+import { TabParamList } from '../navigation/TabNavigator';
 import { getStaffDetail, StaffMember } from '../services/staffService';
 import { ArrowBackIcon } from '../assets/icons';
 
@@ -27,7 +31,7 @@ const PINK_COLOR = '#ff6b81';
 
 const StaffDetailScreen: React.FC = () => {
   const route = useRoute<RouteProp<StaffDetailRouteProps, 'StaffDetail'>>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { staffId } = route.params;
   const [loading, setLoading] = useState(true);
   const [staffData, setStaffData] = useState<StaffMember | null>(null);
@@ -90,6 +94,12 @@ const StaffDetailScreen: React.FC = () => {
   // 关闭全屏预览
   const closeFullScreenView = () => {
     setIsFullScreenView(false);
+  };
+
+  // 处理联系客服-约她按钮点击
+  const handleContactPress = () => {
+    // 跳转到消息页面
+    navigation.navigate('MainTabs', { screen: 'Message' });
   };
 
   if (loading) {
@@ -267,8 +277,8 @@ const StaffDetailScreen: React.FC = () => {
       
       {/* 底部操作区 */}
       <View style={styles.actionContainer}>
-        <TouchableOpacity style={styles.actionButton}>
-          <Text style={styles.actionButtonText}>联系TA</Text>
+        <TouchableOpacity style={styles.actionButton} onPress={handleContactPress}>
+          <Text style={styles.actionButtonText}>联系客服-约她</Text>
         </TouchableOpacity>
       </View>
     </View>

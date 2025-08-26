@@ -186,7 +186,7 @@ interface ChatScreenProps {
 const ChatScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'Chat'>>();
-  const { contactId, contactName, conversationId: routeConversationId } = route.params;
+  const { contactId, contactName, conversationId: routeConversationId, contactAvatar: routeContactAvatar } = route.params;
   
   // 上下文和状态
   const { userToken, userInfo, isCustomerService, logout } = useAuth();
@@ -275,7 +275,7 @@ const ChatScreen: React.FC = () => {
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
   const [showVideoControls, setShowVideoControls] = useState(true);
-  const [contactAvatar, setContactAvatar] = useState<string | null>(null);
+  const [contactAvatar, setContactAvatar] = useState<string | null>(routeContactAvatar || null);
   const [isIncomingCall, setIsIncomingCall] = useState(false);
   const [incomingCallInfo, setIncomingCallInfo] = useState<any>(null);
   
@@ -888,9 +888,10 @@ const ChatScreen: React.FC = () => {
         onOpenFullscreenVideo={(videoUrl: string) => openFullscreenVideo(videoUrl)}
         onViewLocation={handleViewLocation}
         formatMediaUrl={formatMediaUrl}
+        contactAvatar={contactAvatar}
       />
     );
-  }, [userInfo, formatMediaUrl, handleViewLocation]);
+  }, [userInfo, formatMediaUrl, handleViewLocation, contactAvatar]);
 
   // 优化keyExtractor - 使用稳定的消息ID，避免因index变化导致整列表重挂载
   const keyExtractor = useCallback((item: Message) => {

@@ -48,6 +48,7 @@ interface MessageRendererProps {
   onOpenFullscreenVideo: (videoUrl: string) => void;
   onViewLocation?: (location: { latitude: number; longitude: number; locationName?: string; address?: string }) => void;
   formatMediaUrl: (url: string) => string;
+  contactAvatar?: string | null;
 }
 
 const MessageRenderer: React.FC<MessageRendererProps> = ({
@@ -57,6 +58,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
   onOpenFullscreenVideo,
   onViewLocation,
   formatMediaUrl,
+  contactAvatar,
 }) => {
   const isMe = item.senderId === userInfo?._id;
   
@@ -212,6 +214,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
       content={item.content}
       timestamp={item.timestamp}
       isMe={isMe}
+      contactAvatar={contactAvatar}
     />
   );
 };
