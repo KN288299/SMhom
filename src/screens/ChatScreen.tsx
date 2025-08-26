@@ -916,35 +916,54 @@ const ChatScreen: React.FC = () => {
   }, []);
 
   // 处理删除消息
-  const handleDeleteMessage = useCallback((messageId: string) => {
+  const handleDeleteMessage = useCallback(async (messageId: string) => {
+    // 先本地移除，提升响应速度
     setMessages(prevMessages => prevMessages.filter(msg => msg._id !== messageId));
-    
+
+    try {
+      await axios.delete(`${BASE_URL}/api/messages/${messageId}`, {
+        headers: {
+          'Authorization': `Bearer ${userToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+    } catch (error) {
+      console.error('删除消息失败，将回滚本地状态:', error);
+      // 回滚（简单做法：触发重新拉取）
+      fetchMessages(1);
+    }
+
     if (Platform.OS === 'android') {
       ToastAndroid.show('消息已删除', ToastAndroid.SHORT);
     } else {
       Alert.alert('提示', '消息已删除');
     }
-  }, []);
+  }, [BASE_URL, userToken, fetchMessages]);
 
   // 处理撤回消息
-  const handleRecallMessage = useCallback((messageId: string) => {
-    // 发送撤回消息请求到服务器
-    if (socket) {
-      socket.emit('recall_message', {
-        messageId,
-        conversationId: route.params.conversationId,
-      });
-    }
-    
-    // 本地移除消息
+  const handleRecallMessage = useCallback(async (messageId: string) => {
+    // 本地先移除
     setMessages(prevMessages => prevMessages.filter(msg => msg._id !== messageId));
-    
+
+    try {
+      await axios.put(`${BASE_URL}/api/messages/${messageId}/recall`, {}, {
+        headers: {
+          'Authorization': `Bearer ${userToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+    } catch (error) {
+      console.error('撤回消息失败，将回滚本地状态:', error);
+      // 回滚（简单做法：触发重新拉取）
+      fetchMessages(1);
+    }
+
     if (Platform.OS === 'android') {
       ToastAndroid.show('消息已撤回', ToastAndroid.SHORT);
     } else {
       Alert.alert('提示', '消息已撤回');
     }
-  }, [socket, route.params.conversationId]);
+  }, [BASE_URL, userToken, fetchMessages]);
 
   // 渲染消息项 - 使用useCallback优化性能
   const renderMessageItem = useCallback(({ item }: { item: Message }) => {

@@ -10,6 +10,8 @@ interface Message {
   content: string;
   timestamp: Date;
   isRead?: boolean;
+  isDeleted?: boolean;
+  isRecalled?: boolean;
   messageType?: 'text' | 'voice' | 'image' | 'video' | 'location';
   contentType?: 'text' | 'voice' | 'image' | 'video' | 'file' | 'location';
   voiceDuration?: string;
@@ -118,7 +120,10 @@ export const useMessages = ({
         const fetchedMessages = response.data.messages || response.data || [];
         
         // 转换消息格式（适配原有数据结构）
-        const formattedMessages = fetchedMessages.map((msg: any) => {
+        const formattedMessages = fetchedMessages
+          // 客户端兜底过滤（即使后端已过滤）
+          .filter((msg: any) => !msg.isDeleted && !msg.isRecalled)
+          .map((msg: any) => {
           // 检查是否是通话记录消息
           const isCallRecord = msg.isCallRecord || 
                                msg.content?.includes('语音通话') || 

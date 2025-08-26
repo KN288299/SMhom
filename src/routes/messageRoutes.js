@@ -4,7 +4,10 @@ const {
   getMessages,
   markMessageAsRead,
   markAllAsRead,
-  uploadVoiceMessage
+  uploadVoiceMessage,
+  // 新增
+  softDeleteMessage,
+  recallMessage
 } = require('../controllers/messageController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -24,6 +27,12 @@ router.get('/:conversationId', getMessages);
 
 // 标记单条消息为已读
 router.put('/:id/read', markMessageAsRead);
+
+// 软删除消息
+router.delete('/:id', softDeleteMessage);
+
+// 撤回消息
+router.put('/:id/recall', recallMessage);
 
 // 标记会话中的所有消息为已读
 router.put('/conversation/:conversationId/read', markAllAsRead);

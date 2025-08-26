@@ -83,6 +83,30 @@ const messageSchema = mongoose.Schema(
       type: String,
       default: '',
     },
+    // 软删除标记与信息
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    deletedAt: {
+      type: Date,
+    },
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+    // 撤回标记与信息
+    isRecalled: {
+      type: Boolean,
+      default: false,
+    },
+    recalledAt: {
+      type: Date,
+    },
+    recalledBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
     isRead: {
       type: Boolean,
       default: false,
@@ -100,6 +124,8 @@ const messageSchema = mongoose.Schema(
 messageSchema.index({ conversationId: 1, createdAt: -1 });
 messageSchema.index({ senderId: 1 });
 messageSchema.index({ conversationId: 1, isRead: 1 });
+messageSchema.index({ conversationId: 1, isDeleted: 1 });
+messageSchema.index({ conversationId: 1, isRecalled: 1 });
 
 const Message = mongoose.model('Message', messageSchema);
 

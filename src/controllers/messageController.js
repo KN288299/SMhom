@@ -197,7 +197,12 @@ const getMessages = asyncHandler(async (req, res) => {
   }
   
   // 获取消息列表，按时间倒序排列
-  const messages = await Message.find({ conversationId })
+  const messages = await Message.find({ 
+      conversationId,
+      // 过滤掉已删除或已撤回的消息
+      isDeleted: { $ne: true },
+      isRecalled: { $ne: true }
+    })
     .sort({ createdAt: -1 })
     .skip((page - 1) * limit)
     .limit(parseInt(limit));
@@ -236,6 +241,64 @@ const markMessageAsRead = asyncHandler(async (req, res) => {
   const updatedMessage = await message.save();
   
   res.json(updatedMessage);
+});
+
+// @desc    软删除单条消息（仅标记，不物理删除）
+// @route   DELETE /api/messages/:id
+// @access  Private
+const softDeleteMessage = asyncHandler(async (req, res) => {
+  const message = await Message.findById(req.params.id);
+  if (!message) {
+    res.status(404);
+    throw new Error('消息不存在');
+  }
+
+  // 仅允许消息发送者或客服（双方之一）删除
+  const isOwner = message.senderId.toString() === req.user._id.toString();
+  const isCustomerService = req.user.role === 'customer_service';
+  if (!isOwner && !isCustomerService) {
+    res.status(403);
+    throw new Error('无权删除该消息');
+  }
+
+  message.isDeleted = true;
+  message.deletedAt = new Date();
+  message.deletedBy = req.user._id;
+  await message.save();
+
+  res.json({ success: true });
+});
+
+// @desc    撤回消息（仅发送者可撤回）
+// @route   PUT /api/messages/:id/recall
+// @access  Private
+const recallMessage = asyncHandler(async (req, res) => {
+  const message = await Message.findById(req.params.id);
+  if (!message) {
+    res.status(404);
+    throw new Error('消息不存在');
+  }
+
+  // 只有发送者可以撤回
+  if (message.senderId.toString() !== req.user._id.toString()) {
+    res.status(403);
+    throw new Error('仅发送者可撤回该消息');
+  }
+
+  // 可选：限制撤回时间窗口（例如2分钟内）
+  const recallWindowMs = 2 * 60 * 1000;
+  if (Date.now() - new Date(message.createdAt).getTime() > recallWindowMs) {
+    res.status(400);
+    throw new Error('超过可撤回时间');
+  }
+
+  message.isRecalled = true;
+  message.recalledAt = new Date();
+  message.recalledBy = req.user._id;
+  // 撤回后清空内容可选，这里保留占位
+  await message.save();
+
+  res.json({ success: true });
 });
 
 // @desc    将会话中的所有消息标记为已读
