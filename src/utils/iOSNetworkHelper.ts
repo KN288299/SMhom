@@ -11,6 +11,7 @@ export interface OptimizedNetworkState {
   type: string;
   isInternetReachable: boolean | null;
   details: any; // 使用any类型以兼容不同网络类型的详细信息
+  isNetworkTypeChanged?: boolean; // 🔧 网络切换修复：添加网络类型变化标识
 }
 
 /**
@@ -90,8 +91,12 @@ export const testServerConnection = async (
   }
 };
 
+// 🔧 网络切换修复：添加网络类型追踪
+let lastNetworkType: string | null = null;
+let lastNetworkConnected: boolean | null = null;
+
 /**
- * iOS网络状态监听器包装器（轻量级版本）
+ * iOS网络状态监听器包装器（增强版本 - 支持网络切换检测）
  * @param callback 状态变化回调
  * @returns 取消监听函数
  */
@@ -100,22 +105,111 @@ export const addOptimizedNetworkListener = (
 ) => {
   return NetInfo.addEventListener((state) => {
     const isConnected = getOptimizedConnectionStatus(state);
+    const currentNetworkType = state.type || 'unknown';
+    
+    // 🔧 网络切换修复：检测网络类型变化
+    const isNetworkTypeChanged = lastNetworkType !== null && 
+                                lastNetworkType !== currentNetworkType &&
+                                lastNetworkConnected === true && 
+                                isConnected === true;
+    
+    // 🔧 网络切换修复：特别关注蜂窝数据到WiFi的切换
+    const isCellularToWifi = lastNetworkType === 'cellular' && currentNetworkType === 'wifi';
+    const isWifiToCellular = lastNetworkType === 'wifi' && currentNetworkType === 'cellular';
     
     // 轻量级状态对象，避免异步调用
     const details: OptimizedNetworkState = {
       isConnected,
-      type: state.type || 'unknown',
+      type: currentNetworkType,
       isInternetReachable: state.isInternetReachable,
-      details: {} // 减少详细信息获取
+      details: {}, // 减少详细信息获取
+      isNetworkTypeChanged
     };
     
-    // 减少日志输出频率
-    if (Math.random() < 0.1) { // 只有10%的概率输出日志
-      console.log(`📱 网络状态:`, { isConnected, type: state.type });
+    // 🔧 网络切换修复：增强日志输出，特别关注网络切换
+    if (isNetworkTypeChanged || isCellularToWifi || isWifiToCellular) {
+      console.log(`🔄 [NetSwitch] 网络切换检测:`, {
+        from: lastNetworkType,
+        to: currentNetworkType,
+        isConnected,
+        isCellularToWifi,
+        isWifiToCellular,
+        timestamp: new Date().toISOString()
+      });
+    } else if (Math.random() < 0.05) { // 减少到5%的概率输出普通日志
+      console.log(`📱 网络状态:`, { isConnected, type: currentNetworkType });
     }
+    
+    // 更新追踪状态
+    lastNetworkType = currentNetworkType;
+    lastNetworkConnected = isConnected;
     
     callback(isConnected, details);
   });
+};
+
+/**
+ * 🔧 网络切换修复：检测WiFi连接稳定性
+ * @param maxWaitTime 最大等待时间（毫秒）
+ * @param checkInterval 检查间隔（毫秒）
+ * @returns Promise<boolean> WiFi是否稳定
+ */
+export const waitForWifiStability = async (
+  maxWaitTime: number = 3000,
+  checkInterval: number = 500
+): Promise<boolean> => {
+  const startTime = Date.now();
+  
+  while (Date.now() - startTime < maxWaitTime) {
+    try {
+      const state = await NetInfo.fetch();
+      
+      if (state.type === 'wifi' && state.isConnected && state.isInternetReachable !== false) {
+        console.log('✅ [WiFiStability] WiFi连接已稳定');
+        return true;
+      }
+      
+      // 等待一段时间后再次检查
+      await new Promise(resolve => setTimeout(resolve, checkInterval));
+    } catch (error) {
+      console.warn('⚠️ [WiFiStability] WiFi稳定性检查失败:', error);
+    }
+  }
+  
+  console.warn('⚠️ [WiFiStability] WiFi连接稳定性检查超时');
+  return false;
+};
+
+/**
+ * 🔧 网络切换修复：强制Socket重连的辅助函数
+ * @param socketRef Socket引用
+ * @param delay 延迟时间（毫秒）
+ */
+export const forceSocketReconnectAfterNetworkSwitch = (
+  socketRef: any,
+  delay: number = 1000
+): void => {
+  setTimeout(() => {
+    try {
+      if (socketRef?.current) {
+        console.log('🔄 [NetSwitch] 网络切换后强制Socket重连');
+        
+        // 先断开现有连接
+        if (socketRef.current.connected) {
+          socketRef.current.disconnect();
+        }
+        
+        // 短暂延迟后重新连接
+        setTimeout(() => {
+          if (socketRef.current) {
+            socketRef.current.connect();
+          }
+        }, 200);
+      }
+    } catch (error) {
+      console.error('❌ [NetSwitch] 强制Socket重连失败:', error);
+    }
+  }, delay);
 };
 
 export default {
@@ -123,4 +217,6 @@ export default {
   getDetailedNetworkInfo,
   testServerConnection,
   addOptimizedNetworkListener,
+  waitForWifiStability,
+  forceSocketReconnectAfterNetworkSwitch,
 };

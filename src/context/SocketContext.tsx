@@ -143,6 +143,22 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       // 设置全局Socket引用
       (global as any).socketRef = socketRef;
       
+      // 🔧 网络切换修复：连接成功后设置网络切换监听
+      (global as any).onNetworkSwitch = (networkInfo: any) => {
+        console.log('🔄 [GlobalSocket] 收到网络切换通知:', networkInfo);
+        
+        // 蜂窝数据到WiFi切换时，延迟重连以等待WiFi稳定
+        if (networkInfo.isCellularToWifi) {
+          console.log('📶 [GlobalSocket] 蜂窝数据切换到WiFi，延迟重连');
+          setTimeout(() => {
+            if (socketRef.current && !socketRef.current.connected) {
+              console.log('🔄 [GlobalSocket] WiFi稳定期结束，尝试重连');
+              socketRef.current.connect();
+            }
+          }, 2000); // 延迟2秒等待WiFi稳定
+        }
+      };
+      
       // 连接成功后获取离线消息
       setTimeout(() => {
         console.log('📨 [GlobalSocket] 请求离线消息');

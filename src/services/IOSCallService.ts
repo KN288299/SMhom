@@ -1,6 +1,7 @@
 import { Platform, AppState, AppStateStatus } from 'react-native';
 import PushNotification from 'react-native-push-notification';
 import NotificationService from './NotificationService';
+import IOSAudioSession from '../utils/IOSAudioSession';
 
 interface CallData {
   callId: string;
@@ -22,13 +23,37 @@ class IOSCallService {
     if (this.initialized || Platform.OS !== 'ios') return;
 
     try {
-      // 只设置应用状态监听，不立即配置推送通知
+      // 设置应用状态监听
       this.setupAppStateListener();
+      
+      // 预初始化音频会话（为后续通话做准备）
+      await this.prepareAudioSession();
       
       this.initialized = true;
       console.log('✅ [IOSCallService] iOS通话服务初始化完成（推送通知延迟配置）');
     } catch (error) {
       console.error('❌ [IOSCallService] 初始化失败:', error);
+    }
+  }
+
+  // 预初始化音频会话
+  private async prepareAudioSession(): Promise<void> {
+    try {
+      console.log('🎵 [IOSCallService] 预初始化iOS音频会话...');
+      
+      // 获取音频会话实例
+      const audioSession = IOSAudioSession.getInstance();
+      
+      // 如果还没有激活音频会话，进行预初始化
+      if (!audioSession.isActive()) {
+        // 为语音通话准备音频会话（playAndRecord模式）
+        await audioSession.prepareForRecording();
+        console.log('✅ [IOSCallService] iOS音频会话预初始化完成');
+      } else {
+        console.log('✅ [IOSCallService] iOS音频会话已经激活，跳过预初始化');
+      }
+    } catch (error) {
+      console.warn('⚠️ [IOSCallService] 音频会话预初始化失败（不影响功能）:', error);
     }
   }
 

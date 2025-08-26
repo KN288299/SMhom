@@ -924,15 +924,27 @@ const ChatScreen: React.FC = () => {
     }
   }, [messages.length, loading, hasInitialScrolled]);
   
-  // 网络状态监听 - 轻量级版本
+  // 🔧 网络切换修复：增强网络状态监听，支持网络切换检测
   useEffect(() => {
     let lastConnectedState = isNetworkConnected;
+    let lastNetworkType: string | null = null;
     
     const unsubscribe = NetInfo.addEventListener(state => {
       // 使用简化的网络连接检测
       const connected = Platform.OS === 'ios' 
         ? getOptimizedConnectionStatus(state)
         : Boolean(state.isConnected && state.isInternetReachable !== false);
+      
+      const currentNetworkType = state.type || 'unknown';
+      
+      // 🔧 网络切换修复：检测网络类型变化
+      const isNetworkTypeChanged = lastNetworkType !== null && 
+                                  lastNetworkType !== currentNetworkType &&
+                                  lastConnectedState === true && 
+                                  connected === true;
+      
+      // 🔧 网络切换修复：特别处理蜂窝数据到WiFi的切换
+      const isCellularToWifi = lastNetworkType === 'cellular' && currentNetworkType === 'wifi';
       
       // 减少状态更新频率
       if (connected !== lastConnectedState) {
@@ -948,6 +960,44 @@ const ChatScreen: React.FC = () => {
         
         lastConnectedState = connected;
       }
+      
+      // 🔧 网络切换修复：处理网络切换事件
+      if (isNetworkTypeChanged) {
+        console.log(`🔄 [ChatScreen] 检测到网络切换: ${lastNetworkType} → ${currentNetworkType}`);
+        
+        if (isCellularToWifi) {
+          console.log('📶 [ChatScreen] 蜂窝数据切换到WiFi，等待连接稳定后重连Socket');
+          
+          // 导入网络工具函数
+          import('../utils/iOSNetworkHelper').then(({ waitForWifiStability, forceSocketReconnectAfterNetworkSwitch }) => {
+            // 等待WiFi稳定后强制重连Socket
+            waitForWifiStability(3000, 500).then((isStable) => {
+              if (isStable) {
+                // 获取全局Socket引用并强制重连
+                const socketRef = (global as any).socketRef;
+                if (socketRef) {
+                  console.log('🔄 [ChatScreen] WiFi稳定，强制Socket重连');
+                  forceSocketReconnectAfterNetworkSwitch(socketRef, 500);
+                }
+              } else {
+                console.warn('⚠️ [ChatScreen] WiFi连接不稳定，跳过强制重连');
+              }
+            });
+          });
+        } else {
+          // 其他网络切换场景的快速重连
+          console.log('🔄 [ChatScreen] 其他网络切换，立即尝试Socket重连');
+          const socketRef = (global as any).socketRef;
+          if (socketRef) {
+            import('../utils/iOSNetworkHelper').then(({ forceSocketReconnectAfterNetworkSwitch }) => {
+              forceSocketReconnectAfterNetworkSwitch(socketRef, 200);
+            });
+          }
+        }
+      }
+      
+      // 更新网络类型追踪
+      lastNetworkType = currentNetworkType;
     });
 
     return () => unsubscribe();

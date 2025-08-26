@@ -35,6 +35,9 @@ import { useFloatingCall } from '../context/FloatingCallContext';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import AudioManager from '../utils/AudioManager';
 import { DEFAULT_AVATAR } from '../utils/DefaultAvatar';
+import IOSAudioSession from '../utils/IOSAudioSession';
+import NetInfo from '@react-native-community/netinfo';
+import { getOptimizedConnectionStatus } from '../utils/iOSNetworkHelper';
 
 // 定义WebRTC事件类型
 interface RTCPeerConnectionWithEvents extends RTCPeerConnection {
@@ -218,6 +221,19 @@ const VoiceCallScreen: React.FC = () => {
       // 如果已有权限，直接返回成功
       if (permissionStatus === RESULTS.GRANTED) {
         console.log('已有麦克风权限');
+        
+        // 🔧 iOS音频会话优化：权限已有时立即预配置音频会话
+        if (Platform.OS === 'ios') {
+          try {
+            console.log('🍎 [VoiceCall] 已有麦克风权限，预配置iOS音频会话...');
+            const audioSession = IOSAudioSession.getInstance();
+            await audioSession.prepareForRecording();
+            console.log('✅ [VoiceCall] 已有权限-iOS音频会话预配置完成');
+          } catch (audioError) {
+            console.warn('⚠️ [VoiceCall] 已有权限-音频会话预配置失败:', audioError);
+          }
+        }
+        
         return true;
       }
       
@@ -281,8 +297,21 @@ const VoiceCallScreen: React.FC = () => {
         );
       }
       
+      // 🔧 iOS音频会话优化：权限请求成功后立即预配置音频会话
+      const hasPermission = result === RESULTS.GRANTED;
+      if (hasPermission && Platform.OS === 'ios') {
+        try {
+          console.log('🍎 [VoiceCall] 权限请求成功，预配置iOS音频会话...');
+          const audioSession = IOSAudioSession.getInstance();
+          await audioSession.prepareForRecording();
+          console.log('✅ [VoiceCall] 权限请求成功-iOS音频会话预配置完成');
+        } catch (audioError) {
+          console.warn('⚠️ [VoiceCall] 权限请求成功-音频会话预配置失败:', audioError);
+        }
+      }
+      
       // 返回请求结果
-      return result === RESULTS.GRANTED;
+      return hasPermission;
     } catch (error) {
       console.error('请求麦克风权限失败:', error);
       Alert.alert('权限请求错误', '请求麦克风权限时发生错误，请重试');
@@ -320,6 +349,24 @@ const VoiceCallScreen: React.FC = () => {
           AudioManager.setSpeakerOn(false);
           setIsSpeakerOn(false);
           
+          // 🔧 iOS音频会话修复：悬浮窗恢复时也需要确保音频会话正确配置
+          if (Platform.OS === 'ios') {
+            try {
+              console.log('🍎 [VoiceCall] 悬浮窗恢复，检查iOS音频会话状态...');
+              const audioSession = IOSAudioSession.getInstance();
+              
+              // 如果音频会话未激活，重新配置
+              if (!audioSession.isActive()) {
+                await audioSession.prepareForRecording();
+                console.log('✅ [VoiceCall] 悬浮窗恢复，iOS音频会话重新配置完成');
+              } else {
+                console.log('✅ [VoiceCall] 悬浮窗恢复，iOS音频会话已激活');
+              }
+            } catch (audioError) {
+              console.warn('⚠️ [VoiceCall] 悬浮窗恢复时iOS音频会话配置失败:', audioError);
+            }
+          }
+          
           // 设置Socket引用为全局Socket
           socketRef.current = globalSocket;
           
@@ -351,6 +398,22 @@ const VoiceCallScreen: React.FC = () => {
         // 默认使用听筒模式
         AudioManager.setSpeakerOn(false);
         setIsSpeakerOn(false);
+        
+        // 🔧 iOS音频会话初始化修复：在权限获取后立即准备音频会话
+        if (Platform.OS === 'ios') {
+          try {
+            console.log('🍎 [VoiceCall] 权限获取成功，开始准备iOS音频会话...');
+            const audioSession = IOSAudioSession.getInstance();
+            
+            // 重置并重新配置音频会话，确保正确的初始化顺序
+            await audioSession.reset();
+            await audioSession.prepareForRecording();
+            
+            console.log('✅ [VoiceCall] iOS音频会话准备完成');
+          } catch (audioError) {
+            console.warn('⚠️ [VoiceCall] iOS音频会话准备失败（不影响后续流程）:', audioError);
+          }
+        }
         
         // 等待全局Socket连接就绪，避免冷启动竞态
         if (!globalSocket || !isConnected) {
@@ -1081,7 +1144,10 @@ const VoiceCallScreen: React.FC = () => {
       }
     };
     
-    // 监听ICE连接状态变化
+    // 🔧 网络切换修复：增强ICE连接状态变化监听，支持网络切换重连
+    let iceReconnectAttempts = 0;
+    const maxIceReconnectAttempts = 3;
+    
     peerConnectionRef.current.oniceconnectionstatechange = () => {
       const state = peerConnectionRef.current?.iceConnectionState;
       console.log('ICE连接状态:', state);
@@ -1091,20 +1157,70 @@ const VoiceCallScreen: React.FC = () => {
         console.log('🔗 [WebRTC] 设置webrtcConnected=true, callStatus=connected');
         setWebrtcConnected(true);
         setCallStatus('connected');
+        
+        // 🔧 网络切换修复：连接成功后重置重连尝试次数
+        iceReconnectAttempts = 0;
+        
         if (!timerRef.current) {
           startCallTimer();
         }
         // 连接成功后检查选中候选对
         logSelectedCandidatePair();
-      } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
-        console.log('ICE连接已断开或失败');
+      } else if (state === 'disconnected') {
+        console.log('🔶 [WebRTC] ICE连接已断开，可能是网络切换导致');
+        setWebrtcConnected(false);
+        
+        // 🔧 网络切换修复：ICE断开时先尝试重连，而不是立即结束通话
+        if (callStatusRef.current !== 'ended' && !isEndingCallRef.current && !isEnteringFloatingModeRef.current) {
+          if (iceReconnectAttempts < maxIceReconnectAttempts) {
+            iceReconnectAttempts++;
+            console.log(`🔄 [WebRTC] ICE断开，尝试重连 (${iceReconnectAttempts}/${maxIceReconnectAttempts})`);
+            
+            // 延迟重连，给网络切换时间稳定
+            setTimeout(async () => {
+              try {
+                if (peerConnectionRef.current && callStatusRef.current !== 'ended') {
+                  console.log('🔄 [WebRTC] 开始ICE重连过程');
+                  
+                  // 重启ICE连接
+                  await peerConnectionRef.current.restartIce();
+                  
+                  // 如果是发起方，重新创建offer
+                  if (!isIncomingRef.current) {
+                    console.log('🔄 [WebRTC] 发起方重新创建offer');
+                    const offer = await peerConnectionRef.current.createOffer({
+                      iceRestart: true
+                    });
+                    await peerConnectionRef.current.setLocalDescription(offer);
+                    
+                    // 通过Socket发送新的offer
+                    if (globalSocket && activeCallId) {
+                      globalSocket.emit('webrtc_offer', {
+                        callId: activeCallId,
+                        offer: offer,
+                        isIceRestart: true
+                      });
+                    }
+                  }
+                }
+              } catch (error) {
+                console.error('❌ [WebRTC] ICE重连失败:', error);
+              }
+            }, 1000 * iceReconnectAttempts); // 递增延迟
+          } else {
+            console.log('❌ [WebRTC] ICE重连次数已达上限，结束通话');
+            endCall();
+          }
+        }
+      } else if (state === 'failed' || state === 'closed') {
+        console.log('ICE连接已失败或关闭');
         setWebrtcConnected(false);
         // 只有在通话未结束且未主动结束通话且不在悬浮窗模式时才调用endCall
         if (callStatusRef.current !== 'ended' && !isEndingCallRef.current && !isEnteringFloatingModeRef.current) {
-          console.log('ICE连接断开，但不是主动结束，调用endCall');
+          console.log('ICE连接失败，调用endCall');
           endCall();
         } else {
-          console.log('ICE连接断开，但已在结束通话流程中或悬浮窗模式，不重复调用endCall');
+          console.log('ICE连接失败，但已在结束通话流程中或悬浮窗模式，不重复调用endCall');
         }
       }
     };
@@ -1606,6 +1722,68 @@ const VoiceCallScreen: React.FC = () => {
     
     setIsFloating(newFloatingState);
   };
+
+  // 🔧 网络切换修复：添加网络状态监听，支持语音通话中的网络切换
+  useEffect(() => {
+    let lastNetworkType: string | null = null;
+    
+    const networkUnsubscribe = NetInfo.addEventListener(state => {
+      const currentNetworkType = state.type || 'unknown';
+      const connected = Platform.OS === 'ios' 
+        ? getOptimizedConnectionStatus(state)
+        : Boolean(state.isConnected && state.isInternetReachable !== false);
+      
+      // 检测网络类型变化
+      const isNetworkTypeChanged = lastNetworkType !== null && 
+                                  lastNetworkType !== currentNetworkType &&
+                                  connected === true;
+      
+      // 特别关注蜂窝数据到WiFi的切换
+      const isCellularToWifi = lastNetworkType === 'cellular' && currentNetworkType === 'wifi';
+      
+      if (isNetworkTypeChanged && (callStatus === 'connected' || callStatus === 'ringing')) {
+        console.log(`🔄 [VoiceCall] 通话中检测到网络切换: ${lastNetworkType} → ${currentNetworkType}`);
+        
+        if (isCellularToWifi) {
+          console.log('📶 [VoiceCall] 蜂窝数据切换到WiFi，主动触发ICE重连');
+          
+          // 延迟触发ICE重连，等待WiFi稳定
+          setTimeout(async () => {
+            try {
+              if (peerConnectionRef.current && callStatusRef.current === 'connected') {
+                console.log('🔄 [VoiceCall] WiFi稳定，开始主动ICE重连');
+                await peerConnectionRef.current.restartIce();
+                
+                // 如果是发起方，重新创建offer
+                if (!isIncomingRef.current && globalSocket && activeCallId) {
+                  const offer = await peerConnectionRef.current.createOffer({
+                    iceRestart: true
+                  });
+                  await peerConnectionRef.current.setLocalDescription(offer);
+                  
+                  globalSocket.emit('webrtc_offer', {
+                    callId: activeCallId,
+                    offer: offer,
+                    isIceRestart: true
+                  });
+                  
+                  console.log('🔄 [VoiceCall] 网络切换后发送新offer');
+                }
+              }
+            } catch (error) {
+              console.error('❌ [VoiceCall] 网络切换后ICE重连失败:', error);
+            }
+          }, 2000); // 等待2秒WiFi稳定
+        }
+      }
+      
+      lastNetworkType = currentNetworkType;
+    });
+    
+    return () => {
+      networkUnsubscribe();
+    };
+  }, [callStatus, activeCallId, globalSocket]);
 
   // 检查是否是从悬浮窗返回
   useEffect(() => {
