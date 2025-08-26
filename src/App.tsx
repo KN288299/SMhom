@@ -30,51 +30,39 @@ function App(): React.JSX.Element {
     console.log('🚀 [App] 应用初始化完成');
   }, []);
 
-  // 初始化本地通知服务（原Android推送服务）
+  // 🔧 iOS首次使用修复：优化平台特定的初始化流程
   useEffect(() => {
-    console.log('🚀 [App] 初始化本地通知服务');
-    AndroidPushService.initialize();
-    
-    // 初始化iOS通话服务
-    if (Platform.OS === 'ios') {
-      console.log('🍎 [App] 初始化iOS通话服务');
-      IOSCallService.initialize();
-    }
-  }, []);
-
-  // 检查麦克风权限状态（确保语音通话功能正常）
-  useEffect(() => {
-    const checkMicrophonePermission = async () => {
-      try {
-        console.log('🔍 [App] 检查麦克风权限状态...');
-        
-        if (Platform.OS === 'android') {
-          // 检查Android麦克风权限
-          const hasPermission = await PermissionsAndroid.check(
-            PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
-          );
-          console.log('📱 [App] Android麦克风权限状态:', hasPermission ? '已授权' : '未授权');
-          
-          if (!hasPermission) {
-            console.log('⚠️ [App] Android麦克风权限未授权，语音通话功能可能受影响');
-          }
-        } else {
-          // 检查iOS麦克风权限
-          const permissionStatus = await check(PERMISSIONS.IOS.MICROPHONE);
-          console.log('🍎 [App] iOS麦克风权限状态:', permissionStatus);
-          
-          if (permissionStatus !== RESULTS.GRANTED) {
-            console.log('⚠️ [App] iOS麦克风权限未授权，语音通话功能可能受影响');
-          }
+    const initializePlatformServices = async () => {
+      console.log(`🚀 [App] 初始化平台服务 (${Platform.OS})`);
+      
+      if (Platform.OS === 'ios') {
+        // 🍎 iOS: 使用智能初始化管理器
+        console.log('🍎 [App] 使用iOS智能初始化管理器');
+        try {
+          const IOSInitializationManager = require('./services/IOSInitializationManager').default;
+          await IOSInitializationManager.getInstance().smartInitialize();
+          console.log('✅ [App] iOS智能初始化完成');
+        } catch (error) {
+          console.warn('⚠️ [App] iOS智能初始化失败，但应用将继续运行:', error);
         }
-      } catch (error) {
-        console.error('❌ [App] 检查麦克风权限失败:', error);
+      } else {
+        // 🤖 Android: 传统初始化流程
+        console.log('🤖 [App] Android平台，使用传统初始化');
+        AndroidPushService.initialize();
+      }
+      
+      // 🔔 通用：初始化通知服务（iOS也需要本地通知）
+      if (Platform.OS === 'ios') {
+        try {
+          await AndroidPushService.initialize(); // 虽然叫AndroidPushService，但内部支持跨平台
+          console.log('✅ [App] iOS本地通知服务初始化完成');
+        } catch (error) {
+          console.warn('⚠️ [App] iOS本地通知服务初始化失败:', error);
+        }
       }
     };
-
-    // 延迟检查权限，确保应用完全初始化
-    const timer = setTimeout(checkMicrophonePermission, 1000);
-    return () => clearTimeout(timer);
+    
+    initializePlatformServices();
   }, []);
 
   return (

@@ -245,11 +245,21 @@ export const useVoiceRecorder = ({
         
         // 显示友好提示，然后请求权限
         if (Platform.OS === 'ios') {
-          // iOS需要更明确的权限说明
+          // 🔧 iOS首次使用修复：iOS需要更明确的权限说明，并集成初始化管理器
           const hasPermission = await requestRecordingPermission();
           if (!hasPermission) {
             console.log('❌ iOS麦克风权限被拒绝，录音已取消');
             return;
+          }
+          
+          // 🍎 权限获取成功后，通知iOS初始化管理器完成音频会话设置
+          try {
+            const IOSInitializationManager = require('../services/IOSInitializationManager').default;
+            await IOSInitializationManager.getInstance().initializeAudioSessionAfterPermission();
+            console.log('✅ [VoiceRecorder] iOS权限后音频会话设置完成');
+          } catch (audioError) {
+            console.warn('⚠️ [VoiceRecorder] iOS权限后音频会话设置失败:', audioError);
+            // 不中断录音流程，继续使用原方案
           }
         } else {
           // Android权限处理

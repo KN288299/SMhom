@@ -3,6 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API_URL, API_ENDPOINTS } from '../config/api';
 import AndroidPushService from '../services/AndroidPushService';
+import { Platform } from 'react-native';
+import IOSCallService from '../services/IOSCallService';
 
 interface AuthContextType {
   isLoading: boolean;
@@ -99,6 +101,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         await AndroidPushService.updateFCMTokenAfterLogin(token);
       } catch (pushError) {
         console.log('上传FCM Token失败:', pushError);
+      }
+
+      // iOS：登录后配置推送（以便来电通知在首启也可用）
+      try {
+        if (Platform.OS === 'ios') {
+          console.log('🍎 [Auth] 登录后配置iOS推送通知...');
+          await IOSCallService.configurePushNotificationsAfterLogin();
+        }
+      } catch (iosPushError) {
+        console.warn('⚠️ [Auth] iOS推送配置失败（不影响继续使用）:', iosPushError);
       }
     } catch (e) {
       console.log('登录保存失败', e);

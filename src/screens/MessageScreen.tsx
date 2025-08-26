@@ -434,11 +434,28 @@ const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
     }, 1000); // 1秒防抖延迟
   }, [fetchContacts]);
 
-  // 监听Socket事件 - 实时更新用户列表
+  // 🔧 iOS首次使用修复：监听Socket事件 - 实时更新用户列表，加强iOS连接稳定性
   useEffect(() => {
     if (!socket || !isCustomerService()) return;
 
     console.log('📡 [MessageScreen] 客服端开始监听用户上线/下线事件');
+    
+    // 🍎 iOS优化：监听Socket连接状态，确保事件监听器在重连后正常工作
+    const handleSocketConnect = () => {
+      console.log('✅ [MessageScreen] Socket重新连接，事件监听器已就绪');
+      // Socket重连后，事件监听器会自动重新设置（由于useEffect的依赖）
+    };
+    
+    const handleSocketDisconnect = (reason: string) => {
+      console.log('⚠️ [MessageScreen] Socket连接断开:', reason);
+      if (Platform.OS === 'ios' && reason === 'transport close') {
+        console.log('🍎 [MessageScreen] iOS检测到传输层断开，准备重连...');
+      }
+    };
+    
+    // 监听Socket连接状态（iOS特别需要）
+    socket.on('connect', handleSocketConnect);
+    socket.on('disconnect', handleSocketDisconnect);
 
     // 监听用户上线事件
     const handleUserOnline = (data: { userId: string; timestamp: Date }) => {
@@ -491,6 +508,8 @@ const MessageScreen: React.FC<MessageScreenProps> = ({ navigation }) => {
       socket.off('user_online', handleUserOnline);
       socket.off('user_offline', handleUserOffline);  
       socket.off('receive_message', handleNewMessage);
+      socket.off('connect', handleSocketConnect);       // 🔧 新增：清理连接监听器
+      socket.off('disconnect', handleSocketDisconnect); // 🔧 新增：清理断开监听器
       
       // 清理防抖定时器
       if (refreshTimeoutRef.current) {

@@ -116,19 +116,22 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       processedToken.startsWith('CS_') ? '客服令牌' : 
       processedToken.startsWith('U_') ? '用户令牌' : '普通令牌');
     
-    // 创建Socket连接 - iOS通话延迟优化 v2
+    // 🔧 iOS首次使用修复：创建Socket连接 - 优化冷启动处理
     const socket = io(BASE_URL, {
       auth: {
         token: processedToken  // 使用处理后的token
       },
       transports: ['websocket', 'polling'],
-      timeout: 8000,           // 提高超时时间，避免冷启动过早超时
+      timeout: 10000,          // 首次连接超时时间增加到10秒，给iOS冷启动更多时间
       reconnection: true,
-      reconnectionAttempts: 30, // 进一步增加重连次数，iOS需要更多尝试
-      reconnectionDelay: 100,   // 进一步减少重连延迟到100ms
-      reconnectionDelayMax: 800, // 减少最大重连延迟到800ms
-      randomizationFactor: 0.1, // 减少随机化因子到0.1，最快重连
+      reconnectionAttempts: 35, // 增加重连次数，iOS首次启动可能需要更多尝试
+      reconnectionDelay: 100,   // 快速重连延迟100ms
+      reconnectionDelayMax: 1000, // 最大重连延迟1秒
+      randomizationFactor: 0.1, // 减少随机化因子，优先快速重连
       forceNew: false,         // 不强制创建新连接，复用连接
+      // 🍎 iOS优化：增加连接稳定性选项
+      upgrade: true,           // 允许升级到更好的传输方式
+      rememberUpgrade: true,   // 记住升级的传输方式
     });
 
     socketRef.current = socket;
@@ -435,6 +438,21 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const subscribeToIncomingCalls = (callback: (callData: any) => void) => {
     callSubscribersRef.current.add(callback);
     console.log(`📞 [GlobalSocket] 添加通话订阅者，当前数量: ${callSubscribersRef.current.size}`);
+    
+    // 首订阅即回放pending来电（解决首启期间事件先到、订阅者未就位的问题）
+    try {
+      const pending = pendingIncomingCallRef.current;
+      if (pending && Date.now() - pending.timestamp <= PENDING_REPLAY_TTL_MS) {
+        console.log('⏰ [GlobalSocket] 回放pending incoming_call给新订阅者');
+        callback(pending.data);
+        pendingIncomingCallRef.current = null; // 回放后清空，避免重复
+      } else if (pending) {
+        console.log('🧹 [GlobalSocket] 丢弃过期的pending incoming_call');
+        pendingIncomingCallRef.current = null;
+      }
+    } catch (e) {
+      console.warn('回放pending incoming_call失败:', e);
+    }
     
     // 返回取消订阅函数
     return () => {

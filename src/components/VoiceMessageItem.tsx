@@ -203,15 +203,30 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
               }
               setIsDownloading(false);
 
-              // 再次准备音频会话（针对本地文件播放）
-              const audioSession = IOSAudioSession.getInstance();
-              
-              // 如果当前不是播放模式，先重置会话
-              if (audioSession.getCurrentMode() !== 'playback') {
-                await audioSession.reset();
-                await audioSession.prepareForPlayback();
-              } else if (!audioSession.isActive()) {
-                await audioSession.prepareForPlayback();
+              // 🔧 iOS首次使用修复：再次准备音频会话（针对本地文件播放），优先使用初始化管理器
+              try {
+                const IOSInitializationManager = require('../services/IOSInitializationManager').default;
+                const initManager = IOSInitializationManager.getInstance();
+                
+                // 检查初始化管理器是否可用并已准备音频会话
+                if (!initManager.isAudioSessionReady()) {
+                  console.log('🔧 [VoiceMessage] 通过初始化管理器配置播放音频会话...');
+                  await initManager.initializeAudioSessionAfterPermission();
+                  console.log('✅ [VoiceMessage] iOS初始化管理器音频会话配置完成');
+                } else {
+                  console.log('✅ [VoiceMessage] iOS初始化管理器音频会话已就绪');
+                }
+              } catch (managerError) {
+                console.warn('⚠️ [VoiceMessage] 初始化管理器不可用，使用兜底方案:', managerError);
+                
+                // 🛡️ 兜底：直接使用IOSAudioSession
+                const audioSession = IOSAudioSession.getInstance();
+                if (audioSession.getCurrentMode() !== 'playback') {
+                  await audioSession.reset();
+                  await audioSession.prepareForPlayback();
+                } else if (!audioSession.isActive()) {
+                  await audioSession.prepareForPlayback();
+                }
               }
 
               const iosLocalTarget = Platform.OS === 'ios' ? `file://${cachePath}` : cachePath;

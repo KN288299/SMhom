@@ -36,21 +36,33 @@ class IOSCallService {
     }
   }
 
-  // 预初始化音频会话
+  // 🔧 iOS首次使用修复：使用初始化管理器预初始化音频会话
   private async prepareAudioSession(): Promise<void> {
     try {
       console.log('🎵 [IOSCallService] 预初始化iOS音频会话...');
       
-      // 获取音频会话实例
-      const audioSession = IOSAudioSession.getInstance();
-      
-      // 如果还没有激活音频会话，进行预初始化
-      if (!audioSession.isActive()) {
-        // 为语音通话准备音频会话（playAndRecord模式）
-        await audioSession.prepareForRecording();
-        console.log('✅ [IOSCallService] iOS音频会话预初始化完成');
-      } else {
-        console.log('✅ [IOSCallService] iOS音频会话已经激活，跳过预初始化');
+      // 🔧 优先使用iOS初始化管理器，确保与智能初始化策略一致
+      try {
+        const IOSInitializationManager = require('./IOSInitializationManager').default;
+        const initManager = IOSInitializationManager.getInstance();
+        
+        // 通过初始化管理器检查并完成音频会话配置
+        if (!initManager.isAudioSessionReady()) {
+          console.log('🔧 [IOSCallService] 通过初始化管理器配置音频会话...');
+          await initManager.initializeAudioSessionAfterPermission();
+          console.log('✅ [IOSCallService] iOS初始化管理器音频会话配置完成');
+        } else {
+          console.log('✅ [IOSCallService] iOS初始化管理器音频会话已就绪');
+        }
+      } catch (managerError) {
+        console.warn('⚠️ [IOSCallService] 初始化管理器不可用，使用兜底方案:', managerError);
+        
+        // 🛡️ 兜底：直接使用IOSAudioSession
+        const audioSession = IOSAudioSession.getInstance();
+        if (!audioSession.isActive()) {
+          await audioSession.prepareForRecording();
+          console.log('✅ [IOSCallService] 兜底音频会话配置完成');
+        }
       }
     } catch (error) {
       console.warn('⚠️ [IOSCallService] 音频会话预初始化失败（不影响功能）:', error);
@@ -131,8 +143,18 @@ class IOSCallService {
       if (nextAppState === 'active') {
         console.log('🔄 [IOSCallService] 应用激活，执行快速恢复流程');
         
-        // 立即检查并强制重连Socket - 加速版
-        setTimeout(() => this.forceSocketReconnect(), 50);  // 减少到50ms
+        // 🔧 iOS首次使用修复：使用初始化管理器执行快速重连
+        setTimeout(async () => {
+          try {
+            const IOSInitializationManager = require('./IOSInitializationManager').default;
+            await IOSInitializationManager.getInstance().quickReconnect();
+            console.log('✅ [IOSCallService] 初始化管理器快速重连完成');
+          } catch (error) {
+            console.warn('⚠️ [IOSCallService] 初始化管理器快速重连失败，使用原方案:', error);
+            // 兜底：使用原来的强制重连
+            this.forceSocketReconnect();
+          }
+        }, 50);
         
         // 应用回到前台，检查是否有待处理的来电
         setTimeout(() => this.checkPendingCalls(), 100);     // 减少到100ms

@@ -969,29 +969,27 @@ const ChatScreen: React.FC = () => {
           console.log('📶 [ChatScreen] 蜂窝数据切换到WiFi，等待连接稳定后重连Socket');
           
           // 导入网络工具函数
-          import('../utils/iOSNetworkHelper').then(({ waitForWifiStability, forceSocketReconnectAfterNetworkSwitch }) => {
-            // 等待WiFi稳定后强制重连Socket
-            waitForWifiStability(3000, 500).then((isStable) => {
-              if (isStable) {
-                // 获取全局Socket引用并强制重连
-                const socketRef = (global as any).socketRef;
-                if (socketRef) {
-                  console.log('🔄 [ChatScreen] WiFi稳定，强制Socket重连');
-                  forceSocketReconnectAfterNetworkSwitch(socketRef, 500);
-                }
-              } else {
-                console.warn('⚠️ [ChatScreen] WiFi连接不稳定，跳过强制重连');
+          const { waitForWifiStability, forceSocketReconnectAfterNetworkSwitch } = require('../utils/iOSNetworkHelper');
+          // 等待WiFi稳定后强制重连Socket
+          waitForWifiStability(3000, 500).then((isStable: boolean) => {
+            if (isStable) {
+              // 获取全局Socket引用并强制重连
+              const socketRef = (global as any).socketRef;
+              if (socketRef) {
+                console.log('🔄 [ChatScreen] WiFi稳定，强制Socket重连');
+                forceSocketReconnectAfterNetworkSwitch(socketRef, 500);
               }
-            });
+            } else {
+              console.warn('⚠️ [ChatScreen] WiFi连接不稳定，跳过强制重连');
+            }
           });
         } else {
           // 其他网络切换场景的快速重连
           console.log('🔄 [ChatScreen] 其他网络切换，立即尝试Socket重连');
           const socketRef = (global as any).socketRef;
           if (socketRef) {
-            import('../utils/iOSNetworkHelper').then(({ forceSocketReconnectAfterNetworkSwitch }) => {
-              forceSocketReconnectAfterNetworkSwitch(socketRef, 200);
-            });
+            const { forceSocketReconnectAfterNetworkSwitch } = require('../utils/iOSNetworkHelper');
+            forceSocketReconnectAfterNetworkSwitch(socketRef, 200);
           }
         }
       }
@@ -1281,62 +1279,91 @@ const ChatScreen: React.FC = () => {
     setShowImagePreview(false);
   };
   
-  // 确认发送图片
+  // 🔧 第一次媒体发送失败修复：确认发送图片
   const confirmSendImage = async () => {
     if (!selectedImage || !selectedImage.uri || !conversationId) {
       cancelSendImage();
       return;
     }
     
+    // 创建临时消息ID用于本地显示和后续更新
+    const tempMessageId = generateUniqueId();
+    
+    // 立即创建临时消息，提供即时UI反馈
+    const tempMessage: Message = {
+      _id: tempMessageId,
+      senderId: userInfo?._id || '',
+      senderRole: isCustomerService() ? 'customer_service' : 'user',
+      content: '图片消息',
+      timestamp: new Date(),
+      messageType: 'image',
+      imageUrl: selectedImage.uri, // 先使用本地路径
+      isUploading: true,
+      uploadProgress: 0
+    };
+    
+    addMessage(tempMessage);
+    cancelSendImage(); // 立即关闭预览界面
+    
     try {
-      // 创建FormData对象用于上传文件
-      const formData = new FormData();
+      // 🔧 首次发送修复：确保Socket连接已建立
+      console.log('📱 [图片发送] 检查Socket连接状态...');
+      if (!isConnected) {
+        console.log('⚠️ [图片发送] Socket未连接，等待连接建立...');
+        
+        // 尝试触发连接
+        if (socket && socket.disconnected) {
+          socket.connect();
+        }
+        
+        // 等待最多5秒钟连接建立
+        let waitTime = 0;
+        const maxWaitTime = 5000;
+        const checkInterval = 100;
+        
+        while (!isConnected && waitTime < maxWaitTime) {
+          await new Promise(resolve => setTimeout(resolve, checkInterval));
+          waitTime += checkInterval;
+        }
+        
+        if (!isConnected) {
+          throw new Error('网络连接未建立，请检查网络后重试');
+        }
+      }
       
-      // 获取文件扩展名
-      const fileExt = selectedImage.uri.split('.').pop() || 'jpg';
-      const fileName = `image_${Date.now()}.${fileExt}`;
+      console.log('✅ [图片发送] Socket连接已建立，开始上传...');
       
-      // 添加文件到FormData
-      formData.append('image', {
-        uri: Platform.OS === 'android' ? selectedImage.uri : selectedImage.uri.replace('file://', ''),
-        type: selectedImage.type || 'image/jpeg',
-        name: fileName
-      } as any);
+      // 🔧 使用MediaUploadService进行可靠上传
+      const MediaUploadService = require('../services/MediaUploadService').default;
       
-      console.log('开始上传图片...', {
-        uri: selectedImage.uri,
-        type: selectedImage.type,
-        name: fileName,
-        fileSize: selectedImage.fileSize
-      });
-      
-      // 上传图片文件 - 使用server.js中已定义的路由
-      const response = await axios.post(
-        `${BASE_URL}/api/upload/image`,
-        formData,
+      const uploadResult = await MediaUploadService.uploadImage(
+        selectedImage.uri,
         {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            'Authorization': `Bearer ${userToken}`
+          token: userToken,
+          onProgress: (progress: number) => {
+            // 更新上传进度
+            updateMessage(tempMessageId, { 
+              uploadProgress: progress,
+              isUploading: true 
+            });
           },
-          timeout: 30000, // 增加超时时间到30秒
-          onUploadProgress: (progressEvent) => {
-            const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
-            console.log(`上传进度: ${percentCompleted}%`);
-          }
+          maxRetries: 5, // 增加重试次数
+          timeout: 40000, // 40秒超时
+          retryDelay: 2000
         }
       );
       
-      console.log('图片上传成功:', response.data);
+      if (!uploadResult.success) {
+        throw new Error(uploadResult.error || '图片上传失败');
+      }
+      
+      console.log('✅ [图片发送] 图片上传成功:', uploadResult.url);
       
       // 获取上传后的图片URL
-      const imageUrl = response.data.imageUrl;
+      const imageUrl = uploadResult.url;
+      const fullImageUrl = imageUrl?.startsWith('http') ? imageUrl : `${BASE_URL}${imageUrl}`;
       
-      // 确保URL是完整的
-      const fullImageUrl = imageUrl.startsWith('http') ? imageUrl : `${BASE_URL}${imageUrl}`;
-      console.log('完整图片URL:', fullImageUrl);
-      
-      // 通过Socket发送消息
+      // 🔧 确保Socket连接后再发送消息
       const imageMessage = {
         conversationId,
         receiverId: contactId,
@@ -1345,88 +1372,85 @@ const ChatScreen: React.FC = () => {
         imageUrl: imageUrl
       };
       
-      globalSendMessage(imageMessage);
+      // 再次确认Socket连接状态
+      if (isConnected && globalSendMessage) {
+        globalSendMessage(imageMessage);
+        console.log('📡 [图片发送] 已通过Socket发送图片消息');
+      } else {
+        console.warn('⚠️ [图片发送] Socket连接异常，仅通过API保存');
+      }
       
-      // 创建临时消息ID用于本地显示和后续更新
-      const tempMessageId = generateUniqueId();
-      
-      // 添加到本地消息列表 - 修正：使用addMessage函数确保正确排序
-      addMessage({
-        _id: tempMessageId, 
-        senderId: userInfo?._id || '',
-        senderRole: isCustomerService() ? 'customer_service' : 'user',
-        content: '图片消息',
-        timestamp: new Date(),
-        messageType: 'image',
-        imageUrl: fullImageUrl
+      // 更新临时消息为最终状态
+      updateMessage(tempMessageId, {
+        imageUrl: fullImageUrl,
+        isUploading: false,
+        uploadProgress: 100
       });
       
-      // 通过API保存消息以确保持久化
-      axios.post(
-        `${BASE_URL}/api/messages`,
-        {
-          conversationId,
-          content: '图片消息',
-          contentType: 'image',
-          fileUrl: imageUrl,  // 修改这里，使用fileUrl而不是imageUrl，与后端模型保持一致
-          imageUrl: imageUrl  // 保留这个字段以便兼容
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${userToken}`,
-            'Content-Type': 'application/json'
+      // 🔧 通过API保存消息以确保持久化（带重试机制）
+      const saveMessageWithRetry = async (retryCount = 0) => {
+        try {
+          const response = await axios.post(
+            `${BASE_URL}/api/messages`,
+            {
+              conversationId,
+              content: '图片消息',
+              contentType: 'image',
+              fileUrl: imageUrl,
+              imageUrl: imageUrl
+            },
+            {
+              headers: {
+                'Authorization': `Bearer ${userToken}`,
+                'Content-Type': 'application/json'
+              },
+              timeout: 10000
+            }
+          );
+          
+          // 更新临时消息ID为服务器返回的ID
+          if (response.data && response.data._id) {
+            updateMessage(tempMessageId, { _id: response.data._id });
+          }
+          
+          console.log('✅ [图片发送] 消息已保存到数据库');
+        } catch (error: any) {
+          console.error('❌ [图片发送] API保存失败:', error);
+          
+          // 重试逻辑
+          if (retryCount < 3 && (error.code === 'ECONNABORTED' || error.code === 'NETWORK_ERROR')) {
+            console.log(`🔄 [图片发送] API保存重试 ${retryCount + 1}/3`);
+            setTimeout(() => saveMessageWithRetry(retryCount + 1), Math.pow(2, retryCount) * 1000);
+          } else {
+            // 标记为发送失败但保留本地消息
+            updateMessage(tempMessageId, { 
+              content: '图片消息 (发送失败，点击重试)',
+              isUploading: false 
+            });
           }
         }
-      ).then(response => {
-        // 调试日志已清理 - 图片消息已通过API保存
-        
-        // 可选：更新临时消息ID为服务器返回的ID
-        if (response.data && response.data._id) {
-          updateMessage(tempMessageId, { _id: response.data._id });
-        }
-      }).catch(error => {
-        console.error('通过API保存图片消息失败:', error);
-      });
+      };
       
-      // 清理状态
-      cancelSendImage();
+      saveMessageWithRetry();
       
     } catch (error: any) {
-      console.error('发送图片失败:', error);
+      console.error('❌ [图片发送] 发送失败:', error);
       
-      // 更详细的错误信息
-      if (error.response) {
-        // 服务器返回了错误状态码
-        console.error('服务器响应错误:', {
-          status: error.response.status,
-          data: error.response.data
-        });
-        Alert.alert('发送失败', `服务器返回错误: ${error.response.status} - ${JSON.stringify(error.response.data)}`);
-      } else if (error.request) {
-        // 请求已发出，但没有收到响应
-        console.error('无响应错误:', error.request);
-        Alert.alert('发送失败', '服务器没有响应，请检查网络连接');
+      // 更新临时消息为失败状态
+      updateMessage(tempMessageId, { 
+        content: `图片消息 (发送失败: ${error.message})`,
+        isUploading: false,
+        uploadProgress: 0
+      });
+      
+      // 显示友好的错误提示
+      if (error.message.includes('网络连接未建立')) {
+        showToast('网络连接异常，请检查网络后重试');
+      } else if (error.message.includes('上传失败')) {
+        showToast('图片上传失败，请重试');
       } else {
-        // 设置请求时发生错误
-        console.error('请求错误:', error.message);
-        Alert.alert('发送失败', `请求错误: ${error.message}`);
+        showToast(`发送失败: ${error.message}`);
       }
-      
-      // 尝试使用本地图片路径作为备用
-      if (selectedImage && selectedImage.uri) {
-        console.log('使用本地图片作为备用');
-        addMessage({
-          _id: generateUniqueId(), // 使用兼容的ID生成函数
-          senderId: userInfo?._id || '',
-          senderRole: isCustomerService() ? 'customer_service' : 'user',
-          content: '图片消息 (仅本地)',
-          timestamp: new Date(),
-          messageType: 'image',
-          imageUrl: selectedImage.uri
-        });
-      }
-      
-      cancelSendImage();
     }
   };
   
@@ -1436,36 +1460,62 @@ const ChatScreen: React.FC = () => {
     setShowVideoPreview(false);
   };
   
-  // 确认发送视频
+  // 🔧 第一次媒体发送失败修复：确认发送视频
   const confirmSendVideo = async () => {
-    try {
-      if (!selectedVideo || !selectedVideoUri) {
-        // 关闭预览界面
-        setShowVideoPreview(false);
+    if (!selectedVideo || !selectedVideoUri) {
+      setShowVideoPreview(false);
       return;
     }
       
-      // 立即关闭预览界面，避免用户等待上传
-      setShowVideoPreview(false);
-      
-      // 创建临时ID用于本地显示和后续更新
-      const tempMessageId = generateUniqueId();
+    // 立即关闭预览界面，避免用户等待上传
+    setShowVideoPreview(false);
     
-      // 创建新消息对象
-      const newMessage: Message = {
-        _id: tempMessageId,
-        senderId: userInfo?._id || '',
-        content: '',
-        timestamp: new Date(),
-        messageType: 'video',
-        videoUrl: selectedVideoUri,
-        // iOS 自发视频保留本地路径，供预览/播放回退
-        localFileUri: Platform.OS === 'ios' ? selectedVideoUri : undefined,
-        isUploading: true,
-        uploadProgress: 0
-      };
+    // 创建临时ID用于本地显示和后续更新
+    const tempMessageId = generateUniqueId();
+
+    // 创建新消息对象
+    const newMessage: Message = {
+      _id: tempMessageId,
+      senderId: userInfo?._id || '',
+      senderRole: isCustomerService() ? 'customer_service' : 'user',
+      content: '视频消息',
+      timestamp: new Date(),
+      messageType: 'video',
+      videoUrl: selectedVideoUri,
+      localFileUri: Platform.OS === 'ios' ? selectedVideoUri : undefined,
+      isUploading: true,
+      uploadProgress: 0
+    };
+    
+    addMessage(newMessage);
+    
+    try {
+      // 🔧 首次发送修复：确保Socket连接已建立
+      console.log('📱 [视频发送] 检查Socket连接状态...');
+      if (!isConnected) {
+        console.log('⚠️ [视频发送] Socket未连接，等待连接建立...');
+        
+        // 尝试触发连接
+        if (socket && socket.disconnected) {
+          socket.connect();
+        }
+        
+        // 等待最多5秒钟连接建立
+        let waitTime = 0;
+        const maxWaitTime = 5000;
+        const checkInterval = 100;
+        
+        while (!isConnected && waitTime < maxWaitTime) {
+          await new Promise(resolve => setTimeout(resolve, checkInterval));
+          waitTime += checkInterval;
+        }
+        
+        if (!isConnected) {
+          throw new Error('网络连接未建立，请检查网络后重试');
+        }
+      }
       
-      addMessage(newMessage);
+      console.log('✅ [视频发送] Socket连接已建立，开始上传...');
       
       // 计算视频时长（如果可用）
       let videoDuration = '未知';
@@ -1476,231 +1526,143 @@ const ChatScreen: React.FC = () => {
         videoDuration = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
       }
       
-      // 获取视频宽高
-      let videoWidth = 0;
-      let videoHeight = 0;
-      let aspectRatio = 16/9; // 默认宽高比
-      
-      try {
-        if (selectedVideo.width && selectedVideo.height) {
-          videoWidth = selectedVideo.width;
-          videoHeight = selectedVideo.height;
-          aspectRatio = videoWidth / videoHeight;
-        }
-      } catch (error) {
-        console.log('无法获取视频尺寸:', error);
-      }
-      
-      // 创建FormData对象用于上传
-      const formData = new FormData();
-      
-      // 生成文件名
-      const fileName = `chat-video-${Date.now()}.${selectedVideo.type?.split('/')[1] || 'mp4'}`;
-      
-      // 添加文件到FormData，增强对不同平台的兼容性
-      // 处理不同平台的文件URL格式和类型
-      // iOS: 保持原始scheme（包含 file://、ph://、assets-library://）以供缩略图/预览使用;
-      // 但在FormData中，iOS部分库要求去掉file://。这里只在明确是file://时去掉前缀，其它scheme原样保留
-      let fileUri = selectedVideoUri || '';
-      if (Platform.OS === 'ios') {
-        if (fileUri.startsWith('file://')) {
-          fileUri = fileUri.replace('file://', '');
-        }
-      }
-        
-      console.log('准备上传视频文件:', {
-        uri: fileUri,
-        type: selectedVideo.type || 'video/mp4',
-        name: fileName,
-        size: selectedVideo.fileSize
+      console.log('📹 [视频发送] 视频信息:', {
+        uri: selectedVideoUri,
+        duration: videoDuration,
+        width: selectedVideo.width || 0,
+        height: selectedVideo.height || 0,
+        fileSize: selectedVideo.fileSize
       });
       
-      formData.append('video', {
-        uri: fileUri,
-        type: selectedVideo.type || 'video/mp4',
-        name: fileName
-      } as any);
+      // 🔧 使用MediaUploadService进行可靠上传
+      const MediaUploadService = require('../services/MediaUploadService').default;
       
-      console.log('开始上传视频...', {
-        uri: selectedVideoUri || 'unknown',
-        type: selectedVideo.type,
-        name: fileName,
-        fileSize: selectedVideo.fileSize,
-      });
-      
-      // 上传视频文件 - 使用server.js中已定义的路由
-      // 添加重试机制
-      let retries = 3;
-      let response: any = null;
-      
-      while (retries > 0) {
-        try {
-          console.log(`尝试上传视频，剩余尝试次数: ${retries}`);
-          response = await axios.post(
-        `${BASE_URL}/api/upload/video`,
-        formData,
+      const uploadResult = await MediaUploadService.uploadVideo(
+        selectedVideoUri,
         {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            'Authorization': `Bearer ${userToken}`
-          },
-              timeout: 90000, // 增加超时时间到90秒
-          onUploadProgress: (progressEvent) => {
-            const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
-            console.log(`上传进度: ${percentCompleted}%`);
-            
+          token: userToken,
+          onProgress: (progress: number) => {
             // 更新上传进度
-            setMessages(prev => prev.map(msg => 
-                  msg._id === tempMessageId 
-                ? {...msg, uploadProgress: percentCompleted} 
-                : msg
-            ));
-          }
+            updateMessage(tempMessageId, { 
+              uploadProgress: progress,
+              isUploading: true 
+            });
+          },
+          maxRetries: 5,
+          timeout: 600000, // 10分钟超时，支持大视频文件
+          retryDelay: 5000
         }
       );
-          // 成功，跳出循环
-          break;
-        } catch (error: any) {
-          retries--;
-          if (retries === 0) {
-            // 全部尝试都失败，抛出错误
-            throw error;
-          }
-          console.warn(`视频上传失败，将在2秒后重试. 错误:`, error.message);
-          // 等待2秒再重试
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
+      
+      if (!uploadResult.success) {
+        throw new Error(uploadResult.error || '视频上传失败');
       }
       
-      if (!response || !response.data) {
-        throw new Error('上传视频失败：服务器返回空响应');
-      }
-      
-      console.log('视频上传成功:', response.data);
+      console.log('✅ [视频发送] 视频上传成功:', uploadResult.url);
       
       // 获取上传后的视频URL
-      const videoUrl = response.data.videoUrl;
+      const videoUrl = uploadResult.url;
+      const fullVideoUrl = videoUrl?.startsWith('http') ? videoUrl : `${BASE_URL}${videoUrl}`;
       
-      // 确保URL是完整的
-      const fullVideoUrl = videoUrl.startsWith('http') ? videoUrl : `${BASE_URL}${videoUrl}`;
-      console.log('完整视频URL:', fullVideoUrl);
-      
-      // 移除临时消息
-      setMessages(prev => prev.filter(msg => msg._id !== tempMessageId));
-      
-      // 通过Socket发送消息
+      // 🔧 确保Socket连接后再发送消息
       const videoMessage = {
         conversationId,
         receiverId: contactId,
         content: '视频消息',
         messageType: 'video',
-        videoUrl: fullVideoUrl, // 使用完整URL确保接收方能正确生成预览图
-        videoDuration,
-        videoWidth,
-        videoHeight,
-        aspectRatio
+        videoUrl: videoUrl,
+        videoDuration: videoDuration
       };
       
-      globalSendMessage(videoMessage);
+      // 再次确认Socket连接状态
+      if (isConnected && globalSendMessage) {
+        globalSendMessage(videoMessage);
+        console.log('📡 [视频发送] 已通过Socket发送视频消息');
+      } else {
+        console.warn('⚠️ [视频发送] Socket连接异常，仅通过API保存');
+      }
       
-      // 添加到本地消息列表
-      const videoMessageId = generateUniqueId(); // 这里会被API成功调用后更新
-      addMessage({
-        _id: videoMessageId,
-        senderId: userInfo?._id || '',
-        senderRole: isCustomerService() ? 'customer_service' : 'user',
-        content: '视频消息',
-        timestamp: new Date(),
-        messageType: 'video',
+      // 更新临时消息为最终状态
+      updateMessage(tempMessageId, {
         videoUrl: fullVideoUrl,
-        videoDuration,
-        videoWidth,
-        videoHeight,
-        aspectRatio,
-        // iOS: 保留本地文件路径，确保自己发送的视频可以正常显示缩略图和播放
-        localFileUri: Platform.OS === 'ios' ? selectedVideoUri : undefined
+        videoDuration: videoDuration,
+        isUploading: false,
+        uploadProgress: 100
       });
       
-      // 通过API保存消息以确保持久化
-      axios.post(
-        `${BASE_URL}/api/messages`,
-        {
-          conversationId,
-          content: '视频消息',
-          contentType: 'video',
-          fileUrl: videoUrl,  // 使用相对路径保存到数据库
-          videoDuration,
-          videoWidth,
-          videoHeight,
-          aspectRatio
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${userToken}`
+      // 🔧 通过API保存消息以确保持久化（带重试机制）
+      const saveVideoMessageWithRetry = async (retryCount = 0) => {
+        try {
+          const response = await axios.post(
+            `${BASE_URL}/api/messages`,
+            {
+              conversationId,
+              content: '视频消息',
+              contentType: 'video',
+              fileUrl: videoUrl,
+              videoUrl: videoUrl,
+              videoDuration: videoDuration
+            },
+            {
+              headers: {
+                'Authorization': `Bearer ${userToken}`,
+                'Content-Type': 'application/json'
+              },
+              timeout: 10000
+            }
+          );
+          
+          // 更新临时消息ID为服务器返回的ID
+          if (response.data && response.data._id) {
+            updateMessage(tempMessageId, { _id: response.data._id });
+          }
+          
+          console.log('✅ [视频发送] 消息已保存到数据库');
+        } catch (error: any) {
+          console.error('❌ [视频发送] API保存失败:', error);
+          
+          // 重试逻辑
+          if (retryCount < 3 && (error.code === 'ECONNABORTED' || error.code === 'NETWORK_ERROR')) {
+            console.log(`🔄 [视频发送] API保存重试 ${retryCount + 1}/3`);
+            setTimeout(() => saveVideoMessageWithRetry(retryCount + 1), Math.pow(2, retryCount) * 1000);
+          } else {
+            // 标记为发送失败但保留本地消息
+            updateMessage(tempMessageId, { 
+              content: '视频消息 (发送失败，点击重试)',
+              isUploading: false 
+            });
           }
         }
-      )
-      .then(response => {
-        console.log('视频消息已保存到数据库', response.data);
-        // 更新临时消息ID为服务器返回的ID
-        if (response.data && response.data._id) {
-          updateMessage(videoMessageId, { _id: response.data._id });
-        }
-      })
-      .catch(error => {
-        console.error('保存视频消息失败:', error.response?.data || error.message);
-      });
+      };
+      
+      saveVideoMessageWithRetry();
       
       // 清理状态
       setSelectedVideo(null);
+      setSelectedVideoUri(null);
       
     } catch (error: any) {
-      console.error('发送视频失败:', error);
+      console.error('❌ [视频发送] 发送失败:', error);
       
-      // 更详细的错误信息
-      if (error.response) {
-        // 服务器返回了错误状态码
-        console.error('服务器响应错误:', {
-          status: error.response.status,
-          data: error.response.data
-        });
-        Alert.alert('发送失败', `服务器返回错误: ${error.response.status} - ${JSON.stringify(error.response.data)}`);
-      } else if (error.request) {
-        // 请求已发出，但没有收到响应
-        console.error('无响应错误:', error.request);
-        Alert.alert('发送失败', '服务器没有响应，请检查网络连接');
+      // 更新临时消息为失败状态
+      updateMessage(tempMessageId, { 
+        content: `视频消息 (发送失败: ${error.message})`,
+        isUploading: false,
+        uploadProgress: 0
+      });
+      
+      // 显示友好的错误提示
+      if (error.message.includes('网络连接未建立')) {
+        showToast('网络连接异常，请检查网络后重试');
+      } else if (error.message.includes('上传失败')) {
+        showToast('视频上传失败，请重试');
       } else {
-        // 设置请求时发生错误
-        console.error('请求错误:', error.message);
-        Alert.alert('发送失败', `请求错误: ${error.message}`);
+        showToast(`发送失败: ${error.message}`);
       }
       
-      // 尝试使用本地视频路径作为备用
-      if (selectedVideo && selectedVideoUri) {
-        console.log('使用本地视频作为备用');
-        addMessage({
-          _id: generateUniqueId(), // 使用兼容的ID生成函数
-          senderId: userInfo?._id || '',
-          senderRole: isCustomerService() ? 'customer_service' : 'user',
-          content: '视频消息 (仅本地)',
-          timestamp: new Date(),
-          messageType: 'video',
-          videoUrl: selectedVideoUri,
-          videoDuration: selectedVideo.duration ? Math.round(selectedVideo.duration) + '秒' : '未知',
-          videoWidth: selectedVideo?.width || 0,
-          videoHeight: selectedVideo?.height || 0,
-          aspectRatio: selectedVideo?.width && selectedVideo?.height 
-            ? selectedVideo.width / selectedVideo.height 
-            : 1.78,
-          // iOS: 保留本地文件路径，确保失败情况下也能正常显示
-          localFileUri: Platform.OS === 'ios' ? selectedVideoUri : undefined
-        });
-      }
-    } finally {
-      // 无论成功还是失败，都关闭上传状态和预览界面
-      setIsUploading(false);
+      // 清理状态
       setSelectedVideo(null);
-      setShowVideoPreview(false);
+      setSelectedVideoUri(null);
     }
   };
 

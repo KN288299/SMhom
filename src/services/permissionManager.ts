@@ -299,7 +299,7 @@ export const requestMicrophonePermission = async (): Promise<boolean> => {
   }
 };
 
-// 确保麦克风权限已获取（检查+请求）
+// 🔧 iOS首次使用修复：确保麦克风权限已获取（检查+请求），并通知初始化管理器
 export const ensureMicrophonePermission = async (): Promise<boolean> => {
   try {
     // 先检查当前状态
@@ -309,6 +309,18 @@ export const ensureMicrophonePermission = async (): Promise<boolean> => {
     if (!hasPermission) {
       console.log('📱 [PermissionManager] 麦克风权限未授权，尝试请求...');
       hasPermission = await requestMicrophonePermission();
+      
+      // 🍎 iOS特殊处理：权限获取成功后，通知初始化管理器完成音频会话设置
+      if (hasPermission && Platform.OS === 'ios') {
+        try {
+          console.log('🔧 [PermissionManager] iOS麦克风权限获取成功，通知初始化管理器...');
+          const IOSInitializationManager = require('./IOSInitializationManager').default;
+          await IOSInitializationManager.getInstance().initializeAudioSessionAfterPermission();
+          console.log('✅ [PermissionManager] iOS初始化管理器音频会话配置完成');
+        } catch (audioError) {
+          console.warn('⚠️ [PermissionManager] iOS权限后音频会话配置失败（不影响基本功能）:', audioError);
+        }
+      }
     }
     
     return hasPermission;

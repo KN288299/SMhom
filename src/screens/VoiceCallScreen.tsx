@@ -349,21 +349,25 @@ const VoiceCallScreen: React.FC = () => {
           AudioManager.setSpeakerOn(false);
           setIsSpeakerOn(false);
           
-          // 🔧 iOS音频会话修复：悬浮窗恢复时也需要确保音频会话正确配置
+          // 🔧 iOS首次使用修复：悬浮窗恢复时使用初始化管理器确保音频会话正确配置
           if (Platform.OS === 'ios') {
             try {
-              console.log('🍎 [VoiceCall] 悬浮窗恢复，检查iOS音频会话状态...');
-              const audioSession = IOSAudioSession.getInstance();
-              
-              // 如果音频会话未激活，重新配置
-              if (!audioSession.isActive()) {
-                await audioSession.prepareForRecording();
-                console.log('✅ [VoiceCall] 悬浮窗恢复，iOS音频会话重新配置完成');
-              } else {
-                console.log('✅ [VoiceCall] 悬浮窗恢复，iOS音频会话已激活');
-              }
+              console.log('🍎 [VoiceCall] 悬浮窗恢复，使用初始化管理器检查音频会话...');
+              const IOSInitializationManager = require('../services/IOSInitializationManager').default;
+              await IOSInitializationManager.getInstance().initializeAudioSessionAfterPermission();
+              console.log('✅ [VoiceCall] 悬浮窗恢复，初始化管理器音频会话配置完成');
             } catch (audioError) {
-              console.warn('⚠️ [VoiceCall] 悬浮窗恢复时iOS音频会话配置失败:', audioError);
+              console.warn('⚠️ [VoiceCall] 悬浮窗恢复时初始化管理器配置失败，使用原方案:', audioError);
+              // 兜底：使用原来的音频会话逻辑
+              try {
+                const audioSession = IOSAudioSession.getInstance();
+                if (!audioSession.isActive()) {
+                  await audioSession.prepareForRecording();
+                  console.log('✅ [VoiceCall] 悬浮窗恢复，原方案音频会话配置完成');
+                }
+              } catch (fallbackError) {
+                console.warn('⚠️ [VoiceCall] 悬浮窗恢复时原方案也失败:', fallbackError);
+              }
             }
           }
           
@@ -399,19 +403,27 @@ const VoiceCallScreen: React.FC = () => {
         AudioManager.setSpeakerOn(false);
         setIsSpeakerOn(false);
         
-        // 🔧 iOS音频会话初始化修复：在权限获取后立即准备音频会话
+        // 🔧 iOS首次使用修复：权限获取后使用初始化管理器完成音频会话设置
         if (Platform.OS === 'ios') {
           try {
-            console.log('🍎 [VoiceCall] 权限获取成功，开始准备iOS音频会话...');
-            const audioSession = IOSAudioSession.getInstance();
+            console.log('🍎 [VoiceCall] 权限获取成功，使用初始化管理器完成音频会话设置...');
             
-            // 重置并重新配置音频会话，确保正确的初始化顺序
-            await audioSession.reset();
-            await audioSession.prepareForRecording();
+            const IOSInitializationManager = require('../services/IOSInitializationManager').default;
+            await IOSInitializationManager.getInstance().initializeAudioSessionAfterPermission();
             
-            console.log('✅ [VoiceCall] iOS音频会话准备完成');
+            console.log('✅ [VoiceCall] iOS初始化管理器音频会话设置完成');
           } catch (audioError) {
-            console.warn('⚠️ [VoiceCall] iOS音频会话准备失败（不影响后续流程）:', audioError);
+            console.warn('⚠️ [VoiceCall] iOS初始化管理器音频会话设置失败，使用兜底方案:', audioError);
+            
+            // 兜底方案：直接初始化音频会话
+            try {
+              const audioSession = IOSAudioSession.getInstance();
+              await audioSession.reset();
+              await audioSession.prepareForRecording();
+              console.log('✅ [VoiceCall] 兜底音频会话初始化完成');
+            } catch (fallbackError) {
+              console.warn('⚠️ [VoiceCall] 兜底音频会话初始化也失败（不影响后续流程）:', fallbackError);
+            }
           }
         }
         
