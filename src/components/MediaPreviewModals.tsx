@@ -29,11 +29,11 @@ interface MediaPreviewModalsProps {
   onCancelImage: () => void;
   onConfirmImage: () => void;
   
-  // 视频预览相关
-  showVideoPreview: boolean;
-  selectedVideo: any | null;
-  onCancelVideo: () => void;
-  onConfirmVideo: () => void;
+  // 视频预览相关 - 已废弃，视频现在直接发送
+  showVideoPreview?: boolean;
+  selectedVideo?: any | null;
+  onCancelVideo?: () => void;
+  onConfirmVideo?: () => void;
 }
 
 const MediaPreviewModals: React.FC<MediaPreviewModalsProps> = ({
@@ -52,11 +52,11 @@ const MediaPreviewModals: React.FC<MediaPreviewModalsProps> = ({
   onCancelImage,
   onConfirmImage,
   
-  // 视频预览相关
-  showVideoPreview,
-  selectedVideo,
-  onCancelVideo,
-  onConfirmVideo,
+  // 视频预览相关 - 已废弃，视频现在直接发送
+  showVideoPreview = false,
+  selectedVideo = null,
+  onCancelVideo = () => {},
+  onConfirmVideo = () => {},
 }) => {
   return (
     <>
@@ -150,7 +150,8 @@ const MediaPreviewModals: React.FC<MediaPreviewModalsProps> = ({
         </View>
       </Modal>
       
-      {/* 视频预览模态框 */}
+      {/* 视频预览模态框 - 已移除，视频现在直接发送 */}
+      {/* 
       <Modal
         visible={showVideoPreview}
         transparent
@@ -207,6 +208,7 @@ const MediaPreviewModals: React.FC<MediaPreviewModalsProps> = ({
           </View>
         </View>
       </Modal>
+      */}
     </>
   );
 };
