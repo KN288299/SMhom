@@ -251,6 +251,13 @@ class IOSInitializationManager {
   }
 
   /**
+   * 🎵 检查音频会话是否就绪
+   */
+  isAudioSessionReady(): boolean {
+    return this.initStatus.audioSessionReady;
+  }
+
+  /**
    * 🔄 重置初始化状态（用于调试）
    */
   reset(): void {

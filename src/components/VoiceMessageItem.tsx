@@ -97,6 +97,26 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
           AudioCompatibility.logCompatibilityIssue(fullAudioUrl, '格式兼容性警告');
         }
         
+        // 🔧 iOS播放MP3特殊处理：确保音频会话针对MP3优化
+        if (Platform.OS === 'ios' && compatInfo.sourceFormat === 'mp3') {
+          console.log('🎵 iOS播放MP3格式语音，进行特殊优化...');
+          try {
+            const audioSession = IOSAudioSession.getInstance();
+            // 重置音频会话确保清理状态
+            await audioSession.reset();
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // 针对MP3播放的音频会话配置
+            await audioSession.prepareForPlayback('mp3');
+            console.log('✅ iOS MP3播放音频会话配置完成');
+            
+            // 额外等待确保音频会话稳定
+            await new Promise(resolve => setTimeout(resolve, 200));
+          } catch (mp3SessionError) {
+            console.warn('⚠️ iOS MP3音频会话配置失败，继续尝试播放:', mp3SessionError);
+          }
+        }
+        
         console.log('开始播放语音:', fullAudioUrl);
         setIsPlaying(true);
         
@@ -110,7 +130,7 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
             await audioSession.reset();
             await new Promise(resolve => setTimeout(resolve, 100));
             console.log('🔊 配置iOS播放音频会话...');
-            await audioSession.prepareForPlayback();
+            await audioSession.prepareForPlayback(compatInfo.sourceFormat);
             await new Promise(resolve => setTimeout(resolve, 200));
             // 配置播放器订阅
             try {
@@ -122,16 +142,27 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
             console.log('✅ iOS音频播放环境准备完成');
           }
 
-          // iOS 优化：远程URL优先走本地缓存 + file:// 播放，避免“播放成功但无声”
+          // iOS 优化：远程URL优先走本地缓存 + file:// 播放，避免"播放成功但无声"
           let playTarget = fullAudioUrl;
           if (Platform.OS === 'ios' && fullAudioUrl.startsWith('http')) {
             try {
-              const rawName = fullAudioUrl.split('?')[0].split('/').pop() || `voice_${Date.now()}.m4a`;
-              const cachePath = `${RNFS.DocumentDirectoryPath}/${rawName}`;
+              // 🔧 修复：正确保留原始文件扩展名，避免格式错误
+              const urlParts = fullAudioUrl.split('?')[0].split('/');
+              const originalFileName = urlParts.pop() || `voice_${Date.now()}.mp3`;
+              
+              // 确保使用正确的文件扩展名（特别是Android的MP3文件）
+              let fileName = originalFileName;
+              if (!fileName.includes('.')) {
+                // 如果没有扩展名，根据URL判断格式
+                fileName = fullAudioUrl.toLowerCase().includes('mp3') ? `${fileName}.mp3` : `${fileName}.m4a`;
+              }
+              
+              const cachePath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
               const exists = await RNFS.exists(cachePath);
               if (!exists) {
-                console.log('📥 iOS缓存远程语音到本地:', cachePath);
+                console.log('📥 iOS缓存远程语音到本地 (保留原格式):', cachePath);
                 await RNFS.downloadFile({ fromUrl: fullAudioUrl, toFile: cachePath, discretionary: true, cacheable: true }).promise;
+                console.log('✅ 文件下载完成，格式:', fileName.split('.').pop());
               }
               setLocalCachedPath(cachePath);
               // iOS 本地文件使用 file:// 前缀
@@ -178,9 +209,18 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
           if (Platform.OS === 'ios' && fullAudioUrl.startsWith('http')) {
             try {
               console.log('🔄 iOS播放失败，尝试本地缓存方案...');
-              const rawName = fullAudioUrl.split('?')[0].split('/').pop() || `voice_${Date.now()}.m4a`;
+              // 🔧 修复：正确保留原始文件扩展名
+              const urlParts = fullAudioUrl.split('?')[0].split('/');
+              const originalFileName = urlParts.pop() || `voice_${Date.now()}.mp3`;
+              
+              // 确保使用正确的文件扩展名（特别是Android的MP3文件）
+              let fileName = originalFileName;
+              if (!fileName.includes('.')) {
+                fileName = fullAudioUrl.toLowerCase().includes('mp3') ? `${fileName}.mp3` : `${fileName}.m4a`;
+              }
+              
               // iOS使用DocumentDirectory而不是CachesDirectory，权限更稳定
-              const cachePath = `${RNFS.DocumentDirectoryPath}/${rawName}`;
+              const cachePath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
 
               if (!localCachedPath || localCachedPath !== cachePath || !(await RNFS.exists(cachePath))) {
                 console.log('📥 iOS下载语音到本地缓存:', cachePath);
@@ -221,11 +261,13 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
                 
                 // 🛡️ 兜底：直接使用IOSAudioSession
                 const audioSession = IOSAudioSession.getInstance();
+                // 获取音频格式用于优化
+                const fileFormat = fileName.split('.').pop()?.toLowerCase() || 'unknown';
                 if (audioSession.getCurrentMode() !== 'playback') {
                   await audioSession.reset();
-                  await audioSession.prepareForPlayback();
+                  await audioSession.prepareForPlayback(fileFormat);
                 } else if (!audioSession.isActive()) {
-                  await audioSession.prepareForPlayback();
+                  await audioSession.prepareForPlayback(fileFormat);
                 }
               }
 

@@ -167,6 +167,8 @@ class AudioCompatibility {
     
     if (Platform.OS === 'ios' && compatInfo.sourceFormat === 'mp3') {
       tips.push('iOS设备播放MP3时建议检查音频会话配置');
+      tips.push('建议使用本地缓存播放以提高兼容性');
+      tips.push('确保音频会话设置为外放模式');
     }
     
     if (Platform.OS === 'android' && compatInfo.sourceFormat === 'm4a') {

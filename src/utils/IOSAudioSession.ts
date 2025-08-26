@@ -79,14 +79,15 @@ class IOSAudioSession {
   /**
    * 准备音频播放会话
    * 确保iOS能够正常播放音频
+   * @param audioFormat 可选的音频格式，用于特殊优化
    */
-  public async prepareForPlayback(): Promise<void> {
+  public async prepareForPlayback(audioFormat?: string): Promise<void> {
     if (Platform.OS !== 'ios') {
       return;
     }
 
     try {
-      console.log('🎵 准备iOS音频播放会话...');
+      console.log('🎵 准备iOS音频播放会话...', audioFormat ? `(格式: ${audioFormat})` : '');
       
       // 导入AudioRecorderPlayer
       const AudioRecorderPlayer = require('react-native-audio-recorder-player').default;
@@ -100,14 +101,25 @@ class IOSAudioSession {
         // 使用原生模块设置音频会话类别为播放
         const { NativeModules } = require('react-native');
         if (NativeModules.AudioRecorderPlayerModule) {
-          // 设置音频会话类别为播放和录制，允许与其他应用混音
-          await NativeModules.AudioRecorderPlayerModule.setAudioSessionCategory('playAndRecord', {
+          // 根据音频格式调整配置
+          const baseOptions = {
             allowBluetooth: true,
             allowBluetoothA2DP: true,
             allowAirPlay: true,
-            // 确保语音消息默认走外放，避免“能播放但听不到”的问题
+            // 确保语音消息默认走外放，避免"能播放但听不到"的问题
             defaultToSpeaker: true
-          });
+          };
+          
+          // 🔧 MP3格式特殊优化
+          if (audioFormat === 'mp3') {
+            console.log('🎵 配置iOS音频会话以优化MP3播放...');
+            // MP3可能需要更兼容的音频会话设置
+            baseOptions.defaultToSpeaker = true; // 强制外放
+            baseOptions.allowBluetooth = false; // 暂时禁用蓝牙避免兼容问题
+          }
+          
+          // 设置音频会话类别为播放和录制，允许与其他应用混音
+          await NativeModules.AudioRecorderPlayerModule.setAudioSessionCategory('playAndRecord', baseOptions);
           console.log('✅ iOS音频会话类别已设置为播放模式');
         }
       } catch (categoryError) {
@@ -125,7 +137,9 @@ class IOSAudioSession {
       }
       
       // 4. 短暂等待确保音频会话完全激活
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // MP3格式可能需要更长的等待时间
+      const waitTime = audioFormat === 'mp3' ? 300 : 200;
+      await new Promise(resolve => setTimeout(resolve, waitTime));
       
       this.isSessionActive = true;
       this.currentMode = 'playback';

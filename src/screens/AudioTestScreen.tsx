@@ -243,7 +243,9 @@ const AudioTestScreen: React.FC = () => {
           if (session.getCurrentMode() !== 'playback') {
             await session.reset();
           }
-          await session.prepareForPlayback();
+          // 检测音频格式并优化播放
+          const audioFormat = audioPath.split('.').pop()?.toLowerCase() || 'unknown';
+          await session.prepareForPlayback(audioFormat);
           try { await audioRecorderPlayerRef.current.setSubscriptionDuration(0.1); } catch {}
         } catch (iosPlayErr) {
           console.warn('iOS播放会话准备失败，继续尝试:', iosPlayErr);

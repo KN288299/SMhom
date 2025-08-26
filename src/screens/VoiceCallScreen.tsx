@@ -403,26 +403,39 @@ const VoiceCallScreen: React.FC = () => {
         AudioManager.setSpeakerOn(false);
         setIsSpeakerOn(false);
         
-        // 🔧 iOS首次使用修复：权限获取后使用初始化管理器完成音频会话设置
+        // 🔧 iOS首次使用修复：权限获取后确保音频系统完全就绪
         if (Platform.OS === 'ios') {
           try {
-            console.log('🍎 [VoiceCall] 权限获取成功，使用初始化管理器完成音频会话设置...');
+            console.log('🍎 [VoiceCall] 权限获取成功，确保iOS音频系统完全就绪...');
             
+            // 1. 使用初始化管理器配置音频会话
             const IOSInitializationManager = require('../services/IOSInitializationManager').default;
             await IOSInitializationManager.getInstance().initializeAudioSessionAfterPermission();
             
-            console.log('✅ [VoiceCall] iOS初始化管理器音频会话设置完成');
-          } catch (audioError) {
-            console.warn('⚠️ [VoiceCall] iOS初始化管理器音频会话设置失败，使用兜底方案:', audioError);
+            // 2. 额外确保IOSAudioSession状态
+            const audioSession = IOSAudioSession.getInstance();
+            if (!audioSession.isActive()) {
+              await audioSession.reset();
+              await audioSession.prepareForRecording();
+            }
             
-            // 兜底方案：直接初始化音频会话
+            // 3. 关键延迟：确保音频系统完全稳定
+            console.log('⏱️ [VoiceCall] 等待iOS音频系统稳定...');
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            console.log('✅ [VoiceCall] iOS音频系统完全就绪');
+          } catch (audioError) {
+            console.warn('⚠️ [VoiceCall] iOS音频系统配置失败，使用兜底方案:', audioError);
+            
+            // 兜底方案：基础音频会话配置
             try {
               const audioSession = IOSAudioSession.getInstance();
               await audioSession.reset();
               await audioSession.prepareForRecording();
-              console.log('✅ [VoiceCall] 兜底音频会话初始化完成');
+              await new Promise(resolve => setTimeout(resolve, 200));
+              console.log('✅ [VoiceCall] 兜底音频会话配置完成');
             } catch (fallbackError) {
-              console.warn('⚠️ [VoiceCall] 兜底音频会话初始化也失败（不影响后续流程）:', fallbackError);
+              console.warn('⚠️ [VoiceCall] 兜底音频会话配置失败（继续流程）:', fallbackError);
             }
           }
         }
@@ -902,6 +915,50 @@ const VoiceCallScreen: React.FC = () => {
 
       console.log('正在初始化WebRTC...');
       
+      // 🔧 iOS首次使用修复：确保音频系统完全就绪后再初始化WebRTC
+      if (Platform.OS === 'ios') {
+        console.log('🍎 [VoiceCall] iOS设备，确保音频系统完全就绪...');
+        
+        try {
+          // 1. 等待初始化管理器完成音频会话配置
+          const IOSInitializationManager = require('../services/IOSInitializationManager').default;
+          const initManager = IOSInitializationManager.getInstance();
+          
+          if (!initManager.isAudioSessionReady()) {
+            console.log('🔧 [VoiceCall] 音频会话未就绪，等待初始化管理器配置...');
+            await initManager.initializeAudioSessionAfterPermission();
+            console.log('✅ [VoiceCall] 初始化管理器音频会话配置完成');
+          }
+          
+          // 2. 额外确保IOSAudioSession状态正确
+          const audioSession = IOSAudioSession.getInstance();
+          if (!audioSession.isActive()) {
+            console.log('🎵 [VoiceCall] 音频会话未激活，重新配置...');
+            await audioSession.reset();
+            await audioSession.prepareForRecording();
+            console.log('✅ [VoiceCall] IOSAudioSession重新配置完成');
+          }
+          
+          // 3. 关键：等待音频系统完全稳定（iOS需要这个延迟）
+          console.log('⏱️ [VoiceCall] 等待iOS音频系统完全稳定...');
+          await new Promise(resolve => setTimeout(resolve, 500));
+          console.log('✅ [VoiceCall] iOS音频系统稳定延迟完成');
+          
+        } catch (audioError) {
+          console.warn('⚠️ [VoiceCall] iOS音频系统配置失败，使用兜底方案:', audioError);
+          // 兜底方案：基础音频会话重置
+          try {
+            const audioSession = IOSAudioSession.getInstance();
+            await audioSession.reset();
+            await audioSession.prepareForRecording();
+            await new Promise(resolve => setTimeout(resolve, 300));
+            console.log('✅ [VoiceCall] 兜底音频会话配置完成');
+          } catch (fallbackError) {
+            console.warn('⚠️ [VoiceCall] 兜底音频配置也失败:', fallbackError);
+          }
+        }
+      }
+      
       // 检查mediaDevices是否可用
       if (!mediaDevices) {
         console.error('mediaDevices未定义，可能是react-native-webrtc未正确初始化');
@@ -1029,10 +1086,54 @@ const VoiceCallScreen: React.FC = () => {
             sampleRate: 16000,
             channelCount: 1,
           };
-      const stream = await mediaDevices.getUserMedia({
-        audio: audioConstraints,
-        video: false
-      });
+      
+      // 🔧 iOS首次使用修复：增强getUserMedia调用的错误处理和重试机制
+      let stream: MediaStream | null = null;
+      let attempts = 0;
+      const maxAttempts = Platform.OS === 'ios' ? 3 : 1;
+      
+      while (attempts < maxAttempts && !stream) {
+        try {
+          console.log(`🎙️ [VoiceCall] 尝试获取媒体流 (第${attempts + 1}次/共${maxAttempts}次)...`);
+          
+          stream = await mediaDevices.getUserMedia({
+            audio: audioConstraints,
+            video: false
+          });
+          
+          console.log('✅ [VoiceCall] 媒体流获取成功');
+          break;
+          
+        } catch (streamError: any) {
+          attempts++;
+          console.warn(`⚠️ [VoiceCall] 第${attempts}次获取媒体流失败:`, streamError.message);
+          
+          if (attempts >= maxAttempts) {
+            throw streamError; // 重新抛出最后一次的错误
+          }
+          
+          // iOS特殊处理：等待音频系统稳定后重试
+          if (Platform.OS === 'ios') {
+            console.log('🔄 [VoiceCall] iOS等待音频系统稳定后重试...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // 重试前重新配置音频会话
+            try {
+              const audioSession = IOSAudioSession.getInstance();
+              await audioSession.reset();
+              await audioSession.prepareForRecording();
+              console.log('✅ [VoiceCall] 重试前音频会话重新配置完成');
+            } catch (retryAudioError) {
+              console.warn('⚠️ [VoiceCall] 重试前音频会话配置失败:', retryAudioError);
+            }
+          }
+        }
+      }
+      
+      // 确保有有效的流
+      if (!stream) {
+        throw new Error('获取媒体流失败：所有重试都失败了');
+      }
       
       localStreamRef.current = stream;
 
@@ -1091,9 +1192,35 @@ const VoiceCallScreen: React.FC = () => {
       // 确保音频输出到扬声器或听筒
       if (event.track.kind === 'audio') {
         console.log('收到远程音频轨道，设置音频输出...');
+        
+        // 🔧 iOS首次使用修复：增强音频输出配置
         if (Platform.OS === 'ios') {
-          // iOS默认走扬声器，避免“有连接无声”
-          AudioManager.setSpeakerOn(true);
+          console.log('🍎 [VoiceCall] iOS收到远程音频，配置音频输出路径...');
+          
+          // 确保音频会话处于正确状态
+          setTimeout(async () => {
+            try {
+              const audioSession = IOSAudioSession.getInstance();
+              
+              // 检查并重新激活音频会话（如果需要）
+              if (!audioSession.isActive()) {
+                console.log('🔄 [VoiceCall] 远程音频到达时音频会话未激活，重新激活...');
+                await audioSession.prepareForRecording();
+              }
+              
+              // 设置音频输出路径
+              console.log('🔊 [VoiceCall] 设置iOS音频输出为扬声器（首次通话避免听不到）');
+              AudioManager.setSpeakerOn(true);
+              setIsSpeakerOn(true);
+              
+              console.log('✅ [VoiceCall] iOS远程音频配置完成');
+            } catch (audioOutputError) {
+              console.warn('⚠️ [VoiceCall] iOS音频输出配置失败:', audioOutputError);
+              // 兜底：使用基础配置
+              AudioManager.setSpeakerOn(true);
+              setIsSpeakerOn(true);
+            }
+          }, 100); // 小延迟确保音频轨道完全就绪
         } else {
           AudioManager.setSpeakerOn(isSpeakerOn);
         }
