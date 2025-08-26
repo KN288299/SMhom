@@ -92,7 +92,15 @@ class AudioCompatibility {
    */
   public canPlayFormatDirectly(format: string): boolean {
     const supportedFormats = this.getSupportedFormats();
-    return supportedFormats.includes(format.toLowerCase());
+    const canPlay = supportedFormats.includes(format.toLowerCase());
+    
+    // 特殊情况：iOS播放MP3时虽然理论支持，但可能需要特殊处理
+    if (Platform.OS === 'ios' && format.toLowerCase() === 'mp3') {
+      console.log('⚠️ iOS播放MP3：虽然支持但建议使用增强播放器');
+      return true; // 仍然返回true，但会在播放时使用Expo AV
+    }
+    
+    return canPlay;
   }
 
   /**
@@ -138,13 +146,16 @@ class AudioCompatibility {
    */
   public logCompatibilityIssue(audioUrl: string, error: any): void {
     const compatInfo = this.getAudioCompatibilityInfo(audioUrl);
+    const recommendations = this.getPlaybackRecommendations(audioUrl);
     
     console.warn('🎵 音频兼容性问题:', {
       platform: Platform.OS,
       audioUrl,
       compatibilityInfo: compatInfo,
+      recommendations: recommendations.optimizationTips,
       error: error?.message || error,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      useExpoAV: Platform.OS === 'ios' && compatInfo.sourceFormat === 'mp3'
     });
   }
 
@@ -166,9 +177,10 @@ class AudioCompatibility {
     }
     
     if (Platform.OS === 'ios' && compatInfo.sourceFormat === 'mp3') {
-      tips.push('iOS设备播放MP3时建议检查音频会话配置');
-      tips.push('建议使用本地缓存播放以提高兼容性');
-      tips.push('确保音频会话设置为外放模式');
+      tips.push('iOS设备播放Android MP3时建议使用Expo AV播放器');
+      tips.push('自动启用增强兼容性模式以确保正常播放');
+      tips.push('使用本地缓存播放以提高稳定性');
+      tips.push('音频会话优化为MP3专用配置');
     }
     
     if (Platform.OS === 'android' && compatInfo.sourceFormat === 'm4a') {
