@@ -101,9 +101,6 @@
   },
   "overrides": {
     "gaxios": "^7.1.1",
-    "gcp-metadata": "^7.0.1",
-    "eslint-plugin-jest": {
-      "@typescript-eslint/eslint-plugin": "^6.0.0"
-    }
+    "gcp-metadata": "^7.0.1"
   }
 }
