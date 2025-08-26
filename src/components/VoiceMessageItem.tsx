@@ -350,28 +350,59 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
             style={[styles.voiceMessage, isMe ? styles.myVoiceMessage : styles.otherVoiceMessage]} 
             onPress={handlePlayPause}
           >
-            <Icon 
-              name={isPlaying ? "pause" : "play"} 
-              size={20} 
-              color={isMe ? "#333" : "#333"} 
-            />
-            <View style={styles.waveformContainer}>
-              <View style={styles.waveform}>
-                {[...Array(8)].map((_, index) => (
-                  <View 
-                    key={index} 
-                    style={[
-                      styles.waveformBar, 
-                      isMe ? styles.myWaveformBar : styles.otherWaveformBar,
-                      { height: 5 + Math.random() * 15 }
-                    ]} 
-                  />
-                ))}
-              </View>
-              <Text style={[styles.duration, isMe ? styles.myDuration : styles.otherDuration]}>
-                {isPlaying ? currentPosition : duration}
-              </Text>
-            </View>
+            {isMe ? (
+              // 发送的消息：波形在左，播放按钮在右
+              <>
+                <View style={[styles.waveformContainer, styles.myWaveformContainer]}>
+                  <View style={styles.waveform}>
+                    {[...Array(8)].map((_, index) => (
+                      <View 
+                        key={index} 
+                        style={[
+                          styles.waveformBar, 
+                          styles.myWaveformBar,
+                          { height: 5 + Math.random() * 15 }
+                        ]} 
+                      />
+                    ))}
+                  </View>
+                  <Text style={[styles.duration, styles.myDuration]}>
+                    {isPlaying ? currentPosition : duration}
+                  </Text>
+                </View>
+                <Icon 
+                  name={isPlaying ? "pause" : "play"} 
+                  size={20} 
+                  color="#333" 
+                />
+              </>
+            ) : (
+              // 接收的消息：播放按钮在左，波形在右
+              <>
+                <Icon 
+                  name={isPlaying ? "pause" : "play"} 
+                  size={20} 
+                  color="#333" 
+                />
+                <View style={[styles.waveformContainer, styles.otherWaveformContainer]}>
+                  <View style={styles.waveform}>
+                    {[...Array(8)].map((_, index) => (
+                      <View 
+                        key={index} 
+                        style={[
+                          styles.waveformBar, 
+                          styles.otherWaveformBar,
+                          { height: 5 + Math.random() * 15 }
+                        ]} 
+                      />
+                    ))}
+                  </View>
+                  <Text style={[styles.duration, styles.otherDuration]}>
+                    {isPlaying ? currentPosition : duration}
+                  </Text>
+                </View>
+              </>
+            )}
           </TouchableOpacity>
           {/* 时间显示已移除 */}
         </View>
@@ -401,7 +432,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   avatarContainer: {
-    marginHorizontal: 8,
+    marginHorizontal: 4,
   },
   avatar: {
     width: 50,
@@ -431,8 +462,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   waveformContainer: {
-    marginLeft: 10,
     flex: 1,
+  },
+  myWaveformContainer: {
+    marginRight: 10,
+  },
+  otherWaveformContainer: {
+    marginLeft: 10,
   },
   waveform: {
     flexDirection: 'row',

@@ -46,6 +46,7 @@ interface SocketContextType {
   leaveConversation: (conversationId: string) => void;
   subscribeToMessages: (callback: (message: Message) => void) => () => void;
   subscribeToIncomingCalls: (callback: (callData: any) => void) => () => void;
+  subscribeToMessageRead: (callback: (data: any) => void) => () => void;
   rejectCall: (callId: string, recipientId: string, conversationId?: string) => void;
   // 主动释放 incoming_call 去重（用于接听/拒绝后立即允许新的来电）
   releaseIncomingCallDedup: (callId: string) => void;
@@ -62,6 +63,7 @@ export const SocketContext = createContext<SocketContextType>({
   leaveConversation: () => {},
   subscribeToMessages: () => () => {},
   subscribeToIncomingCalls: () => () => {},
+  subscribeToMessageRead: () => () => {},
   rejectCall: () => {},
   releaseIncomingCallDedup: () => {},
   unreadMessageCount: 0,
@@ -90,6 +92,9 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   
   // 消息订阅者列表
   const messageSubscribersRef = useRef<Set<(message: Message) => void>>(new Set());
+  
+  // 🆕 消息已读状态订阅者列表
+  const messageReadSubscribersRef = useRef<Set<(data: any) => void>>(new Set());
   const callSubscribersRef = useRef<Set<(callData: any) => void>>(new Set());
 
   // 初始化Socket连接
@@ -202,6 +207,20 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     const handleOfflineMessagesDelivered = (data: any) => {
       console.log('📨 [GlobalSocket] 离线消息已送达:', data);
       console.log(`📨 [GlobalSocket] 收到 ${data.count} 条离线消息`);
+    };
+
+    // 🆕 接收已读状态更新
+    const handleMessagesRead = (data: any) => {
+      console.log('📖 [GlobalSocket] 收到已读状态更新:', data);
+      
+      // 通知所有消息已读订阅者
+      messageReadSubscribersRef.current.forEach(callback => {
+        try {
+          callback(data);
+        } catch (error) {
+          console.error('已读状态回调执行失败:', error);
+        }
+      });
     };
 
     // 接收通话
@@ -345,6 +364,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     socket.on('call_rejected', handleCallRejected);
     socket.on('call_ended', handleCallEnded);
     socket.on('call_accepted', handleCallAccepted);
+    socket.on('messages_read', handleMessagesRead);
     
     console.log('🔗 [GlobalSocket] 已绑定所有Socket事件，包括incoming_call');
     console.log('🔗 [GlobalSocket] handleIncomingCall函数类型:', typeof handleIncomingCall);
@@ -387,6 +407,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       socket.off('call_rejected', handleCallRejected);
       socket.off('call_ended', handleCallEnded);
       socket.off('call_accepted', handleCallAccepted);
+      socket.off('messages_read', handleMessagesRead);
       socket.offAny(); // 清理onAny监听器
       socket.disconnect();
       socketRef.current = null;
@@ -471,6 +492,18 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     setUnreadMessageCount(0);
   };
 
+  // 🆕 订阅已读状态更新
+  const subscribeToMessageRead = (callback: (data: any) => void) => {
+    messageReadSubscribersRef.current.add(callback);
+    console.log(`📖 [GlobalSocket] 添加已读状态订阅者，当前数量: ${messageReadSubscribersRef.current.size}`);
+    
+    // 返回取消订阅函数
+    return () => {
+      messageReadSubscribersRef.current.delete(callback);
+      console.log(`🗑️ [GlobalSocket] 移除已读状态订阅者，当前数量: ${messageReadSubscribersRef.current.size}`);
+    };
+  };
+
   // 拒绝来电
   const rejectCall = (callId: string, recipientId: string, conversationId?: string) => {
     if (socketRef.current && isConnected) {
@@ -506,6 +539,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     leaveConversation,
     subscribeToMessages,
     subscribeToIncomingCalls,
+    subscribeToMessageRead,
     rejectCall,
     releaseIncomingCallDedup,
     unreadMessageCount,

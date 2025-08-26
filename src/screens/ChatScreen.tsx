@@ -21,6 +21,7 @@ import {
   Dimensions,
   Linking,
   ToastAndroid,
+  Clipboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { iOSChatStyles, iOSMessageStyles, isIOS, getPlatformStyles, getIOSFontSize, IOS_CHAT_HEADER_HEIGHT, IOS_SAFE_AREA_TOP } from '../styles/iOSStyles';
@@ -302,6 +303,7 @@ const ChatScreen: React.FC = () => {
     joinConversation: globalJoinConversation,
     subscribeToMessages,
     subscribeToIncomingCalls,
+    subscribeToMessageRead,
     clearUnreadMessages
   } = useSocket();
   
@@ -432,12 +434,37 @@ const ChatScreen: React.FC = () => {
     console.log('ChatScreen收到来电事件，交由全局处理:', callData.callId);
   });
 
+    // 🆕 监听已读状态更新
+    const unsubscribeMessageRead = subscribeToMessageRead((data: any) => {
+      console.log('📖 [ChatScreen] 收到已读状态更新:', data);
+      
+      // 如果是当前会话的已读状态更新
+      if (data.conversationId === conversationId) {
+        console.log('📖 [ChatScreen] 更新当前会话的已读状态');
+        
+        // 更新消息列表中的已读状态
+        setMessages(prevMessages => 
+          prevMessages.map(message => {
+            // 只更新当前用户发送的消息的已读状态
+            if (message.senderId === userInfo?._id) {
+              return {
+                ...message,
+                isRead: true
+              };
+            }
+            return message;
+          })
+        );
+      }
+    });
+
     // 清理订阅
     return () => {
       unsubscribeMessages();
       unsubscribeIncomingCalls();
+      unsubscribeMessageRead();
     };
-  }, [userInfo?._id, subscribeToMessages, subscribeToIncomingCalls]);
+  }, [userInfo?._id, conversationId, subscribeToMessages, subscribeToIncomingCalls, subscribeToMessageRead]);
 
   // 清除服务器端未读计数
   const clearServerUnreadCount = async (conversationId: string) => {
@@ -878,6 +905,47 @@ const ChatScreen: React.FC = () => {
     setShowLocationViewer(true);
   }, []);
 
+  // 处理复制消息
+  const handleCopyMessage = useCallback((content: string) => {
+    Clipboard.setString(content);
+    if (Platform.OS === 'android') {
+      ToastAndroid.show('消息已复制到剪贴板', ToastAndroid.SHORT);
+    } else {
+      Alert.alert('提示', '消息已复制到剪贴板');
+    }
+  }, []);
+
+  // 处理删除消息
+  const handleDeleteMessage = useCallback((messageId: string) => {
+    setMessages(prevMessages => prevMessages.filter(msg => msg._id !== messageId));
+    
+    if (Platform.OS === 'android') {
+      ToastAndroid.show('消息已删除', ToastAndroid.SHORT);
+    } else {
+      Alert.alert('提示', '消息已删除');
+    }
+  }, []);
+
+  // 处理撤回消息
+  const handleRecallMessage = useCallback((messageId: string) => {
+    // 发送撤回消息请求到服务器
+    if (socket) {
+      socket.emit('recall_message', {
+        messageId,
+        conversationId: route.params.conversationId,
+      });
+    }
+    
+    // 本地移除消息
+    setMessages(prevMessages => prevMessages.filter(msg => msg._id !== messageId));
+    
+    if (Platform.OS === 'android') {
+      ToastAndroid.show('消息已撤回', ToastAndroid.SHORT);
+    } else {
+      Alert.alert('提示', '消息已撤回');
+    }
+  }, [socket, route.params.conversationId]);
+
   // 渲染消息项 - 使用useCallback优化性能
   const renderMessageItem = useCallback(({ item }: { item: Message }) => {
     // 格式化用户头像URL，确保客服端也能正确显示自己的头像
@@ -893,9 +961,12 @@ const ChatScreen: React.FC = () => {
         formatMediaUrl={formatMediaUrl}
         contactAvatar={contactAvatar}
         userAvatar={formattedUserAvatar}
+        onCopyMessage={handleCopyMessage}
+        onDeleteMessage={handleDeleteMessage}
+        onRecallMessage={handleRecallMessage}
       />
     );
-  }, [userInfo, formatMediaUrl, handleViewLocation, contactAvatar]);
+  }, [userInfo, formatMediaUrl, handleViewLocation, contactAvatar, handleCopyMessage, handleDeleteMessage, handleRecallMessage]);
 
   // 优化keyExtractor - 使用稳定的消息ID，避免因index变化导致整列表重挂载
   const keyExtractor = useCallback((item: Message) => {

@@ -19,9 +19,16 @@ const ReadStatusIndicator: React.FC<ReadStatusIndicatorProps> = ({
 
   return (
     <View style={[styles.container, style]}>
-      <Text style={[styles.checkMark, isRead ? styles.readCheckMark : styles.sentCheckMark]}>
-        {isRead ? '√√' : '√'}
-      </Text>
+      {isRead ? (
+        // 已读状态：两个斜杠
+        <View style={styles.readContainer}>
+          <Text style={[styles.checkMark, styles.readCheckMark]}>/</Text>
+          <Text style={[styles.checkMark, styles.readCheckMark, styles.secondCheck]}>/</Text>
+        </View>
+      ) : (
+        // 已发送但未读：单个斜杠
+        <Text style={[styles.checkMark, styles.sentCheckMark]}>/</Text>
+      )}
     </View>
   );
 };
@@ -31,17 +38,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 4,
+    minWidth: 16,
+    height: 16,
+  },
+  readContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
   },
   checkMark: {
-    fontSize: 12,
-    fontWeight: 'bold',
+    fontSize: 11,
+    fontWeight: '600',
+    lineHeight: 12,
   },
   sentCheckMark: {
-    color: '#fff',
-    opacity: 0.7,
+    opacity: 0.6,
   },
   readCheckMark: {
-    color: '#4CAF50', // 绿色表示已读
+    opacity: 0.8,
+  },
+  secondCheck: {
+    marginLeft: -3, // 让两个勾重叠一点，形成双勾效果
+    opacity: 0.9,
   },
 });
 

@@ -315,6 +315,26 @@ const markAllAsRead = asyncHandler(async (req, res) => {
   console.log('  更新前:', beforeUpdate);
   console.log('  更新后:', afterUpdate);
   
+  // 🆕 通过Socket广播已读状态更新
+  if (updateResult.modifiedCount > 0) {
+    const io = req.app.get('io');
+    if (io) {
+      // 获取需要通知的用户ID（发送者）
+      const notifyUserId = isCustomerService ? conversation.userId : conversation.customerServiceId;
+      
+      // 广播已读状态更新给发送者
+      io.to(`user_${notifyUserId}`).emit('messages_read', {
+        conversationId,
+        readerId: req.user._id,
+        readerRole: isCustomerService ? 'customer_service' : 'user',
+        readCount: updateResult.modifiedCount,
+        timestamp: new Date()
+      });
+      
+      console.log('📡 [markAllAsRead] 已广播已读状态更新给用户:', notifyUserId);
+    }
+  }
+  
   res.json({ 
     success: true, 
     message: '所有消息已标记为已读',

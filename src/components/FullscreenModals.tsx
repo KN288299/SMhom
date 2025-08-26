@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import Video from 'react-native-video';
 import Icon from 'react-native-vector-icons/Ionicons';
+import EnhancedImageViewer from './EnhancedImageViewer';
 
 const { width, height } = Dimensions.get('window');
 
@@ -67,33 +68,12 @@ const FullscreenModals: React.FC<FullscreenModalsProps> = ({
 
   return (
     <>
-      {/* 全屏图片查看器 */}
-      <Modal
+      {/* 增强的全屏图片查看器 */}
+      <EnhancedImageViewer
         visible={showFullscreenImage}
-        transparent
-        animationType="fade"
-        onRequestClose={onCloseFullscreenImage}
-      >
-        <TouchableOpacity 
-          style={styles.fullscreenImageContainer}
-          onPress={onCloseFullscreenImage}
-          activeOpacity={0.9}
-        >
-          {fullscreenImageUrl && (
-            <Image 
-              source={{ uri: fullscreenImageUrl }}
-              style={styles.fullscreenImage}
-              resizeMode="contain"
-            />
-          )}
-          <TouchableOpacity 
-            style={styles.closeFullscreenButton}
-            onPress={onCloseFullscreenImage}
-          >
-            <Icon name="close-circle" size={36} color="#fff" />
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+        imageUrl={fullscreenImageUrl}
+        onClose={onCloseFullscreenImage}
+      />
       
       {/* 全屏视频播放器 */}
       <Modal
@@ -182,29 +162,6 @@ const FullscreenModals: React.FC<FullscreenModalsProps> = ({
 };
 
 const styles = StyleSheet.create({
-  // 全屏图片样式
-  fullscreenImageContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fullscreenImage: {
-    width: width,
-    height: height,
-  },
-  closeFullscreenButton: {
-    position: 'absolute',
-    top: 40,
-    right: 20,
-    width: 50,
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 25,
-  },
-  
   // 全屏视频样式
   fullscreenVideoContainer: {
     flex: 1,

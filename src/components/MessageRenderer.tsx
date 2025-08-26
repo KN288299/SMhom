@@ -50,6 +50,9 @@ interface MessageRendererProps {
   formatMediaUrl: (url: string) => string;
   contactAvatar?: string | null;
   userAvatar?: string | null;
+  onCopyMessage?: (content: string) => void;
+  onDeleteMessage?: (messageId: string) => void;
+  onRecallMessage?: (messageId: string) => void;
 }
 
 const MessageRenderer: React.FC<MessageRendererProps> = ({
@@ -61,6 +64,9 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
   formatMediaUrl,
   contactAvatar,
   userAvatar,
+  onCopyMessage,
+  onDeleteMessage,
+  onRecallMessage,
 }) => {
   const isMe = item.senderId === userInfo?._id;
   
@@ -231,6 +237,10 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
       contactAvatar={contactAvatar}
       userAvatar={userAvatar}
       isRead={item.isRead}
+      messageId={item._id}
+      onCopyMessage={onCopyMessage}
+      onDeleteMessage={onDeleteMessage}
+      onRecallMessage={onRecallMessage}
     />
   );
 };

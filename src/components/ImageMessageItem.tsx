@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   avatarContainer: {
-    marginHorizontal: 8,
+    marginHorizontal: 4,
   },
   avatar: {
     width: 50,

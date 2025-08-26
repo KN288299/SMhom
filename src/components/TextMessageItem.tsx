@@ -1,13 +1,17 @@
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Image,
+  TouchableOpacity,
+  Alert,
+  Clipboard,
 } from 'react-native';
 import { iOSMessageStyles, isIOS, getPlatformStyles } from '../styles/iOSStyles';
 import { DEFAULT_AVATAR } from '../utils/DefaultAvatar';
 import ReadStatusIndicator from './ReadStatusIndicator';
+import MessageActionSheet, { MessageAction } from './MessageActionSheet';
 
 // 工具函数
 const formatMessageTime = (timestamp: Date): string => {
@@ -21,6 +25,10 @@ interface TextMessageItemProps {
   contactAvatar?: string | null;
   userAvatar?: string | null;
   isRead?: boolean;
+  messageId?: string;
+  onCopyMessage?: (content: string) => void;
+  onDeleteMessage?: (messageId: string) => void;
+  onRecallMessage?: (messageId: string) => void;
 }
 
 const TextMessageItem: React.FC<TextMessageItemProps> = ({
@@ -30,7 +38,97 @@ const TextMessageItem: React.FC<TextMessageItemProps> = ({
   contactAvatar,
   userAvatar,
   isRead = false,
+  messageId,
+  onCopyMessage,
+  onDeleteMessage,
+  onRecallMessage,
 }) => {
+  const [showActionSheet, setShowActionSheet] = useState(false);
+
+  // 处理长按事件
+  const handleLongPress = () => {
+    setShowActionSheet(true);
+  };
+
+  // 处理复制消息
+  const handleCopyMessage = () => {
+    Clipboard.setString(content);
+    if (onCopyMessage) {
+      onCopyMessage(content);
+    }
+    Alert.alert('提示', '消息已复制到剪贴板');
+  };
+
+  // 处理删除消息
+  const handleDeleteMessage = () => {
+    if (!messageId) return;
+    
+    Alert.alert(
+      '删除消息',
+      '确定要删除这条消息吗？',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '删除',
+          style: 'destructive',
+          onPress: () => {
+            if (onDeleteMessage) {
+              onDeleteMessage(messageId);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // 处理撤回消息
+  const handleRecallMessage = () => {
+    if (!messageId) return;
+    
+    Alert.alert(
+      '撤回消息',
+      '确定要撤回这条消息吗？',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '撤回',
+          style: 'destructive',
+          onPress: () => {
+            if (onRecallMessage) {
+              onRecallMessage(messageId);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // 生成操作选项
+  const getActions = (): MessageAction[] => {
+    const actions: MessageAction[] = [
+      {
+        label: '复制',
+        onPress: handleCopyMessage,
+      },
+      {
+        label: '删除',
+        onPress: handleDeleteMessage,
+        type: 'destructive',
+      },
+    ];
+
+    // 只有自己发送的消息才能撤回
+    if (isMe) {
+      actions.splice(1, 0, {
+        label: '撤回',
+        onPress: handleRecallMessage,
+        type: 'destructive',
+      });
+    }
+
+    return actions;
+  };
+
   // 渲染头像
   const renderAvatar = () => {
     // 根据消息发送者显示对应的头像
@@ -56,10 +154,15 @@ const TextMessageItem: React.FC<TextMessageItemProps> = ({
       
       <View style={styles.messageContent}>
         <View style={styles.messageBubbleWithTime}>
-          <View style={[
-            getPlatformStyles(iOSMessageStyles.messageBubble, styles.messageBubble),
-            isMe ? getPlatformStyles(iOSMessageStyles.myBubble, styles.myBubble) : getPlatformStyles(iOSMessageStyles.otherBubble, styles.otherBubble)
-          ]}>
+          <TouchableOpacity
+            style={[
+              getPlatformStyles(iOSMessageStyles.messageBubble, styles.messageBubble),
+              isMe ? getPlatformStyles(iOSMessageStyles.myBubble, styles.myBubble) : getPlatformStyles(iOSMessageStyles.otherBubble, styles.otherBubble)
+            ]}
+            onLongPress={handleLongPress}
+            delayLongPress={500}
+            activeOpacity={0.8}
+          >
             <Text style={[
               getPlatformStyles(
                 isMe ? iOSMessageStyles.myMessageText : iOSMessageStyles.otherMessageText,
@@ -74,7 +177,7 @@ const TextMessageItem: React.FC<TextMessageItemProps> = ({
               isMe={isMe}
               style={styles.readStatus}
             />
-          </View>
+          </TouchableOpacity>
           {/* 时间显示已移除 */}
         </View>
       </View>
@@ -85,6 +188,14 @@ const TextMessageItem: React.FC<TextMessageItemProps> = ({
           {renderAvatar()}
         </View>
       )}
+
+      {/* 长按操作菜单 */}
+      <MessageActionSheet
+        visible={showActionSheet}
+        onClose={() => setShowActionSheet(false)}
+        actions={getActions()}
+        title="消息操作"
+      />
     </View>
   );
 };
@@ -103,7 +214,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   avatarContainer: {
-    marginHorizontal: 8,
+    marginHorizontal: 4,
   },
   avatar: {
     width: 50,
@@ -169,6 +280,10 @@ export default memo(TextMessageItem, (prevProps, nextProps) => {
     prevProps.isMe === nextProps.isMe &&
     prevProps.contactAvatar === nextProps.contactAvatar &&
     prevProps.userAvatar === nextProps.userAvatar &&
-    prevProps.isRead === nextProps.isRead
+    prevProps.isRead === nextProps.isRead &&
+    prevProps.messageId === nextProps.messageId &&
+    prevProps.onCopyMessage === nextProps.onCopyMessage &&
+    prevProps.onDeleteMessage === nextProps.onDeleteMessage &&
+    prevProps.onRecallMessage === nextProps.onRecallMessage
   );
 }); 
