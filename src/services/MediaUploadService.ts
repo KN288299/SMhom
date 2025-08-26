@@ -184,11 +184,9 @@ class MediaUploadService {
 
   // 预处理文件URI
   private processFileUri(uri: string): string {
-    if (Platform.OS === 'android') {
-      return uri;
-    } else {
-      return uri.replace('file://', '');
-    }
+    // 为提升兼容性，保持原始scheme。多数RN环境与服务器均能接受包含 file:// 的路径。
+    // 某些老设备/库要求去掉 file://，如后续发现问题可按需在调用点传入已处理路径。
+    return uri;
   }
 
   // 上传语音文件
@@ -372,12 +370,36 @@ class MediaUploadService {
   ): Promise<UploadResult> {
     try {
       const formData = new FormData();
-      const fileExt = videoUri.split('.').pop() || 'mp4';
-      const fileName = `video_${Date.now()}.${fileExt}`;
+      const rawName = videoUri.split('/').pop() || '';
+      const lowerName = rawName.toLowerCase();
+      const extMatch = lowerName.match(/\.([a-z0-9]+)(?:\?|#|$)/);
+      const fileExt = extMatch ? extMatch[1] : (lowerName.includes('.mov') ? 'mov' : 'mp4');
+      const fileName = rawName && rawName.includes('.') ? rawName : `video_${Date.now()}.${fileExt}`;
+      let mimeType = 'video/mp4';
+      switch (fileExt) {
+        case 'mp4':
+          mimeType = 'video/mp4';
+          break;
+        case 'mov':
+          mimeType = 'video/quicktime';
+          break;
+        case 'm4v':
+          mimeType = 'video/x-m4v';
+          break;
+        case '3gp':
+        case '3gpp':
+          mimeType = 'video/3gpp';
+          break;
+        case 'mkv':
+          mimeType = 'video/x-matroska';
+          break;
+        default:
+          mimeType = 'video/mp4';
+      }
       
       formData.append('video', {
         uri: this.processFileUri(videoUri),
-        type: 'video/mp4',
+        type: mimeType,
         name: fileName
       } as any);
 
@@ -389,7 +411,15 @@ class MediaUploadService {
         retryDelay: options.retryDelay || 5000 // 增加重试延迟到5秒
       };
 
-      return await this.uploadWithRetry('/api/upload/video', formData, videoOptions);
+      return await this.uploadWithRetry('/api/upload/video', formData, {
+        ...videoOptions,
+        onProgress: (p: number) => {
+          // 委托真实回调
+          if (options.onProgress) {
+            options.onProgress(p);
+          }
+        }
+      });
     } catch (error) {
       console.error('视频上传预处理失败:', error);
       return {

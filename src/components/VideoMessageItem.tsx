@@ -8,6 +8,7 @@ import {
   Animated,
   StyleSheet,
   Platform,
+  Dimensions,
 } from 'react-native';
 import Video from 'react-native-video';
 import MessageActionSheet from './MessageActionSheet';
@@ -68,6 +69,12 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
   const [thumbnailError, setThumbnailError] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [showActionSheet, setShowActionSheet] = useState(false);
+  const [bubbleVideoReady, setBubbleVideoReady] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
+
+  const screenWidth = Dimensions.get('window').width;
+  // 估算气泡最大宽度：消息容器70%再减去内边距
+  const bubbleMaxWidthPx = Math.max(120, Math.min(CONSTANTS.MAX_VIDEO_SIZE + CONSTANTS.BUBBLE_PADDING * 2, Math.floor(screenWidth * 0.7) - 32));
 
   // 渲染头像
   const renderAvatar = () => {
@@ -340,10 +347,17 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
               styles.messageBubble, 
               isMe ? styles.myBubble : styles.otherBubble, 
               styles.videoBubble,
-              { 
-                width: videoWidth + (CONSTANTS.BUBBLE_PADDING * 2), 
-                height: videoHeight + (CONSTANTS.BUBBLE_PADDING * 2) 
-              }
+              // 容器根据可用宽度等比缩放，避免被父级maxWidth裁剪
+              (() => {
+                const innerMax = Math.max(1, bubbleMaxWidthPx - CONSTANTS.BUBBLE_PADDING * 2);
+                const scale = Math.min(1, innerMax / Math.max(1, videoWidth));
+                const displayWidth = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(videoWidth * scale));
+                const displayHeight = Math.max(Math.floor(videoHeight * scale), Math.floor(CONSTANTS.MIN_VIDEO_SIZE * (videoHeight / Math.max(1, videoWidth))));
+                return {
+                  width: displayWidth + (CONSTANTS.BUBBLE_PADDING * 2),
+                  height: displayHeight + (CONSTANTS.BUBBLE_PADDING * 2)
+                };
+              })()
             ]}
             onPress={() => {
               if (isUploading) {
@@ -361,80 +375,122 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
             activeOpacity={0.8}
             disabled={isUploading ? !(Platform.OS === 'ios' && !!localFileUri) : !videoUrl}
           >
-            <View style={[styles.videoContainer, { width: videoWidth, height: videoHeight }]}>
-              {loading && !isUploading ? (
-                <View style={styles.videoLoadingContainer}>
-                  <ActivityIndicator size="large" color="#fff" />
-                </View>
-              ) : isUploading ? (
-                <View style={styles.videoUploadingContainer}>
-                  <View style={styles.uploadProgressContainer}>
-                    <View style={[styles.uploadProgressBar, { width: `${uploadProgress}%` }]} />
-                  </View>
-                  <Text style={styles.uploadProgressText}>{`${uploadProgress}%`}</Text>
-                  <ActivityIndicator size="small" color="#fff" style={styles.uploadingIndicator} />
-                </View>
-              ) : shouldAutoplayInBubble ? (
-                <>
-                  <Video
-                    source={{ uri: videoUrl }}
-                    style={{ width: '100%', height: '100%' }}
-                    resizeMode="cover"
-                    repeat
-                    muted
-                    paused={false}
-                    controls={false}
-                    ignoreSilentSwitch="obey"
-                  />
-                  <View style={styles.videoDurationContainer}>
-                    <Text style={styles.videoDurationText}>
-                      {videoDuration || `${durationSeconds}s`}
-                    </Text>
-                  </View>
-                </>
-              ) : (
-                <>
-                  {thumbnailUrl && !thumbnailError ? (
-                    <Animated.View style={{ 
-                      opacity: fadeAnim, 
-                      width: '100%', 
-                      height: '100%',
-                      borderRadius: 12,
-                      overflow: 'hidden'
-                    }}>
-                      <Image 
-                        source={{ 
-                          uri: thumbnailUrl,
-                          cache: 'force-cache' // 强制使用缓存
+            {(() => {
+              const innerMax = Math.max(1, bubbleMaxWidthPx - CONSTANTS.BUBBLE_PADDING * 2);
+              const scale = Math.min(1, innerMax / Math.max(1, videoWidth));
+              const displayWidth = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(videoWidth * scale));
+              const displayHeight = Math.max(Math.floor(videoHeight * scale), Math.floor(CONSTANTS.MIN_VIDEO_SIZE * (videoHeight / Math.max(1, videoWidth))));
+              return (
+                <View style={[styles.videoContainer, { width: displayWidth, height: displayHeight }]}>
+                  {loading && !isUploading ? (
+                    <View style={styles.videoLoadingContainer}>
+                      <ActivityIndicator size="large" color="#fff" />
+                    </View>
+                  ) : isUploading ? (
+                    <View style={styles.videoUploadingContainer}>
+                      {uploadProgress > 0 ? (
+                        <>
+                          <View style={styles.uploadProgressContainer}>
+                            <View style={[styles.uploadProgressBar, { width: `${uploadProgress}%` }]} />
+                          </View>
+                          <Text style={styles.uploadProgressText}>{`${uploadProgress}%`}</Text>
+                        </>
+                      ) : (
+                        <Text style={styles.uploadProgressText}>正在上传...</Text>
+                      )}
+                      <ActivityIndicator size="small" color="#fff" style={styles.uploadingIndicator} />
+                    </View>
+                  ) : shouldAutoplayInBubble ? (
+                    <>
+                      <Video
+                        source={{ uri: videoUrl }}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="contain"
+                        repeat
+                        muted
+                        paused={!bubbleVideoReady || isBuffering}
+                        controls={false}
+                        ignoreSilentSwitch="obey"
+                        poster={thumbnailUrl || undefined}
+                        onLoad={() => {
+                          setBubbleVideoReady(true);
+                          setIsBuffering(false);
                         }}
-                        style={{ 
+                        onBuffer={(e: any) => {
+                          setIsBuffering(!!e?.isBuffering);
+                        }}
+                        onError={() => {
+                          setBubbleVideoReady(false);
+                          setIsBuffering(false);
+                        }}
+                        {...(Platform.OS === 'android'
+                          ? {
+                              bufferConfig: {
+                                minBufferMs: 15000,
+                                maxBufferMs: 50000,
+                                bufferForPlaybackMs: 2500,
+                                bufferForPlaybackAfterRebufferMs: 5000,
+                              },
+                            }
+                          : {})}
+                      />
+                      {(!bubbleVideoReady || isBuffering) && (
+                        <View style={styles.videoLoadingOverlay}>
+                          <ActivityIndicator size="small" color="#fff" />
+                        </View>
+                      )}
+                      <View style={styles.videoDurationContainer}>
+                        <Text style={styles.videoDurationText}>
+                          {videoDuration || `${durationSeconds}s`}
+                        </Text>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      {thumbnailUrl && !thumbnailError ? (
+                        <Animated.View style={{ 
+                          opacity: fadeAnim, 
                           width: '100%', 
                           height: '100%',
-                          borderRadius: 12
-                        }}
-                        resizeMode="cover"
-                        // 添加缓存相关优化
-                        defaultSource={undefined} // 不使用默认图片，避免闪烁
-                        progressiveRenderingEnabled={false} // 禁用渐进式渲染，避免闪烁
-                        fadeDuration={0} // 禁用淡入动画，避免闪烁
-                      />
-                    </Animated.View>
-                  ) : (
-                    <View style={styles.videoPlaceholder}>
-                      <Text style={styles.videoPlaceholderText}>视频</Text>
-                    </View>
+                          borderRadius: 12,
+                          overflow: 'hidden'
+                        }}>
+                          <Image 
+                            source={{ 
+                              uri: thumbnailUrl,
+                              cache: 'force-cache' // 强制使用缓存
+                            }}
+                            style={{ 
+                              width: '100%', 
+                              height: '100%',
+                              borderRadius: 12
+                            }}
+                            resizeMode="contain"
+                            // 添加缓存相关优化
+                            defaultSource={undefined} // 不使用默认图片，避免闪烁
+                            progressiveRenderingEnabled={false} // 禁用渐进式渲染，避免闪烁
+                            fadeDuration={0} // 禁用淡入动画，避免闪烁
+                          />
+                        </Animated.View>
+                      ) : (
+                        <View style={styles.videoPlaceholder}>
+                          <Text style={styles.videoPlaceholderText}>视频</Text>
+                        </View>
+                      )}
+                      <View style={styles.videoPlayIconContainer}>
+                        <Icon name="play-circle" size={40} color="#fff" />
+                      </View>
+                      <View style={styles.videoDurationContainer}>
+                        <Text style={styles.videoDurationText}>
+                          {videoDuration || '视频'}
+                        </Text>
+                      </View>
+                    </>
                   )}
-                  <View style={styles.videoPlayIconContainer}>
-                    <Icon name="play-circle" size={40} color="#fff" />
-                  </View>
-                  <View style={styles.videoDurationContainer}>
-                    <Text style={styles.videoDurationText}>
-                      {videoDuration || '视频'}
-                    </Text>
-                  </View>
-                </>
-              )}
-            </View>
+                </View>
+              );
+            })()}
+            
           </TouchableOpacity>
           {/* 时间显示已移除，保留上传状态 */}
           {isUploading && (
@@ -523,6 +579,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#333',
+    borderRadius: 12,
+  },
+  videoLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.25)',
     borderRadius: 12,
   },
   videoUploadingContainer: {

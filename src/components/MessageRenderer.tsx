@@ -185,6 +185,8 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
             timestamp={item.timestamp}
             isMe={isMe}
             videoDuration={item.videoDuration}
+            isUploading={item.isUploading}
+            uploadProgress={item.uploadProgress}
             onPress={(url) => {
               // iOS: 如果有本地文件路径，优先使用本地播放（特别是自己发送的视频）
               if (Platform.OS === 'ios' && item.localFileUri && 
