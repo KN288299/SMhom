@@ -23,7 +23,7 @@ import {
   ToastAndroid,
   Clipboard,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { iOSChatStyles, iOSMessageStyles, isIOS, getPlatformStyles, getIOSFontSize, IOS_CHAT_HEADER_HEIGHT, IOS_SAFE_AREA_TOP } from '../styles/iOSStyles';
 import NetInfo from '@react-native-community/netinfo';
 import { getOptimizedConnectionStatus } from '../utils/iOSNetworkHelper';
@@ -102,9 +102,15 @@ const formatMediaUrl = (url: string): string => {
     url.startsWith('ph://') ||
     url.startsWith('assets-library://')
   ) {
-    return url;
+    // 统一进行编码，避免空格/中文等导致请求失败
+    try { return encodeURI(url); } catch { return url; }
   }
-  return `${BASE_URL}${url}`;
+
+  // 规范化 BASE_URL 与相对路径的斜杠，避免出现 // 或缺失 /
+  const base = BASE_URL.replace(/\/+$/, '');
+  const normalizedPath = url.startsWith('/') ? url : `/${url}`;
+  const full = `${base}${normalizedPath}`;
+  try { return encodeURI(full); } catch { return full; }
 };
 
 // 时间格式化工具函数
@@ -186,6 +192,26 @@ interface ChatScreenProps {
 
 const ChatScreen: React.FC = () => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  // iOS 键盘与底部安全区处理：
+  // - 键盘显示时：底部内边距为 0，确保输入区紧贴键盘无缝隙
+  // - 键盘隐藏时：使用安全区 + 轻微上移偏移（避免被 Home 指示条遮挡，又不要太高）
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const keyboardShowEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+  const keyboardHideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(keyboardShowEvent, () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(keyboardHideEvent, () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  // 轻微上移量（单位：pt）。要求“往上移一点点”，取 4pt。
+  const slightLift = 4;
+  const bottomPadding = isIOS ? (isKeyboardVisible ? 0 : Math.max(insets.bottom, 0) + slightLift) : 0;
   const route = useRoute<RouteProp<RootStackParamList, 'Chat'>>();
   const { contactId, contactName, conversationId: routeConversationId, contactAvatar: routeContactAvatar } = route.params;
   
@@ -1315,6 +1341,7 @@ const ChatScreen: React.FC = () => {
         quality: 0.8,
         selectionLimit: 1,
         includeBase64: false,
+        includeExtra: true, // 确保能拿到 video duration/文件信息（iOS/Android）
         maxWidth: 1280,
         maxHeight: 1280,
       });
@@ -1436,13 +1463,20 @@ const ChatScreen: React.FC = () => {
         selectedImage.uri,
         {
           token: userToken,
-          onProgress: (progress: number) => {
-            // 更新上传进度
-            updateMessage(tempMessageId, { 
-              uploadProgress: progress,
-              isUploading: true 
-            });
-          },
+          onProgress: (() => {
+            // 节流上传进度，降低频繁setState导致的卡顿
+            let lastEmit = 0;
+            return (progress: number) => {
+              const now = Date.now();
+              if (progress === 100 || now - lastEmit > 120) {
+                lastEmit = now;
+                updateMessage(tempMessageId, { 
+                  uploadProgress: progress,
+                  isUploading: true 
+                });
+              }
+            };
+          })(),
           maxRetries: 5, // 增加重试次数
           timeout: 40000, // 40秒超时
           retryDelay: 2000
@@ -1980,12 +2014,22 @@ const ChatScreen: React.FC = () => {
   };
 
   // 视频播放进度回调
-  const onVideoProgress = (data: any) => {
-    setVideoCurrentTime(data.currentTime);
-    if (videoDuration > 0) {
-      setVideoProgress(data.currentTime / videoDuration);
-    }
-  };
+  const onVideoProgress = (() => {
+    // 节流进度更新，降低全屏播放过程中的频繁re-render
+    let last = 0;
+    return (data: any) => {
+      const now = Date.now();
+      if (now - last < 150 && data.currentTime !== 0 && data.seekableDuration === 0) {
+        // 在加载初期或seekableDuration异常时，不频繁更新
+        return;
+      }
+      last = now;
+      setVideoCurrentTime(data.currentTime);
+      if (videoDuration > 0) {
+        setVideoProgress(data.currentTime / videoDuration);
+      }
+    };
+  })();
 
   // 视频加载完成回调
   const onVideoLoad = (data: any) => {
@@ -2236,6 +2280,7 @@ const ChatScreen: React.FC = () => {
           onVoiceCall={handleVoiceCallButton}
           onShowToast={showToast}
           onSendLocation={handleSendLocation}
+          bottomPadding={bottomPadding}
         />
       </KeyboardAvoidingView>
       

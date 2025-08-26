@@ -386,7 +386,7 @@ export const iOSMessageStyles = StyleSheet.create({
     borderRadius: 18,
     padding: 14, // 增加内边距让气泡更大
     minHeight: 38, // 增加最小高度
-    maxWidth: '75%', // 气泡本身的最大宽度
+    maxWidth: '100%', // 允许由外层容器控制最大宽度，避免过早换行
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 0.5 },
     shadowOpacity: 0.1,

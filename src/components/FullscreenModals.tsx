@@ -8,6 +8,7 @@ import {
   Image,
   StyleSheet,
   Dimensions,
+  Platform,
 } from 'react-native';
 import Video from 'react-native-video';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -136,6 +137,18 @@ const FullscreenModals: React.FC<FullscreenModalsProps> = ({
                     onEnd={onVideoEnd}
                     paused={!isVideoPlaying}
                     repeat={false}
+                    progressUpdateInterval={250}
+                    {...(Platform.OS === 'android'
+                      ? {
+                          useTextureView: false,
+                          bufferConfig: {
+                            minBufferMs: 20000,
+                            maxBufferMs: 120000,
+                            bufferForPlaybackMs: 3000,
+                            bufferForPlaybackAfterRebufferMs: 6000,
+                          },
+                        }
+                      : {})}
                   />
                 </View>
               </TouchableWithoutFeedback>

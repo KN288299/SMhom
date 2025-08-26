@@ -33,6 +33,8 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
   const [localCachedPath, setLocalCachedPath] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   
+  const WAVEFORM_PATTERN = [6, 10, 14, 18, 14, 12, 8, 10];
+  
   // 获取完整的音频URL
   const getFullAudioUrl = () => {
     // 安全检查：确保audioUrl是有效的字符串
@@ -70,6 +72,34 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
   }, [isPlaying]);
 
   const handlePlayPause = async () => {
+    // 解析远程音频文件名与扩展名（使用响应头或启发式）
+    const resolveRemoteAudioFileName = async (url: string): Promise<string> => {
+      try {
+        const urlWithoutQuery = url.split('?')[0];
+        const rawName = decodeURIComponent(urlWithoutQuery.split('/').pop() || `voice_${Date.now()}`);
+        const lower = rawName.toLowerCase();
+        const known = ['.mp3', '.m4a', '.aac', '.wav', '.mp4'];
+        const hasKnownExt = known.some(ext => lower.endsWith(ext));
+        if (hasKnownExt) {
+          return rawName;
+        }
+        // 优先通过 HEAD 的 Content-Type 判断
+        try {
+          const res = await fetch(url, { method: 'HEAD' });
+          const ct = res.headers.get('Content-Type') || res.headers.get('content-type') || '';
+          let ext = '.mp3';
+          if (ct.includes('m4a') || ct.includes('aac') || ct.includes('mp4')) ext = '.m4a';
+          else if (ct.includes('wav')) ext = '.wav';
+          else if (ct.includes('mpeg') || ct.includes('mp3')) ext = '.mp3';
+          return `${rawName}${ext}`;
+        } catch {}
+        // 回退：根据URL关键字或平台经验判断（安卓多为mp3）
+        const guessMp3 = url.toLowerCase().includes('mp3');
+        return `${rawName}${guessMp3 ? '.mp3' : '.mp3'}`;
+      } catch {
+        return `voice_${Date.now()}.mp3`;
+      }
+    };
     try {
       if (isPlaying) {
         console.log('停止播放语音');
@@ -150,19 +180,13 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
           }
 
           // iOS 优化：远程URL优先走本地缓存 + file:// 播放，避免"播放成功但无声"
+          // 辅助：根据URL/响应头判断正确的文件扩展名
+
           let playTarget = fullAudioUrl;
           if (Platform.OS === 'ios' && fullAudioUrl.startsWith('http')) {
             try {
-              // 🔧 修复：正确保留原始文件扩展名，避免格式错误
-              const urlParts = fullAudioUrl.split('?')[0].split('/');
-              const originalFileName = urlParts.pop() || `voice_${Date.now()}.mp3`;
-              
-              // 确保使用正确的文件扩展名（特别是Android的MP3文件）
-              let fileName = originalFileName;
-              if (!fileName.includes('.')) {
-                // 如果没有扩展名，根据URL判断格式
-                fileName = fullAudioUrl.toLowerCase().includes('mp3') ? `${fileName}.mp3` : `${fileName}.m4a`;
-              }
+              // 使用更稳健的方式解析文件名与扩展名
+              const fileName = await resolveRemoteAudioFileName(fullAudioUrl);
               
               const cachePath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
               const exists = await RNFS.exists(cachePath);
@@ -216,15 +240,8 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
           if (Platform.OS === 'ios' && fullAudioUrl.startsWith('http')) {
             try {
               console.log('🔄 iOS播放失败，尝试本地缓存方案...');
-              // 🔧 修复：正确保留原始文件扩展名
-              const urlParts = fullAudioUrl.split('?')[0].split('/');
-              const originalFileName = urlParts.pop() || `voice_${Date.now()}.mp3`;
-              
-              // 确保使用正确的文件扩展名（特别是Android的MP3文件）
-              let fileName = originalFileName;
-              if (!fileName.includes('.')) {
-                fileName = fullAudioUrl.toLowerCase().includes('mp3') ? `${fileName}.mp3` : `${fileName}.m4a`;
-              }
+              // 使用更稳健的方式解析文件名与扩展名
+              const fileName = await resolveRemoteAudioFileName(fullAudioUrl);
               
               // iOS使用DocumentDirectory而不是CachesDirectory，权限更稳定
               const cachePath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
@@ -355,13 +372,13 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
               <>
                 <View style={[styles.waveformContainer, styles.myWaveformContainer]}>
                   <View style={styles.waveform}>
-                    {[...Array(8)].map((_, index) => (
+                    {WAVEFORM_PATTERN.map((height, index) => (
                       <View 
                         key={index} 
                         style={[
                           styles.waveformBar, 
                           styles.myWaveformBar,
-                          { height: 5 + Math.random() * 15 }
+                          { height }
                         ]} 
                       />
                     ))}
@@ -386,13 +403,13 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
                 />
                 <View style={[styles.waveformContainer, styles.otherWaveformContainer]}>
                   <View style={styles.waveform}>
-                    {[...Array(8)].map((_, index) => (
+                    {WAVEFORM_PATTERN.map((height, index) => (
                       <View 
                         key={index} 
                         style={[
                           styles.waveformBar, 
                           styles.otherWaveformBar,
-                          { height: 5 + Math.random() * 15 }
+                          { height }
                         ]} 
                       />
                     ))}
@@ -449,17 +466,19 @@ const styles = StyleSheet.create({
   voiceMessage: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     minWidth: 120,
     maxWidth: 240,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
   myVoiceMessage: {
-    backgroundColor: '#ff6b81',
+    backgroundColor: '#EAF3FF',
   },
   otherVoiceMessage: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#FFFFFF',
   },
   waveformContainer: {
     flex: 1,
@@ -473,28 +492,28 @@ const styles = StyleSheet.create({
   waveform: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 20,
+    height: 18,
     marginBottom: 2,
   },
   waveformBar: {
-    width: 3,
+    width: 2,
     marginHorizontal: 1,
     borderRadius: 1,
   },
   myWaveformBar: {
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: '#6B7280',
   },
   otherWaveformBar: {
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: '#6B7280',
   },
   duration: {
     fontSize: 12,
   },
   myDuration: {
-    color: '#000',
+    color: '#111',
   },
   otherDuration: {
-    color: '#666',
+    color: '#374151',
   },
   timestamp: {
     fontSize: 10,

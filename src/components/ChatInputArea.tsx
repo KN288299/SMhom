@@ -37,6 +37,8 @@ interface ChatInputAreaProps {
   onVoiceCall: () => void;
   onShowToast: (message: string) => void;
   onSendLocation: () => void;
+  // 底部内边距：用于 iOS 键盘隐藏时避免被 Home 指示条遮挡
+  bottomPadding: number;
 }
 
 const ChatInputArea: React.FC<ChatInputAreaProps> = ({
@@ -58,6 +60,7 @@ const ChatInputArea: React.FC<ChatInputAreaProps> = ({
   onVoiceCall,
   onShowToast,
   onSendLocation,
+  bottomPadding,
 }) => {
   // 获取语音输入区域的提示文本
   const getVoiceInputText = () => {
@@ -92,7 +95,7 @@ const ChatInputArea: React.FC<ChatInputAreaProps> = ({
 
   return (
     <>
-      <View style={getPlatformStyles(iOSChatStyles.inputContainer, styles.inputContainer)}>
+      <View style={[getPlatformStyles(iOSChatStyles.inputContainer, styles.inputContainer), { paddingBottom: bottomPadding }]}>
         <View style={getPlatformStyles(iOSChatStyles.inputWrapper, styles.inputWrapper)}>
           <TouchableOpacity
             style={[styles.voiceButton, isVoiceMode && styles.activeVoiceButton]}
@@ -188,7 +191,7 @@ const ChatInputArea: React.FC<ChatInputAreaProps> = ({
       
       {/* 多功能选择面板 */}
       {showMoreOptions && (
-        <View style={getPlatformStyles(iOSChatStyles.moreOptionsPanel, styles.optionsContainer)}>
+        <View style={[getPlatformStyles(iOSChatStyles.moreOptionsPanel, styles.optionsContainer), { paddingBottom: bottomPadding }]}>
           <TouchableOpacity 
             style={styles.optionButton} 
             onPress={onTakePhoto}

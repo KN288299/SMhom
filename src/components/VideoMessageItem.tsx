@@ -406,7 +406,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
                         source={{ uri: videoUrl }}
                         style={{ width: '100%', height: '100%' }}
                         resizeMode="contain"
-                        repeat
+                        repeat={false}
                         muted
                         paused={!bubbleVideoReady || isBuffering}
                         controls={false}
@@ -425,11 +425,12 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
                         }}
                         {...(Platform.OS === 'android'
                           ? {
+                              useTextureView: false,
                               bufferConfig: {
                                 minBufferMs: 15000,
-                                maxBufferMs: 50000,
-                                bufferForPlaybackMs: 2500,
-                                bufferForPlaybackAfterRebufferMs: 5000,
+                                maxBufferMs: 60000,
+                                bufferForPlaybackMs: 2000,
+                                bufferForPlaybackAfterRebufferMs: 4000,
                               },
                             }
                           : {})}

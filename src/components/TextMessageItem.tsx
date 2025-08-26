@@ -152,12 +152,16 @@ const TextMessageItem: React.FC<TextMessageItemProps> = ({
         </View>
       )}
       
-      <View style={styles.messageContent}>
+      <View style={[
+        styles.messageContent,
+        isMe ? styles.messageContentRight : styles.messageContentLeft
+      ]}>
         <View style={styles.messageBubbleWithTime}>
           <TouchableOpacity
             style={[
               getPlatformStyles(iOSMessageStyles.messageBubble, styles.messageBubble),
-              isMe ? getPlatformStyles(iOSMessageStyles.myBubble, styles.myBubble) : getPlatformStyles(iOSMessageStyles.otherBubble, styles.otherBubble)
+              isMe ? getPlatformStyles(iOSMessageStyles.myBubble, styles.myBubble) : getPlatformStyles(iOSMessageStyles.otherBubble, styles.otherBubble),
+              isMe ? styles.bubbleRight : styles.bubbleLeft
             ]}
             onLongPress={handleLongPress}
             delayLongPress={500}
@@ -223,6 +227,13 @@ const styles = StyleSheet.create({
   },
   messageContent: {
     maxWidth: '70%',
+    flexShrink: 1,
+  },
+  messageContentRight: {
+    alignItems: 'flex-end',
+  },
+  messageContentLeft: {
+    alignItems: 'flex-start',
   },
   messageBubbleWithTime: {
     flexDirection: 'row',
@@ -234,6 +245,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     minWidth: 50,
     maxWidth: '100%',
+  },
+  bubbleRight: {
+    alignSelf: 'flex-end',
+  },
+  bubbleLeft: {
+    alignSelf: 'flex-start',
   },
   myBubble: {
     backgroundColor: '#ff6b81',
