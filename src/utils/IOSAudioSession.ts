@@ -116,8 +116,6 @@ class IOSAudioSession {
             // MP3可能需要更兼容的音频会话设置
             baseOptions.defaultToSpeaker = true; // 强制外放
             baseOptions.allowBluetooth = false; // 暂时禁用蓝牙避免兼容问题
-            baseOptions.allowBluetoothA2DP = false; // 禁用A2DP避免延迟
-            baseOptions.allowAirPlay = false; // 禁用AirPlay确保本地播放
           }
           
           // 设置音频会话类别为播放和录制，允许与其他应用混音

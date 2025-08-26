@@ -264,10 +264,9 @@ const ChatScreen: React.FC = () => {
   } | null>(null);
   const [selectedImage, setSelectedImage] = useState<Asset | null>(null);
   const [showImagePreview, setShowImagePreview] = useState(false);
-  // 🔧 视频发送状态 - 保留用于直接发送逻辑
   const [selectedVideo, setSelectedVideo] = useState<any | null>(null);
   const [selectedVideoUri, setSelectedVideoUri] = useState<string | null>(null);
-  // const [showVideoPreview, setShowVideoPreview] = useState(false); // 已移除，视频直接发送
+  const [showVideoPreview, setShowVideoPreview] = useState(false);
   const [showFullscreenImage, setShowFullscreenImage] = useState(false);
   const [fullscreenImageUrl, setFullscreenImageUrl] = useState('');
   const [showFullscreenVideo, setShowFullscreenVideo] = useState(false);
@@ -1248,13 +1247,12 @@ const ChatScreen: React.FC = () => {
             return;
           }
           
-          // 🔧 修改：直接发送视频，不显示预览弹窗
+          // 处理视频
           setSelectedVideo(selectedAsset);
           if (selectedAsset.uri) {
             setSelectedVideoUri(selectedAsset.uri);
           }
-          // 直接调用确认发送视频函数
-          handleDirectSendVideo(selectedAsset);
+          setShowVideoPreview(true);
         } else {
           // 检查图片大小限制
           if (selectedAsset.fileSize && selectedAsset.fileSize > 50 * 1024 * 1024) { // 50MB
@@ -1457,184 +1455,21 @@ const ChatScreen: React.FC = () => {
     }
   };
   
-  // 🔧 取消发送视频 - 已废弃，视频现在直接发送
-  /*
+  // 取消发送视频
   const cancelSendVideo = () => {
     setSelectedVideo(null);
     setShowVideoPreview(false);
   };
-  */
   
-  // 🔧 新增：直接发送视频，无需预览
-  const handleDirectSendVideo = async (videoAsset: any) => {
-    if (!videoAsset || !videoAsset.uri) {
-      Alert.alert('错误', '视频文件无效');
-      return;
-    }
-
-    // 设置视频状态
-    setSelectedVideo(videoAsset);
-    setSelectedVideoUri(videoAsset.uri);
-
-    // 创建临时消息ID
-    const tempMessageId = `temp_video_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    // 计算视频时长
-    let videoDuration = '未知';
-    if (videoAsset.duration) {
-      const durationInSec = videoAsset.duration;
-      const minutes = Math.floor(durationInSec / 60);
-      const seconds = Math.floor(durationInSec % 60);
-      videoDuration = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    }
-
-    // 创建临时消息对象
-    const newMessage: any = {
-      _id: tempMessageId,
-      conversationId,
-      senderId: userInfo?._id,
-      senderRole: isCustomerService ? 'customer_service' : 'user',
-      content: '视频消息',
-      messageType: 'video',
-      videoUrl: videoAsset.uri,
-      videoDuration: videoDuration,
-      localFileUri: videoAsset.uri,
-      timestamp: new Date().toISOString(),
-      isUploading: true,
-      uploadProgress: 0
-    };
-    
-    // 添加到消息列表
-    addMessage(newMessage);
-
-    try {
-      // 检查Socket连接状态
-      console.log('📱 [直接视频发送] 检查Socket连接状态...');
-      if (!isConnected) {
-        console.log('⚠️ [直接视频发送] Socket未连接，等待连接建立...');
-        
-        if (socket && socket.disconnected) {
-          socket.connect();
-        }
-        
-        let waitTime = 0;
-        const maxWaitTime = 5000;
-        const checkInterval = 100;
-        
-        while (!isConnected && waitTime < maxWaitTime) {
-          await new Promise(resolve => setTimeout(resolve, checkInterval));
-          waitTime += checkInterval;
-        }
-        
-        if (!isConnected) {
-          throw new Error('网络连接未建立，请检查网络后重试');
-        }
-      }
-      
-      console.log('✅ [直接视频发送] Socket连接已建立，开始上传...');
-      
-      // 使用MediaUploadService进行上传
-      const MediaUploadService = require('../services/MediaUploadService').default;
-      
-      const uploadResult = await MediaUploadService.uploadVideo(
-        videoAsset.uri,
-        {
-          token: userToken,
-          onProgress: (progress: number) => {
-            updateMessage(tempMessageId, { 
-              uploadProgress: progress,
-              isUploading: true 
-            });
-          },
-          maxRetries: 5,
-          timeout: 600000,
-          retryDelay: 5000
-        }
-      );
-      
-      if (!uploadResult.success) {
-        throw new Error(uploadResult.error || '视频上传失败');
-      }
-      
-      console.log('✅ [直接视频发送] 视频上传成功:', uploadResult.url);
-      
-      const videoUrl = uploadResult.url;
-      const fullVideoUrl = videoUrl?.startsWith('http') ? videoUrl : `${BASE_URL}${videoUrl}`;
-      
-      // 发送消息
-      const videoMessage = {
-        conversationId,
-        receiverId: contactId,
-        content: '视频消息',
-        messageType: 'video',
-        videoUrl: videoUrl,
-        videoDuration: videoDuration
-      };
-      
-      if (isConnected && globalSendMessage) {
-        globalSendMessage(videoMessage);
-        console.log('📡 [直接视频发送] 已通过Socket发送视频消息');
-      } else {
-        console.warn('⚠️ [直接视频发送] Socket连接异常，仅通过API保存');
-      }
-      
-      // 更新消息为最终状态
-      updateMessage(tempMessageId, {
-        videoUrl: fullVideoUrl,
-        videoDuration: videoDuration,
-        isUploading: false,
-        uploadProgress: 100
-      });
-      
-      // API保存消息
-      try {
-        const response = await axios.post(`${BASE_URL}/api/messages`, {
-          conversationId,
-          content: '视频消息',
-          contentType: 'video',
-          messageType: 'video',
-          videoUrl: videoUrl,
-          videoDuration: videoDuration
-        }, {
-          headers: { Authorization: `Bearer ${userToken}` },
-          timeout: 30000
-        });
-        
-        console.log('✅ [直接视频发送] 消息API保存成功');
-      } catch (apiError: any) {
-        console.error('❌ [直接视频发送] API保存失败:', apiError);
-      }
-      
-      // 清理状态
-      setSelectedVideo(null);
-      setSelectedVideoUri(null);
-      
-    } catch (error: any) {
-      console.error('❌ [直接视频发送] 发送失败:', error);
-      
-      // 更新消息状态为失败
-      updateMessage(tempMessageId, {
-        isUploading: false,
-        uploadProgress: 0
-      });
-      
-      Alert.alert('发送失败', error.message || '视频发送失败，请重试');
-      
-      // 清理状态
-      setSelectedVideo(null);
-      setSelectedVideoUri(null);
-    }
-  };
-
   // 🔧 第一次媒体发送失败修复：确认发送视频
   const confirmSendVideo = async () => {
     if (!selectedVideo || !selectedVideoUri) {
-      // setShowVideoPreview(false); // 已移除预览功能
+      setShowVideoPreview(false);
       return;
     }
       
     // 立即关闭预览界面，避免用户等待上传
-    // setShowVideoPreview(false); // 已移除预览功能
+    setShowVideoPreview(false);
     
     // 创建临时ID用于本地显示和后续更新
     const tempMessageId = generateUniqueId();
@@ -2339,6 +2174,10 @@ const ChatScreen: React.FC = () => {
         selectedImage={selectedImage}
         onCancelImage={cancelSendImage}
         onConfirmImage={confirmSendImage}
+        showVideoPreview={showVideoPreview}
+        selectedVideo={selectedVideo}
+        onCancelVideo={cancelSendVideo}
+        onConfirmVideo={confirmSendVideo}
       />
       
       {/* 全屏模态框 */}

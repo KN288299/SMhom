@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, memo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform, Image } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
-import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
 import { BASE_URL } from '../config/api';
 import IOSAudioSession from '../utils/IOSAudioSession';
 import AudioCompatibility from '../utils/AudioCompatibility';
@@ -27,10 +26,8 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPosition, setCurrentPosition] = useState('00:00');
   const audioPlayerRef = useRef<AudioRecorderPlayer>(new AudioRecorderPlayer());
-  const expoSoundRef = useRef<Audio.Sound | null>(null);
   const [localCachedPath, setLocalCachedPath] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [useExpoPlayer, setUseExpoPlayer] = useState(false);
   
   // 获取完整的音频URL
   const getFullAudioUrl = () => {
@@ -62,30 +59,18 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
   useEffect(() => {
     return () => {
       if (isPlaying) {
-        if (useExpoPlayer && expoSoundRef.current) {
-          expoSoundRef.current.unloadAsync();
-        } else {
-          audioPlayerRef.current.stopPlayer();
-          audioPlayerRef.current.removePlayBackListener();
-        }
+        audioPlayerRef.current.stopPlayer();
+        audioPlayerRef.current.removePlayBackListener();
       }
     };
-  }, [isPlaying, useExpoPlayer]);
+  }, [isPlaying]);
 
   const handlePlayPause = async () => {
     try {
       if (isPlaying) {
         console.log('停止播放语音');
-        if (useExpoPlayer && expoSoundRef.current) {
-          console.log('停止Expo AV播放器');
-          await expoSoundRef.current.stopAsync();
-          await expoSoundRef.current.unloadAsync();
-          expoSoundRef.current = null;
-        } else {
-          console.log('停止默认播放器');
-          await audioPlayerRef.current.stopPlayer();
-          audioPlayerRef.current.removePlayBackListener();
-        }
+        await audioPlayerRef.current.stopPlayer();
+        audioPlayerRef.current.removePlayBackListener();
         setIsPlaying(false);
         setCurrentPosition('00:00');
       } else {
@@ -115,103 +100,9 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
           AudioCompatibility.logCompatibilityIssue(fullAudioUrl, '格式兼容性警告');
         }
         
-        // 🔧 iOS播放MP3特殊处理：优先使用Expo AV播放器
+        // 🔧 iOS播放MP3特殊处理：确保音频会话针对MP3优化
         if (Platform.OS === 'ios' && compatInfo.sourceFormat === 'mp3') {
-          console.log('🎵 [iOS MP3兼容性修复] 检测到Android发送的MP3语音，启用增强播放模式...');
-          console.log('🎵 [iOS MP3兼容性修复] 音频URL:', fullAudioUrl);
-          console.log('🎵 [iOS MP3兼容性修复] 兼容性信息:', compatInfo);
-          setUseExpoPlayer(true);
-          setIsPlaying(true);
-          
-          try {
-            // 准备播放URL（优先本地缓存）
-            let playTarget = fullAudioUrl;
-            if (fullAudioUrl.startsWith('http')) {
-              try {
-                const urlParts = fullAudioUrl.split('?')[0].split('/');
-                const originalFileName = urlParts.pop() || `voice_${Date.now()}.mp3`;
-                let fileName = originalFileName;
-                if (!fileName.includes('.')) {
-                  fileName = `${fileName}.mp3`;
-                }
-                
-                const cachePath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
-                const exists = await RNFS.exists(cachePath);
-                if (!exists) {
-                  console.log('📥 缓存MP3语音到本地:', cachePath);
-                  await RNFS.downloadFile({ fromUrl: fullAudioUrl, toFile: cachePath }).promise;
-                  console.log('✅ MP3文件下载完成');
-                }
-                setLocalCachedPath(cachePath);
-                playTarget = `file://${cachePath}`;
-                console.log('🎵 使用本地缓存播放MP3 (Expo AV):', playTarget);
-              } catch (cacheErr) {
-                console.warn('⚠️ 缓存MP3失败，使用直连播放:', cacheErr);
-              }
-            }
-
-            // 设置Expo AV音频模式
-            await Audio.setAudioModeAsync({
-              allowsRecordingIOS: false,
-              interruptionModeIOS: InterruptionModeIOS.DoNotMix,
-              playsInSilentModeIOS: true,
-              shouldDuckAndroid: true,
-              interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
-              playThroughEarpieceAndroid: false,
-            });
-
-            // 创建Expo AV Sound对象
-            const { sound } = await Audio.Sound.createAsync({ uri: playTarget });
-            expoSoundRef.current = sound;
-
-            // 播放状态监听
-            sound.setOnPlaybackStatusUpdate((status) => {
-              if (status.isLoaded) {
-                if (status.isPlaying) {
-                  const seconds = Math.floor((status.positionMillis || 0) / 1000);
-                  const minutes = Math.floor(seconds / 60);
-                  const remainingSeconds = seconds % 60;
-                  setCurrentPosition(
-                    `${minutes < 10 ? '0' + minutes : minutes}:${
-                      remainingSeconds < 10 ? '0' + remainingSeconds : remainingSeconds
-                    }`
-                  );
-                }
-
-                if (status.didJustFinish) {
-                  setIsPlaying(false);
-                  setCurrentPosition('00:00');
-                  if (expoSoundRef.current) {
-                    expoSoundRef.current.unloadAsync();
-                    expoSoundRef.current = null;
-                  }
-                }
-              }
-            });
-
-            await sound.playAsync();
-            console.log('✅ [iOS MP3兼容性修复] Expo AV播放器成功开始播放Android MP3语音');
-            console.log('✅ [iOS MP3兼容性修复] 跨平台语音兼容性问题已解决');
-            return; // 成功使用Expo AV播放，直接返回
-          } catch (expoError: any) {
-            console.error('Expo AV播放失败，回退到默认播放器:', expoError);
-            AudioCompatibility.logCompatibilityIssue(fullAudioUrl, expoError);
-            setUseExpoPlayer(false);
-            if (expoSoundRef.current) {
-              try {
-                await expoSoundRef.current.unloadAsync();
-              } catch {}
-              expoSoundRef.current = null;
-            }
-            // 显示用户友好的提示
-            console.log('🔄 Expo AV播放失败，尝试使用默认播放器...');
-            // 继续执行默认播放器逻辑
-          }
-        }
-        
-        // 默认播放器逻辑或Expo AV失败后的回退
-        if (Platform.OS === 'ios' && compatInfo.sourceFormat === 'mp3') {
-          console.log('🎵 iOS播放MP3格式语音，使用默认播放器并进行特殊优化...');
+          console.log('🎵 iOS播放MP3格式语音，进行特殊优化...');
           try {
             const audioSession = IOSAudioSession.getInstance();
             // 重置音频会话确保清理状态
