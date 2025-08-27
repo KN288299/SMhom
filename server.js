@@ -663,6 +663,35 @@ io.on('connection', (socket) => {
         rejected
       });
       
+      // 补充发送者头像，用于前端弹窗显示
+      let senderAvatar = null;
+      try {
+        if (socket.user.role === 'customer_service') {
+          const CustomerService = require('./src/models/customerServiceModel');
+          const csInfo = await CustomerService.findById(socket.user.id).select('avatar');
+          if (csInfo && csInfo.avatar) {
+            // 统一为以/开头的相对路径或完整URL
+            if (typeof csInfo.avatar === 'string') {
+              senderAvatar = csInfo.avatar.startsWith('http')
+                ? csInfo.avatar
+                : (csInfo.avatar.startsWith('/') ? csInfo.avatar : `/uploads/${csInfo.avatar}`);
+            }
+          }
+        } else {
+          const User = require('./src/models/userModel');
+          const userInfo = await User.findById(socket.user.id).select('avatar');
+          if (userInfo && userInfo.avatar) {
+            if (typeof userInfo.avatar === 'string') {
+              senderAvatar = userInfo.avatar.startsWith('http')
+                ? userInfo.avatar
+                : (userInfo.avatar.startsWith('/') ? userInfo.avatar : `/uploads/${userInfo.avatar}`);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('查询发送者头像失败:', e);
+      }
+
       // 创建消息记录（这里可以调用现有的消息控制器）
       // 省略数据库操作，后续可以添加
       
@@ -674,6 +703,7 @@ io.on('connection', (socket) => {
           userSocket.emit('receive_message', {
             senderId: socket.user.id,
             senderRole: 'customer_service',
+            senderAvatar,
             content,
             conversationId,
             timestamp: new Date(),
@@ -701,6 +731,7 @@ io.on('connection', (socket) => {
             id: Date.now().toString(),
             senderId: socket.user.id,
             senderRole: 'customer_service',
+            senderAvatar,
             senderName: '客服',
             content,
             conversationId,
@@ -750,6 +781,7 @@ io.on('connection', (socket) => {
           csSocket.emit('receive_message', {
             senderId: socket.user.id,
             senderRole: 'user',
+            senderAvatar,
             content,
             conversationId,
             timestamp: new Date(),
@@ -777,6 +809,7 @@ io.on('connection', (socket) => {
             id: Date.now().toString(),
             senderId: socket.user.id,
             senderRole: 'user',
+            senderAvatar,
             senderName: '用户',
             content,
             conversationId,

@@ -110,6 +110,7 @@ const GlobalMessageBannerManager: React.FC = () => {
         conversationId: message?.conversationId,
         contactId: message?.senderId,
         contactName,
+        // 优先展示发送者头像（客服发送时显示客服头像；用户发送时显示用户头像）
         contactAvatar: formatAvatarUrl(message?.senderAvatar || message?.contactAvatar || null),
         previewText,
       };
