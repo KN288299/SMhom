@@ -105,7 +105,9 @@ const GlobalMessageBannerManager: React.FC = () => {
       // 组装展示数据
       const previewText = getPreviewText(message);
       const isFromCustomerService = message?.senderRole === 'customer_service';
-      const contactName = isFromCustomerService ? '客服' : '用户';
+      const nameFromMessage: string | undefined = message?.senderName || message?.contactName;
+      const phoneFromMessage: string | undefined = message?.senderPhoneNumber || message?.phoneNumber;
+      const contactName = nameFromMessage || (isFromCustomerService ? '客服' : (phoneFromMessage || '用户'));
       const data: MessageBannerData = {
         conversationId: message?.conversationId,
         contactId: message?.senderId,

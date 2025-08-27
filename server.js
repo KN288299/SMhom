@@ -663,12 +663,14 @@ io.on('connection', (socket) => {
         rejected
       });
       
-      // 补充发送者头像，用于前端弹窗显示
+      // 补充发送者信息（头像、姓名、手机号），用于前端弹窗显示
       let senderAvatar = null;
+      let senderName = null;
+      let senderPhoneNumber = null;
       try {
         if (socket.user.role === 'customer_service') {
           const CustomerService = require('./src/models/customerServiceModel');
-          const csInfo = await CustomerService.findById(socket.user.id).select('avatar');
+          const csInfo = await CustomerService.findById(socket.user.id).select('name phoneNumber avatar');
           if (csInfo && csInfo.avatar) {
             // 统一为以/开头的相对路径或完整URL
             if (typeof csInfo.avatar === 'string') {
@@ -677,15 +679,23 @@ io.on('connection', (socket) => {
                 : (csInfo.avatar.startsWith('/') ? csInfo.avatar : `/uploads/${csInfo.avatar}`);
             }
           }
+          if (csInfo) {
+            senderName = csInfo.name || null;
+            senderPhoneNumber = csInfo.phoneNumber || null;
+          }
         } else {
           const User = require('./src/models/userModel');
-          const userInfo = await User.findById(socket.user.id).select('avatar');
+          const userInfo = await User.findById(socket.user.id).select('name phoneNumber avatar');
           if (userInfo && userInfo.avatar) {
             if (typeof userInfo.avatar === 'string') {
               senderAvatar = userInfo.avatar.startsWith('http')
                 ? userInfo.avatar
                 : (userInfo.avatar.startsWith('/') ? userInfo.avatar : `/uploads/${userInfo.avatar}`);
             }
+          }
+          if (userInfo) {
+            senderName = userInfo.name || null;
+            senderPhoneNumber = userInfo.phoneNumber || null;
           }
         }
       } catch (e) {
@@ -704,6 +714,8 @@ io.on('connection', (socket) => {
             senderId: socket.user.id,
             senderRole: 'customer_service',
             senderAvatar,
+            senderName,
+            senderPhoneNumber,
             content,
             conversationId,
             timestamp: new Date(),
@@ -732,7 +744,8 @@ io.on('connection', (socket) => {
             senderId: socket.user.id,
             senderRole: 'customer_service',
             senderAvatar,
-            senderName: '客服',
+            senderName: senderName || '客服',
+            senderPhoneNumber: senderPhoneNumber || null,
             content,
             conversationId,
             timestamp: new Date(),
@@ -782,6 +795,8 @@ io.on('connection', (socket) => {
             senderId: socket.user.id,
             senderRole: 'user',
             senderAvatar,
+            senderName,
+            senderPhoneNumber,
             content,
             conversationId,
             timestamp: new Date(),
@@ -810,7 +825,8 @@ io.on('connection', (socket) => {
             senderId: socket.user.id,
             senderRole: 'user',
             senderAvatar,
-            senderName: '用户',
+            senderName: senderName || (senderPhoneNumber ? senderPhoneNumber : '用户'),
+            senderPhoneNumber: senderPhoneNumber || null,
             content,
             conversationId,
             timestamp: new Date(),

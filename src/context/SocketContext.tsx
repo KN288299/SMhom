@@ -36,6 +36,9 @@ interface Message {
   longitude?: number;
   locationName?: string;
   address?: string;
+  // New optional fields for banner display
+  senderName?: string;
+  senderPhoneNumber?: string;
 }
 
 interface SocketContextType {
