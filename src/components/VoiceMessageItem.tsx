@@ -173,31 +173,9 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
             } catch {}
           }
 
-          // iOS 优化：远程URL优先走本地缓存 + file:// 播放，避免"播放成功但无声"
-          // 辅助：根据URL/响应头判断正确的文件扩展名
-
+          // 修复：默认优先直接播放远程URL，避免因为本地file://路径导致的iOS闪退
+          // 仅在播放失败时再尝试本地缓存回退
           let playTarget = fullAudioUrl;
-          if (Platform.OS === 'ios' && fullAudioUrl.startsWith('http')) {
-            try {
-              // 使用更稳健的方式解析文件名与扩展名
-              const fileName = await resolveRemoteAudioFileName(fullAudioUrl);
-              
-              const cachePath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
-              const exists = await RNFS.exists(cachePath);
-              if (!exists) {
-                console.log('📥 iOS缓存远程语音到本地 (保留原格式):', cachePath);
-                await RNFS.downloadFile({ fromUrl: fullAudioUrl, toFile: cachePath, discretionary: true, cacheable: true }).promise;
-                console.log('✅ 文件下载完成，格式:', fileName.split('.').pop());
-              }
-              setLocalCachedPath(cachePath);
-              // iOS 本地文件使用 file:// 前缀
-              playTarget = `file://${cachePath}`;
-              console.log('🎵 使用本地缓存播放(iOS):', playTarget);
-            } catch (cacheErr) {
-              console.warn('⚠️ iOS缓存远程语音失败，改用直连播放:', cacheErr);
-              playTarget = fullAudioUrl;
-            }
-          }
 
           // 防御：播放前清理可能的占用与残留监听
           try { await audioPlayerRef.current.stopRecorder(); } catch {}
@@ -208,8 +186,32 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
           try {
             await audioPlayerRef.current.startPlayer(playTarget);
           } catch (primaryPlayErr) {
-            // iOS 回退：若使用 file:// 前缀失败，尝试去掉前缀再播放
-            if (Platform.OS === 'ios' && playTarget.startsWith('file://')) {
+            // 回退：iOS远程直连失败时，尝试缓存到本地后再播放
+            if (Platform.OS === 'ios' && fullAudioUrl.startsWith('http')) {
+              try {
+                console.warn('⚠️ iOS远程播放失败，尝试缓存回退:', (primaryPlayErr as any)?.message || String(primaryPlayErr));
+                const fileName = await resolveRemoteAudioFileName(fullAudioUrl);
+                const cachePath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+                const exists = await RNFS.exists(cachePath);
+                if (!exists) {
+                  console.log('📥 下载语音到本地缓存:', cachePath);
+                  await RNFS.downloadFile({ fromUrl: fullAudioUrl, toFile: cachePath, discretionary: true, cacheable: true }).promise;
+                }
+                setLocalCachedPath(cachePath);
+                const iosLocalTarget = `file://${cachePath}`;
+                try {
+                  await audioPlayerRef.current.startPlayer(iosLocalTarget);
+                } catch (cachePlayErr) {
+                  // 最后回退：去掉 file:// 再试
+                  const noSchemePath = iosLocalTarget.replace('file://', '');
+                  console.warn('⚠️ iOS缓存(file://)播放失败，尝试无前缀路径:', noSchemePath);
+                  await audioPlayerRef.current.startPlayer(noSchemePath);
+                }
+              } catch (cacheFallbackErr) {
+                throw cacheFallbackErr;
+              }
+            } else if (Platform.OS === 'ios' && playTarget.startsWith('file://')) {
+              // 备用回退：若当前是本地file://路径失败，尝试无scheme
               const noSchemePath = playTarget.replace('file://', '');
               console.warn('⚠️ iOS使用file://播放失败，尝试无前缀路径:', noSchemePath);
               await audioPlayerRef.current.startPlayer(noSchemePath);
