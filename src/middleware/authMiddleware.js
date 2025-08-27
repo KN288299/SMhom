@@ -59,12 +59,18 @@ const protect = asyncHandler(async (req, res, next) => {
           console.log('Auth中间件 - 客服不存在:', decoded.id);
           throw new Error('客服不存在');
         }
-        // 为了兼容性，也设置user
+        // 为了兼容性，也设置user，确保包含所有客服信息
         req.user = { 
           _id: req.customerService._id,
           role: 'customer_service',
+          userType: 'customerService', // 添加userType字段用于前端判断
           name: req.customerService.name,
-          phoneNumber: req.customerService.phoneNumber
+          phoneNumber: req.customerService.phoneNumber,
+          avatar: req.customerService.avatar, // 重要：添加头像信息
+          status: req.customerService.status,
+          serviceStats: req.customerService.serviceStats,
+          isActive: req.customerService.isActive,
+          lastActiveTime: req.customerService.lastActiveTime
         };
         console.log('Auth中间件 - 客服身份验证成功:', req.customerService._id);
       } else if (tokenType === 'admin') {

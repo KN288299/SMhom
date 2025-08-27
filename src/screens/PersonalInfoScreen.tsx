@@ -16,6 +16,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuth } from '../context/AuthContext';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { DEFAULT_AVATAR } from '../utils/DefaultAvatar';
+import { BASE_URL } from '../config/api';
 
 interface PersonalInfoScreenProps {
   navigation: any;
@@ -141,7 +142,12 @@ const PersonalInfoScreen: React.FC<PersonalInfoScreenProps> = ({ navigation }) =
       return { uri: avatarSource };
     }
     if (userInfo?.avatar) {
-      return { uri: userInfo.avatar };
+      // 如果头像路径以http开头，直接使用，否则拼接服务器地址
+      const avatarUrl = userInfo.avatar.startsWith('http') 
+        ? userInfo.avatar 
+        : `${BASE_URL}${userInfo.avatar}`;
+      console.log('客服头像URL:', avatarUrl);
+      return { uri: avatarUrl };
     }
     // 使用本地默认头像
     return DEFAULT_AVATAR;
