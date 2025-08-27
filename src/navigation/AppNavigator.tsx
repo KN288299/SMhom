@@ -31,6 +31,7 @@ import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import AboutAppScreen from '../screens/AboutAppScreen';
 import PlatformCallManager from '../components/PlatformCallManager';
 import GlobalFloatingCallManager from '../components/GlobalFloatingCallManager';
+import GlobalMessageBannerManager from '../components/GlobalMessageBannerManager';
 
 // 定义路由参数类型
 export type RootStackParamList = {
@@ -210,6 +211,8 @@ const AppNavigator = () => {
       <PlatformIncomingCallManager />
       {/* 全局悬浮窗管理器 */}
       <GlobalFloatingCallManager />
+      {/* 全局消息顶部弹窗 */}
+      <GlobalMessageBannerManager />
     </NavigationContainer>
   );
 };
