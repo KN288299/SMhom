@@ -34,7 +34,7 @@ const MessageBanner: React.FC<MessageBannerProps> = ({ visible, data, onPress })
 
   const avatarSource = data.contactAvatar
     ? { uri: data.contactAvatar }
-    : require('../assets/images/default-avatar.png');
+    : require('../assets/images/moren.png');
 
   return (
     <View style={styles.container} pointerEvents="box-none">
