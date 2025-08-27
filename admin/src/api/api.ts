@@ -457,17 +457,19 @@ export const customerServiceAPI = {
           Authorization: `Bearer ${localStorage.getItem('adminToken')}`
         }
       });
-      console.log('获取到的客服列表数据:', response.data);
+      const data = response.data;
+      console.log('获取到的客服列表数据:', data);
+      const list = Array.isArray(data) ? data : (Array.isArray(data?.customerServices) ? data.customerServices : []);
       // 检查每个客服的头像路径
-      if (Array.isArray(response.data)) {
-        response.data.forEach(cs => {
+      if (Array.isArray(list)) {
+        list.forEach(cs => {
           console.log(`客服 ${cs.name} 的头像路径: ${cs.avatar}`);
           if (cs.avatar) {
             console.log(`完整URL: ${SERVER_BASE_URL}${cs.avatar}`);
           }
         });
       }
-      return response.data;
+      return list;
     } catch (error) {
       console.error('获取客服列表失败:', error);
       throw error;
