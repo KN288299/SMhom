@@ -11,6 +11,7 @@ import {
   ShoppingCartOutlined,
   CustomerServiceOutlined,
   SettingOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -103,6 +104,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               icon: <CustomerServiceOutlined />,
               label: '客服管理',
               onClick: () => handleMenuClick('/customer-service'),
+            },
+            {
+              key: '/message-management',
+              icon: <MessageOutlined />,
+              label: '消息管理',
+              onClick: () => handleMenuClick('/message-management'),
             },
             {
               key: '/page-management',

@@ -9,6 +9,7 @@ import OrderManagement from './pages/OrderManagement';
 import CustomerServiceManagement from './pages/CustomerServiceManagement';
 import TestPage from './pages/TestPage';
 import PageManagement from './pages/PageManagement';
+import MessageManagement from './pages/MessageManagement';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const App: React.FC = () => {
@@ -50,6 +51,11 @@ const App: React.FC = () => {
           <Route path="/page-management" element={
             <ProtectedRoute>
               <PageManagement />
+            </ProtectedRoute>
+          } />
+          <Route path="/message-management" element={
+            <ProtectedRoute>
+              <MessageManagement />
             </ProtectedRoute>
           } />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

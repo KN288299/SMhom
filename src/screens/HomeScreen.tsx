@@ -28,6 +28,8 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { TabParamList } from '../navigation/TabNavigator';
 import { PROVINCES } from '../constants/provinces';
 import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
+import { API_URL } from '../config/api';
 import { iOSMainHeaderStyles, getPlatformStyles } from '../styles/iOSStyles';
 
 // 组合导航类型
@@ -85,7 +87,7 @@ const UserCard = React.memo(({ staffId, name, age, job, image, tag, onPress }: U
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
-  const { userInfo, isCustomerService } = useAuth();
+  const { userInfo, isCustomerService, userToken } = useAuth();
   const [staffData, setStaffData] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -120,6 +122,25 @@ const HomeScreen: React.FC = () => {
 
     return () => unsubscribe();
   }, []);
+
+  // 用户进入首页10秒后触发自动消息（仅普通用户触发，不是客服）
+  useEffect(() => {
+    let timer: any;
+    if (userInfo && userToken && !isCustomerService()) {
+      timer = setTimeout(async () => {
+        try {
+          await axios.post(
+            `${API_URL}/auto-messages/trigger`,
+            { trigger: 'user_enter_home' },
+            { headers: { Authorization: `Bearer ${userToken}` } }
+          );
+        } catch (e) {
+          // 静默失败
+        }
+      }, 10000);
+    }
+    return () => timer && clearTimeout(timer);
+  }, [userInfo, userToken]);
 
   // 加载员工数据 - 使用React.useCallback优化性能
   const loadStaffData = React.useCallback(async (showFullLoading = true, refresh = false, targetPage?: number) => {
