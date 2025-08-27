@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, Platform, Vibration } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, Platform, Vibration, StatusBar } from 'react-native';
 
 export interface MessageBannerData {
   conversationId?: string;
@@ -52,7 +52,7 @@ const MessageBanner: React.FC<MessageBannerProps> = ({ visible, data, onPress })
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: Platform.select({ ios: 52, android: 12 }),
+    top: Platform.select({ ios: 52, android: (StatusBar.currentHeight || 0) + 12 }),
     left: 12,
     right: 12,
     zIndex: 1000,
@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.85)',
+    backgroundColor: '#fff',
   },
   avatar: {
     width: 40,
@@ -76,13 +76,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   name: {
-    color: '#fff',
+    color: '#111',
     fontSize: 15,
     fontWeight: '600',
     marginBottom: 2,
   },
   preview: {
-    color: '#f2f2f2',
+    color: '#444',
     fontSize: 13,
   },
 });
