@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   avatarContainer: {
-    marginHorizontal: 4,
+    marginHorizontal: 2, // 从4减少到2，减少50%的距离
   },
   avatar: {
     width: 50,

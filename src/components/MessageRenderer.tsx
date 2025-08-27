@@ -53,6 +53,8 @@ interface MessageRendererProps {
   onCopyMessage?: (content: string) => void;
   onDeleteMessage?: (messageId: string) => void;
   onRecallMessage?: (messageId: string) => void;
+  // 是否允许该条视频气泡自动播放（由父级计算最新短视频）
+  autoplayEligible?: boolean;
 }
 
 const MessageRenderer: React.FC<MessageRendererProps> = ({
@@ -67,6 +69,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
   onCopyMessage,
   onDeleteMessage,
   onRecallMessage,
+  autoplayEligible = false,
 }) => {
   const isMe = item.senderId === userInfo?._id;
   
@@ -169,6 +172,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
             contactAvatar={contactAvatar}
             userAvatar={userAvatar}
             isRead={item.isRead}
+            autoplayEligible={false}
           />
         );
     }
@@ -203,6 +207,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
             contactAvatar={contactAvatar}
             userAvatar={userAvatar}
             isRead={item.isRead}
+            autoplayEligible={autoplayEligible}
           />
         );
     }

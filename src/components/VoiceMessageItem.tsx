@@ -176,6 +176,10 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
             } catch (subscriptionError) {
               console.warn('⚠️ iOS播放器订阅配置警告:', subscriptionError);
             }
+            // 确保播放音量为最大，避免“播放成功但声音很小/无声”的误判
+            try {
+              await audioPlayerRef.current.setVolume(1.0);
+            } catch {}
             console.log('✅ iOS音频播放环境准备完成');
           }
 
@@ -211,7 +215,18 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
           try { audioPlayerRef.current.removePlayBackListener(); } catch {}
 
           console.log('开始播放音频文件:', playTarget);
-          await audioPlayerRef.current.startPlayer(playTarget);
+          try {
+            await audioPlayerRef.current.startPlayer(playTarget);
+          } catch (primaryPlayErr) {
+            // iOS 回退：若使用 file:// 前缀失败，尝试去掉前缀再播放
+            if (Platform.OS === 'ios' && playTarget.startsWith('file://')) {
+              const noSchemePath = playTarget.replace('file://', '');
+              console.warn('⚠️ iOS使用file://播放失败，尝试无前缀路径:', noSchemePath);
+              await audioPlayerRef.current.startPlayer(noSchemePath);
+            } else {
+              throw primaryPlayErr;
+            }
+          }
           console.log('✅ 播放开始成功');
           
           audioPlayerRef.current.addPlayBackListener((e) => {
@@ -297,7 +312,17 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
 
               const iosLocalTarget = Platform.OS === 'ios' ? `file://${cachePath}` : cachePath;
               console.log('🎵 使用本地缓存文件播放语音:', iosLocalTarget);
-              await audioPlayerRef.current.startPlayer(iosLocalTarget);
+              try {
+                await audioPlayerRef.current.startPlayer(iosLocalTarget);
+              } catch (cachePlayErr) {
+                if (Platform.OS === 'ios' && iosLocalTarget.startsWith('file://')) {
+                  const noSchemePath = iosLocalTarget.replace('file://', '');
+                  console.warn('⚠️ iOS本地缓存(file://)播放失败，尝试无前缀路径:', noSchemePath);
+                  await audioPlayerRef.current.startPlayer(noSchemePath);
+                } else {
+                  throw cachePlayErr;
+                }
+              }
 
               audioPlayerRef.current.addPlayBackListener((e) => {
                 const seconds = Math.floor(e.currentPosition / 1000);
@@ -449,7 +474,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   avatarContainer: {
-    marginHorizontal: 4,
+    marginHorizontal: 2, // 从4减少到2，减少50%的距离
   },
   avatar: {
     width: 50,

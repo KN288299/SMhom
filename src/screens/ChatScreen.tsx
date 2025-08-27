@@ -997,6 +997,44 @@ const ChatScreen: React.FC = () => {
     // 格式化用户头像URL，确保客服端也能正确显示自己的头像
     const formattedUserAvatar = userInfo?.avatar ? formatMediaUrl(userInfo.avatar) : null;
     
+    // 仅让"最新的10秒内的视频"自动播放：
+    // - 必须是对方发来的消息（在气泡内自动播放时我们已在子组件限制了 !isMe）
+    // - 在 messages 倒序数组中，找到第一个满足 duration<=10s 的视频消息
+    // - 只有这条消息的 autoplayEligible 才为 true，其余为 false
+    const getDurationSeconds = (duration?: string): number => {
+      if (!duration) return 0;
+      const str = String(duration).trim();
+      const hourMatch = str.match(/(\d+)\s*(小时|h)/i);
+      const minMatch = str.match(/(\d+)\s*(分|min)/i);
+      const secMatch = str.match(/(\d+)\s*(秒|s)/i);
+      if (hourMatch || minMatch || secMatch) {
+        const h = hourMatch ? parseInt(hourMatch[1], 10) : 0;
+        const m = minMatch ? parseInt(minMatch[1], 10) : 0;
+        const s = secMatch ? parseInt(secMatch[1], 10) : 0;
+        return h * 3600 + m * 60 + s;
+      }
+      if (str.includes(':')) {
+        const parts = str.split(':').map(p => parseInt(p, 10) || 0);
+        return parts.reduce((acc, val) => acc * 60 + val, 0);
+      }
+      const num = parseInt(str.replace(/[^0-9]/g, ''), 10);
+      return isNaN(num) ? 0 : num;
+    };
+    
+    const SHORT_VIDEO_SECONDS = 10;
+    let latestShortVideoId: string | null = null;
+    for (let i = 0; i < messages.length; i++) {
+      const m = messages[i];
+      if ((m.messageType === 'video' || m.contentType === 'video') && !m.isUploading) {
+        const sec = getDurationSeconds(m.videoDuration);
+        if (sec > 0 && sec <= SHORT_VIDEO_SECONDS) {
+          latestShortVideoId = m._id;
+          break; // 倒序数组中第一个即为最新
+        }
+      }
+    }
+    const autoplayEligible = latestShortVideoId === item._id;
+    
     return (
       <MessageRenderer
         item={item}
@@ -1010,6 +1048,7 @@ const ChatScreen: React.FC = () => {
         onCopyMessage={handleCopyMessage}
         onDeleteMessage={handleDeleteMessage}
         onRecallMessage={handleRecallMessage}
+        autoplayEligible={autoplayEligible}
       />
     );
   }, [userInfo, formatMediaUrl, handleViewLocation, contactAvatar, handleCopyMessage, handleDeleteMessage, handleRecallMessage]);

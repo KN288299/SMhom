@@ -1,14 +1,16 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
   Modal,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   Image,
   StyleSheet,
   Dimensions,
   Platform,
+  PanResponder,
+  Animated,
+  ActivityIndicator,
 } from 'react-native';
 import Video from 'react-native-video';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -59,6 +61,32 @@ const FullscreenModals: React.FC<FullscreenModalsProps> = ({
   onVideoLoad = () => {},
   onVideoEnd = () => {},
 }) => {
+  // 手势：点击暂停/播放，垂直滑动退出
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_evt, gestureState) => {
+        const { dx, dy } = gestureState;
+        // 垂直滑动或明显移动时拦截
+        return Math.abs(dy) > 6 || Math.abs(dx) > 6;
+      },
+      onPanResponderRelease: (_evt, gestureState) => {
+        const { dy, vy, dx } = gestureState;
+        const isSwipeToDismiss = Math.abs(dy) > 60 && Math.abs(vy) > 0.3 && Math.abs(dy) > Math.abs(dx);
+        if (isSwipeToDismiss) {
+          onCloseFullscreenVideo();
+          return;
+        }
+        // 视为点击：切换播放/暂停
+        onToggleVideoPlayPause();
+      },
+    })
+  ).current;
+
+  // 缓冲与首帧就绪处理，避免黑屏闪烁
+  const [isBuffering, setIsBuffering] = useState(true);
+  const [isReadyForDisplay, setIsReadyForDisplay] = useState(false);
+  const videoOpacity = useRef(new Animated.Value(0)).current;
   
   // 格式化时间
   const formatTime = (seconds: number) => {
@@ -125,33 +153,59 @@ const FullscreenModals: React.FC<FullscreenModalsProps> = ({
         <View style={styles.fullscreenVideoContainer}>
           {fullscreenVideoUrl && (
             <>
-              <TouchableWithoutFeedback onPress={onToggleVideoControls}>
-                <View style={styles.fullscreenVideoWrapper}>
+              <View style={styles.fullscreenVideoWrapper} {...panResponder.panHandlers}>
+                <Animated.View style={{ flex: 1, opacity: videoOpacity }}>
                   <Video
+                    key={fullscreenVideoUrl}
                     // iOS: 支持 file:// / ph:// / assets-library://
                     source={{ uri: fullscreenVideoUrl }}
                     style={styles.fullscreenVideo}
                     resizeMode="contain"
+                    onLoadStart={() => {
+                      setIsBuffering(true);
+                      setIsReadyForDisplay(false);
+                      videoOpacity.setValue(0);
+                    }}
+                    onBuffer={({ isBuffering }) => setIsBuffering(isBuffering)}
+                    onReadyForDisplay={() => {
+                      setIsReadyForDisplay(true);
+                      setIsBuffering(false);
+                      Animated.timing(videoOpacity, {
+                        toValue: 1,
+                        duration: 200,
+                        useNativeDriver: true,
+                      }).start();
+                    }}
                     onProgress={onVideoProgress}
                     onLoad={onVideoLoad}
                     onEnd={onVideoEnd}
-                    paused={!isVideoPlaying}
-                    repeat={false}
-                    progressUpdateInterval={250}
+                    // 使用 rate 控制播放，避免切换 paused 带来的黑屏闪烁
+                    paused={false}
+                    rate={isVideoPlaying ? 1.0 : 0.0}
+                    repeat={true}
+                    progressUpdateInterval={500}
+                    playInBackground={false}
+                    playWhenInactive={false}
                     {...(Platform.OS === 'android'
                       ? {
                           useTextureView: false,
+                          shutterColor: 'transparent',
                           bufferConfig: {
                             minBufferMs: 20000,
-                            maxBufferMs: 120000,
-                            bufferForPlaybackMs: 3000,
-                            bufferForPlaybackAfterRebufferMs: 6000,
+                            maxBufferMs: 90000,
+                            bufferForPlaybackMs: 2000,
+                            bufferForPlaybackAfterRebufferMs: 4000,
                           },
                         }
                       : {})}
                   />
-                </View>
-              </TouchableWithoutFeedback>
+                </Animated.View>
+                {(isBuffering || !isReadyForDisplay) && (
+                  <View style={styles.bufferingOverlay} pointerEvents="none">
+                    <ActivityIndicator size="large" color="#fff" />
+                  </View>
+                )}
+              </View>
               
               {showVideoControls && (
                 <View style={styles.videoControlsContainer}>
@@ -323,6 +377,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
     borderRadius: 30,
+  },
+  bufferingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
   },
 });
 

@@ -47,6 +47,8 @@ interface VideoMessageItemProps {
   contactAvatar?: string | null;
   userAvatar?: string | null;
   isRead?: boolean;
+  // 仅允许最新的短视频自动播放
+  autoplayEligible?: boolean;
 }
 
 const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
@@ -61,6 +63,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
   contactAvatar,
   userAvatar,
   isRead,
+  autoplayEligible = false,
 }) => {
   const [videoWidth, setVideoWidth] = useState(CONSTANTS.DEFAULT_VIDEO_WIDTH);
   const [videoHeight, setVideoHeight] = useState(CONSTANTS.DEFAULT_VIDEO_HEIGHT);
@@ -99,46 +102,39 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
         return;
       }
 
-      // 如果是上传中的视频，尝试生成缩略图（特别是iOS本地视频）
+      // 如果是上传中的视频，优先用本地地址生成缩略图（iOS/Android 通用）
       if (isUploading) {
-        // 对于iOS本地视频（file://, assets-library://, ph://），尝试生成缩略图
-        if (Platform.OS === 'ios') {
-          const localCandidate = localFileUri || videoUrl;
-          const isLocalScheme = !!localCandidate && (
-            localCandidate.startsWith('file://') ||
-            localCandidate.startsWith('assets-library://') ||
-            localCandidate.startsWith('ph://')
-          );
-          if (isLocalScheme) {
-            const sourceForThumb = localCandidate;
-            console.log('尝试为iOS上传中的本地视频生成缩略图:', sourceForThumb);
-            try {
-              const result = await createThumbnail({
-                url: sourceForThumb,
-                timeStamp: 1000,
-                cacheName: `upload_${Date.now()}`,
-              });
-              if (isMounted && result.path) {
-                console.log('iOS上传中视频缩略图生成成功:', result.path);
-                setThumbnailUrl(result.path);
-                const aspectRatio = result.width / result.height;
-                let newWidth = CONSTANTS.DEFAULT_VIDEO_WIDTH;
-                let newHeight = newWidth / aspectRatio;
-                if (newHeight > CONSTANTS.DEFAULT_VIDEO_HEIGHT) {
-                  newHeight = CONSTANTS.DEFAULT_VIDEO_HEIGHT;
-                  newWidth = newHeight * aspectRatio;
-                }
-                setVideoWidth(newWidth);
-                setVideoHeight(newHeight);
+        const localCandidate = localFileUri || videoUrl;
+        if (localCandidate) {
+          try {
+            const result = await createThumbnail({
+              url: localCandidate,
+              timeStamp: 800,
+              cacheName: `upload_${Date.now()}`,
+            });
+            if (isMounted && result?.path) {
+              console.log('上传中视频缩略图生成成功:', result.path);
+              setThumbnailUrl(result.path);
+              const aspectRatio = Math.max(0.1, result.width / Math.max(1, result.height));
+              let newWidth = Math.min(CONSTANTS.MAX_VIDEO_SIZE, result.width);
+              let newHeight = newWidth / aspectRatio;
+              if (newHeight > CONSTANTS.MAX_VIDEO_SIZE) {
+                newHeight = CONSTANTS.MAX_VIDEO_SIZE;
+                newWidth = newHeight * aspectRatio;
               }
-            } catch (thumbError) {
-              console.log('iOS上传中视频缩略图生成失败:', thumbError);
+              // 保底最小尺寸
+              if (newWidth < CONSTANTS.MIN_VIDEO_SIZE) {
+                newWidth = CONSTANTS.MIN_VIDEO_SIZE;
+                newHeight = newWidth / aspectRatio;
+              }
+              setVideoWidth(newWidth);
+              setVideoHeight(newHeight);
             }
+          } catch (thumbError) {
+            console.log('上传中视频缩略图生成失败:', thumbError);
           }
         }
-        
         if (isMounted) {
-          // 如果没有生成缩略图，使用默认尺寸
           if (!thumbnailUrl) {
             setVideoWidth(CONSTANTS.DEFAULT_VIDEO_WIDTH);
             setVideoHeight(CONSTANTS.DEFAULT_VIDEO_HEIGHT);
@@ -306,7 +302,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
   };
 
   const durationSeconds = parseDurationToSeconds(videoDuration);
-  const shouldAutoplayInBubble = !isMe && durationSeconds > 0 && durationSeconds <= CONSTANTS.SHORT_VIDEO_THRESHOLD_SECONDS;
+  const shouldAutoplayInBubble = autoplayEligible && !isMe && durationSeconds > 0 && durationSeconds <= CONSTANTS.SHORT_VIDEO_THRESHOLD_SECONDS;
 
   const handleLongPress = () => {
     setShowActionSheet(true);
@@ -344,18 +340,21 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
         <View style={styles.videoWithTime}>
           <TouchableOpacity 
             style={[
-              styles.messageBubble, 
-              isMe ? styles.myBubble : styles.otherBubble, 
-              styles.videoBubble,
-              // 容器根据可用宽度等比缩放，避免被父级maxWidth裁剪
+              // 移除彩色气泡外层，直接按比例显示视频矩形
               (() => {
-                const innerMax = Math.max(1, bubbleMaxWidthPx - CONSTANTS.BUBBLE_PADDING * 2);
+                const innerMax = Math.max(1, bubbleMaxWidthPx);
                 const scale = Math.min(1, innerMax / Math.max(1, videoWidth));
                 const displayWidth = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(videoWidth * scale));
-                const displayHeight = Math.max(Math.floor(videoHeight * scale), Math.floor(CONSTANTS.MIN_VIDEO_SIZE * (videoHeight / Math.max(1, videoWidth))));
+                const displayHeight = Math.max(
+                  Math.floor(videoHeight * scale),
+                  Math.floor(CONSTANTS.MIN_VIDEO_SIZE * (videoHeight / Math.max(1, videoWidth)))
+                );
+                const shrinkFactor = 0.7; // 按比例缩小 30%
+                const finalWidth = Math.max(1, Math.floor(displayWidth * shrinkFactor));
+                const finalHeight = Math.max(1, Math.floor(displayHeight * shrinkFactor));
                 return {
-                  width: displayWidth + (CONSTANTS.BUBBLE_PADDING * 2),
-                  height: displayHeight + (CONSTANTS.BUBBLE_PADDING * 2)
+                  width: finalWidth,
+                  height: finalHeight,
                 };
               })()
             ]}
@@ -376,31 +375,19 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
             disabled={isUploading ? !(Platform.OS === 'ios' && !!localFileUri) : !videoUrl}
           >
             {(() => {
-              const innerMax = Math.max(1, bubbleMaxWidthPx - CONSTANTS.BUBBLE_PADDING * 2);
+              const innerMax = Math.max(1, bubbleMaxWidthPx);
               const scale = Math.min(1, innerMax / Math.max(1, videoWidth));
               const displayWidth = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(videoWidth * scale));
-              const displayHeight = Math.max(Math.floor(videoHeight * scale), Math.floor(CONSTANTS.MIN_VIDEO_SIZE * (videoHeight / Math.max(1, videoWidth))));
+              const displayHeight = Math.max(
+                Math.floor(videoHeight * scale),
+                Math.floor(CONSTANTS.MIN_VIDEO_SIZE * (videoHeight / Math.max(1, videoWidth)))
+              );
+              const shrinkFactor = 0.7; // 按比例缩小 30%
+              const finalWidth = Math.max(1, Math.floor(displayWidth * shrinkFactor));
+              const finalHeight = Math.max(1, Math.floor(displayHeight * shrinkFactor));
               return (
-                <View style={[styles.videoContainer, { width: displayWidth, height: displayHeight }]}>
-                  {loading && !isUploading ? (
-                    <View style={styles.videoLoadingContainer}>
-                      <ActivityIndicator size="large" color="#fff" />
-                    </View>
-                  ) : isUploading ? (
-                    <View style={styles.videoUploadingContainer}>
-                      {uploadProgress > 0 ? (
-                        <>
-                          <View style={styles.uploadProgressContainer}>
-                            <View style={[styles.uploadProgressBar, { width: `${uploadProgress}%` }]} />
-                          </View>
-                          <Text style={styles.uploadProgressText}>{`${uploadProgress}%`}</Text>
-                        </>
-                      ) : (
-                        <Text style={styles.uploadProgressText}>正在上传...</Text>
-                      )}
-                      <ActivityIndicator size="small" color="#fff" style={styles.uploadingIndicator} />
-                    </View>
-                  ) : shouldAutoplayInBubble ? (
+                <View style={[styles.videoContainer, { width: finalWidth, height: finalHeight }]}>                    
+                  {shouldAutoplayInBubble ? (
                     <>
                       <Video
                         source={{ uri: videoUrl }}
@@ -478,6 +465,12 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
                           <Text style={styles.videoPlaceholderText}>视频</Text>
                         </View>
                       )}
+                      {/* 加载缩略图时，仅覆盖一个轻量半透明层，不显示正方形黑色全屏 */}
+                      {loading && !thumbnailUrl && (
+                        <View style={styles.videoLoadingOverlay}>
+                          <ActivityIndicator size="small" color="#fff" />
+                        </View>
+                      )}
                       <View style={styles.videoPlayIconContainer}>
                         <Icon name="play-circle" size={40} color="#fff" />
                       </View>
@@ -486,6 +479,24 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
                           {videoDuration || '视频'}
                         </Text>
                       </View>
+                      {/* 上传时显示覆盖层，但当进度接近或达到100%时自动隐藏，避免一直转圈 */}
+                      {isUploading && uploadProgress < 100 && (
+                        <View style={styles.videoUploadingContainer}>
+                          {uploadProgress > 0 ? (
+                            <>
+                              <View style={styles.uploadProgressContainer}>
+                                <View style={[styles.uploadProgressBar, { width: `${Math.min(100, Math.max(0, Math.floor(uploadProgress)))}%` }]} />
+                              </View>
+                              <Text style={styles.uploadProgressText}>{`${Math.min(100, Math.max(0, Math.floor(uploadProgress)))}%`}</Text>
+                            </>
+                          ) : (
+                            <Text style={styles.uploadProgressText}>正在上传...</Text>
+                          )}
+                          {uploadProgress === 0 && (
+                            <ActivityIndicator size="small" color="#fff" style={styles.uploadingIndicator} />
+                          )}
+                        </View>
+                      )}
                     </>
                   )}
                 </View>
@@ -536,7 +547,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   avatarContainer: {
-    marginHorizontal: 8,
+    marginHorizontal: 2,
   },
   avatar: {
     width: 50,
@@ -687,6 +698,7 @@ export default memo(VideoMessageItem, (prevProps, nextProps) => {
     prevProps.isUploading === nextProps.isUploading &&
     prevProps.uploadProgress === nextProps.uploadProgress &&
     prevProps.contactAvatar === nextProps.contactAvatar &&
-    prevProps.userAvatar === nextProps.userAvatar
+    prevProps.userAvatar === nextProps.userAvatar &&
+    prevProps.autoplayEligible === nextProps.autoplayEligible
   );
 }); 
