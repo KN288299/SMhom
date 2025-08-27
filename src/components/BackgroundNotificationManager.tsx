@@ -49,19 +49,15 @@ const BackgroundNotificationManager: React.FC = () => {
       if (AppState.currentState !== 'active') {
         console.log('📨 [BackgroundNotification] 后台收到新消息');
         
-        // 获取发送者名称
-        let senderName = '未知用户';
-        if (message.senderRole === 'customer_service') {
-          senderName = '客服';
-        } else {
-          senderName = '用户';
-        }
+        // 获取发送者名称（优先后端提供的senderName，其次根据角色回退）
+        const senderName = message?.senderName
+          || (message.senderRole === 'customer_service' ? '客服' : '用户');
         
         // 显示消息通知
         notificationService.showMessageNotification(
           senderName,
           message.content,
-          'conversation-id' // 暂时使用固定值，实际使用时从其他地方获取
+          message?.conversationId || ''
         );
       } else {
         console.log('📨 [BackgroundNotification] 前台收到消息，不显示通知');

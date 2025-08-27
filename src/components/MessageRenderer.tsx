@@ -45,7 +45,7 @@ interface MessageRendererProps {
   item: Message;
   userInfo: any;
   onOpenFullscreenImage: (imageUrl: string) => void;
-  onOpenFullscreenVideo: (videoUrl: string) => void;
+  onOpenFullscreenVideo: (videoUrl: string, posterUrl?: string | null) => void;
   onViewLocation?: (location: { latitude: number; longitude: number; locationName?: string; address?: string }) => void;
   formatMediaUrl: (url: string) => string;
   contactAvatar?: string | null;
@@ -169,7 +169,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
             onPress={(url) => {
               const canPreviewLocal = !!(item.localFileUri && (item.localFileUri.startsWith('file://') || item.localFileUri.startsWith('ph://') || item.localFileUri.startsWith('assets-library://')));
               if (canPreviewLocal) {
-                onOpenFullscreenVideo(item.localFileUri!);
+                onOpenFullscreenVideo(item.localFileUri!, (item as any).videoThumbLocalPath);
               }
             }}
             isUploading={true}
@@ -208,10 +208,10 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
                   (item.localFileUri.startsWith('file://') || 
                    item.localFileUri.startsWith('ph://') || 
                    item.localFileUri.startsWith('assets-library://'))) {
-                onOpenFullscreenVideo(item.localFileUri);
+                onOpenFullscreenVideo(item.localFileUri, (item as any).videoThumbLocalPath);
               } else {
                 // 使用应用内视频播放器
-                onOpenFullscreenVideo(url);
+                onOpenFullscreenVideo(url, (item as any).videoThumbLocalPath);
               }
             }}
             localFileUri={item.localFileUri}

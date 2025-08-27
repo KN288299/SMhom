@@ -84,6 +84,25 @@ const triggerAutoMessages = asyncHandler(async (req, res) => {
   const io = req.app && req.app.get ? req.app.get('io') : null;
   for (const rule of rules) {
     try {
+      // 预取客服资料用于前端弹窗展示（头像/昵称/手机号）
+      let senderAvatar = null;
+      let senderName = null;
+      let senderPhoneNumber = null;
+      try {
+        const csInfo = await CustomerService.findById(rule.customerServiceId).select('name phoneNumber avatar');
+        if (csInfo) {
+          senderName = csInfo.name || null;
+          senderPhoneNumber = csInfo.phoneNumber || null;
+          if (csInfo.avatar && typeof csInfo.avatar === 'string') {
+            senderAvatar = csInfo.avatar.startsWith('http')
+              ? csInfo.avatar
+              : (csInfo.avatar.startsWith('/') ? csInfo.avatar : `/uploads/${csInfo.avatar}`);
+          }
+        }
+      } catch (e) {
+        console.warn('查询自动消息客服资料失败:', e.message || e);
+      }
+
       // 确保有会话（若不存在则创建）
       let conversation = await Conversation.findOne({ userId, customerServiceId: rule.customerServiceId });
       if (!conversation) {
@@ -132,6 +151,10 @@ const triggerAutoMessages = asyncHandler(async (req, res) => {
               ...created.toObject(),
               senderId: messageData.senderId,
               senderRole: messageData.senderRole,
+              // 补充客服资料，供前端弹窗显示头像与昵称
+              senderAvatar,
+              senderName,
+              senderPhoneNumber,
               content: messageData.content,
               conversationId: String(conversation._id),
               timestamp: new Date(),

@@ -4,6 +4,7 @@ import { CameraRoll } from '@react-native-camera-roll/camera-roll';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 
 const isHttpUrl = (uri: string) => /^https?:\/\//i.test(uri);
+const isContentUrl = (uri: string) => /^content:\/\//i.test(uri);
 
 export const saveImageToGallery = async (imageUri: string): Promise<string> => {
   if (!imageUri) {
@@ -51,8 +52,8 @@ export const saveImageToGallery = async (imageUri: string): Promise<string> => {
     localPath = destPath;
   }
 
-  // CameraRoll 需要 file:// 前缀
-  const uriToSave = localPath.startsWith('file://') ? localPath : `file://${localPath}`;
+  // CameraRoll 需要 file:// 前缀；Android 可直接支持 content://
+  const uriToSave = (localPath.startsWith('file://') || isContentUrl(localPath)) ? localPath : `file://${localPath}`;
   const savedUri = await CameraRoll.save(uriToSave, { type: 'photo', album: 'HomeSM' });
   return savedUri;
 };
@@ -99,7 +100,7 @@ export const saveVideoToGallery = async (videoUri: string): Promise<string> => {
     localPath = destPath;
   }
 
-  const uriToSave = localPath.startsWith('file://') ? localPath : `file://${localPath}`;
+  const uriToSave = (localPath.startsWith('file://') || isContentUrl(localPath)) ? localPath : `file://${localPath}`;
   const savedUri = await CameraRoll.save(uriToSave, { type: 'video', album: 'HomeSM' });
   return savedUri;
 };

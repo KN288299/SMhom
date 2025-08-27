@@ -37,6 +37,7 @@ interface Message {
   locationName?: string;
   address?: string;
   // New optional fields for banner display
+  senderAvatar?: string;
   senderName?: string;
   senderPhoneNumber?: string;
 }

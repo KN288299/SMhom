@@ -303,6 +303,7 @@ const ChatScreen: React.FC = () => {
   const [fullscreenImageUrl, setFullscreenImageUrl] = useState('');
   const [showFullscreenVideo, setShowFullscreenVideo] = useState(false);
   const [fullscreenVideoUrl, setFullscreenVideoUrl] = useState('');
+  const [fullscreenPosterUrl, setFullscreenPosterUrl] = useState('');
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
@@ -358,6 +359,23 @@ const ChatScreen: React.FC = () => {
       sendVoiceMessage(audioUrl, duration);
     },
   });
+
+  // 路由参数变化时，同步本地会话和头像，并重新加入会话房间
+  useEffect(() => {
+    // 同步头像
+    if (routeContactAvatar !== undefined && routeContactAvatar !== contactAvatar) {
+      setContactAvatar(routeContactAvatar || null);
+    }
+    // 同步会话ID并加入会话
+    if (routeConversationId && routeConversationId !== conversationId) {
+      setConversationId(routeConversationId);
+      try {
+        globalJoinConversation(routeConversationId);
+      } catch (e) {
+        console.warn('加入会话失败:', e);
+      }
+    }
+  }, [routeConversationId, routeContactAvatar]);
 
   // 为了兼容现有代码，直接解构到原变量名
   const {
@@ -2047,9 +2065,10 @@ const ChatScreen: React.FC = () => {
   };
   
   // 打开全屏视频播放器
-  const openFullscreenVideo = (videoUrl: string) => {
+  const openFullscreenVideo = (videoUrl: string, posterUrl?: string | null) => {
     console.log('打开全屏视频播放器，URL:', videoUrl);
     setFullscreenVideoUrl(videoUrl);
+    setFullscreenPosterUrl(posterUrl || '');
     setShowFullscreenVideo(true);
     setIsVideoPlaying(true); // 修改为true，实现自动播放
     setVideoProgress(0);
@@ -2073,6 +2092,7 @@ const ChatScreen: React.FC = () => {
     setVideoProgress(0);
     setVideoDuration(0);
     setVideoCurrentTime(0);
+    setFullscreenPosterUrl('');
     setShowVideoControls(true);
     
     // 清除控制器自动隐藏定时器
@@ -2106,23 +2126,19 @@ const ChatScreen: React.FC = () => {
     }
   };
 
-  // 视频播放进度回调
-  const onVideoProgress = (() => {
-    // 节流进度更新，降低全屏播放过程中的频繁re-render
-    let last = 0;
-    return (data: any) => {
-      const now = Date.now();
-      if (now - last < 150 && data.currentTime !== 0 && data.seekableDuration === 0) {
-        // 在加载初期或seekableDuration异常时，不频繁更新
-        return;
-      }
-      last = now;
-      setVideoCurrentTime(data.currentTime);
-      if (videoDuration > 0) {
-        setVideoProgress(data.currentTime / videoDuration);
-      }
-    };
-  })();
+  // 视频播放进度回调（使用ref持久节流，避免每次渲染重置节流时间）
+  const videoProgressLastRef = useRef<number>(0);
+  const onVideoProgress = useCallback((data: any) => {
+    const now = Date.now();
+    if (now - videoProgressLastRef.current < 150 && data.currentTime !== 0 && data.seekableDuration === 0) {
+      return;
+    }
+    videoProgressLastRef.current = now;
+    setVideoCurrentTime(data.currentTime);
+    if (videoDuration > 0) {
+      setVideoProgress(data.currentTime / Math.max(1e-3, videoDuration));
+    }
+  }, [videoDuration]);
 
   // 视频加载完成回调
   const onVideoLoad = (data: any) => {
@@ -2452,6 +2468,7 @@ const ChatScreen: React.FC = () => {
         onCloseFullscreenImage={closeFullscreenImage}
         showFullscreenVideo={showFullscreenVideo}
         fullscreenVideoUrl={fullscreenVideoUrl}
+        fullscreenPosterUrl={fullscreenPosterUrl}
         isVideoPlaying={isVideoPlaying}
         videoProgress={videoProgress}
         videoDuration={videoDuration}

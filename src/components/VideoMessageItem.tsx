@@ -87,6 +87,8 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [bubbleVideoReady, setBubbleVideoReady] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
+  const lastBufferUpdateRef = useRef<number>(0);
+  const bubbleReadyFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mediaAspectRatio, setMediaAspectRatio] = useState<number>(() => {
     // 按真实视频宽高比初始化（若父级已提供初始尺寸则直接使用）
     const width = initialWidth || videoWidth || CONSTANTS.DEFAULT_VIDEO_WIDTH;
@@ -124,11 +126,37 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 解析时长字符串为秒，支持 mm:ss / hh:mm:ss / 数字 / 带“秒”或“s”
+  const parseDurationToSeconds = (duration?: string): number => {
+    if (!duration) return 0;
+    const str = String(duration).trim();
+    // 尝试中文单位
+    const hourMatch = str.match(/(\d+)\s*(小时|h)/i);
+    const minMatch = str.match(/(\d+)\s*(分|min)/i);
+    const secMatch = str.match(/(\d+)\s*(秒|s)/i);
+    if (hourMatch || minMatch || secMatch) {
+      const h = hourMatch ? parseInt(hourMatch[1], 10) : 0;
+      const m = minMatch ? parseInt(minMatch[1], 10) : 0;
+      const s = secMatch ? parseInt(secMatch[1], 10) : 0;
+      return h * 3600 + m * 60 + s;
+    }
+    if (str.includes(':')) {
+      const parts = str.split(':').map(p => parseInt(p, 10) || 0);
+      return parts.reduce((acc, val) => acc * 60 + val, 0);
+    }
+    const num = parseInt(str.replace(/[^0-9]/g, ''), 10);
+    return isNaN(num) ? 0 : num;
+  };
+
   // 生成视频缩略图
   useEffect(() => {
     let isMounted = true;
 
     const generateThumbnail = async () => {
+      // 仅对可见项生成，降低离屏开销
+      if (!isItemVisible) {
+        return;
+      }
       if (!videoUrl) {
         if (isMounted) {
           setLoading(false);
@@ -157,7 +185,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
           try {
             const result = await createThumbnail({
               url: localCandidate,
-              timeStamp: 800,
+              timeStamp: 300,
               cacheName: `upload_${Date.now()}`,
             });
             if (isMounted && result?.path) {
@@ -178,7 +206,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
         return;
       }
 
-      if (isMounted) {
+      if (isMounted && isItemVisible) {
         setLoading(true);
         setThumbnailError(false);
         fadeAnim.setValue(0);
@@ -218,9 +246,12 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
         }
         console.log('开始为视频生成缩略图:', fullVideoUrl);
         
+        // 短视频优先抽取更靠前的帧，默认300ms，最长不超过500ms
+        const seconds = parseDurationToSeconds(videoDuration);
+        const dynamicTs = seconds > 0 ? Math.min(500, Math.max(200, Math.floor(seconds * 200))) : 300;
         const result = await createThumbnail({
           url: fullVideoUrl,
-          timeStamp: 1000,
+          timeStamp: dynamicTs,
           cacheName: videoUrl.split('/').pop(),
         });
 
@@ -272,29 +303,17 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [videoUrl, isUploading, fadeAnim]);
+  }, [videoUrl, isUploading, fadeAnim, isItemVisible, videoDuration]);
 
-  // 解析时长字符串为秒，支持 mm:ss / hh:mm:ss / 数字 / 带“秒”或“s”
-  const parseDurationToSeconds = (duration?: string): number => {
-    if (!duration) return 0;
-    const str = String(duration).trim();
-    // 尝试中文单位
-    const hourMatch = str.match(/(\d+)\s*(小时|h)/i);
-    const minMatch = str.match(/(\d+)\s*(分|min)/i);
-    const secMatch = str.match(/(\d+)\s*(秒|s)/i);
-    if (hourMatch || minMatch || secMatch) {
-      const h = hourMatch ? parseInt(hourMatch[1], 10) : 0;
-      const m = minMatch ? parseInt(minMatch[1], 10) : 0;
-      const s = secMatch ? parseInt(secMatch[1], 10) : 0;
-      return h * 3600 + m * 60 + s;
-    }
-    if (str.includes(':')) {
-      const parts = str.split(':').map(p => parseInt(p, 10) || 0);
-      return parts.reduce((acc, val) => acc * 60 + val, 0);
-    }
-    const num = parseInt(str.replace(/[^0-9]/g, ''), 10);
-    return isNaN(num) ? 0 : num;
-  };
+  // 卸载时清理全屏就绪兜底定时器
+  useEffect(() => {
+    return () => {
+      if (bubbleReadyFallbackTimerRef.current) {
+        clearTimeout(bubbleReadyFallbackTimerRef.current);
+        bubbleReadyFallbackTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const durationSeconds = parseDurationToSeconds(videoDuration);
   // 自动播放：仅在对方消息、父级标记允许、页面在焦点且该条目可见，并且时长<=5秒
@@ -332,17 +351,20 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
         </View>
       )}
       
-      <View style={styles.messageContent}>
-        <View style={styles.videoWithTime}>
-          <TouchableOpacity 
-            style={(() => {
-              // 外层Touchable与内层容器同尺寸，避免加载前后尺寸跳变
-              const innerMax = Math.max(1, bubbleMaxWidthPx);
-              const aspect = Math.max(0.1, mediaAspectRatio);
-              let displayWidth = innerMax;
-              let displayHeight = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayWidth / aspect));
-              return { width: displayWidth, height: displayHeight };
-            })()}
+              <View style={styles.messageContent}>
+          <View style={styles.videoWithTime}>
+            <TouchableOpacity 
+              style={(() => {
+                // 外层Touchable与内层容器同尺寸，避免加载前后尺寸跳变
+                const innerMax = Math.max(1, bubbleMaxWidthPx);
+                const aspect = Math.max(0.1, mediaAspectRatio);
+                let displayWidth = innerMax;
+                let displayHeight = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayWidth / aspect));
+                // iOS和Android都应用70%缩放，保持一致的视觉效果
+                displayWidth = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayWidth * 0.7));
+                displayHeight = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayHeight * 0.7));
+                return { width: displayWidth, height: displayHeight };
+              })()}
             onPress={() => {
               if (isUploading) {
                 if (Platform.OS === 'ios' && localFileUri) {
@@ -367,31 +389,64 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
               let displayWidth = innerMax;
               // 保持宽高比得到高度
               let displayHeight = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayWidth / aspect));
-              // iOS 再整体缩小30%（宽高等比），与安卓视觉一致
-              if (Platform.OS === 'ios') {
-                displayWidth = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayWidth * 0.7));
-                displayHeight = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayHeight * 0.7));
-              }
+              // iOS和Android都应用70%缩放，保持一致的视觉效果
+              displayWidth = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayWidth * 0.7));
+              displayHeight = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayHeight * 0.7));
               return (
                 <View style={[styles.videoContainer, { width: displayWidth, height: displayHeight }]}>                    
                   {shouldAutoplayInBubble ? (
                     <>
                       <Video
+                        key={videoUrl}
                         source={{ uri: videoUrl }}
                         style={{ width: '100%', height: '100%' }}
                         resizeMode="contain"
                         repeat={true}
                         muted
-                        paused={!shouldAutoplayInBubble || !bubbleVideoReady || isBuffering}
+                        // 使用 rate 控制播放，避免切换 paused 导致的黑屏闪烁
+                        paused={false}
+                        rate={shouldAutoplayInBubble && bubbleVideoReady ? 1.0 : 0.0}
                         controls={false}
                         ignoreSilentSwitch="obey"
                         poster={thumbnailUrl || undefined}
-                        onLoad={() => {
+                        posterResizeMode="cover"
+                        onLoadStart={() => {
+                          setBubbleVideoReady(false);
+                          setIsBuffering(true);
+                          if (bubbleReadyFallbackTimerRef.current) {
+                            clearTimeout(bubbleReadyFallbackTimerRef.current);
+                            bubbleReadyFallbackTimerRef.current = null;
+                          }
+                        }}
+                        onReadyForDisplay={() => {
+                          if (bubbleReadyFallbackTimerRef.current) {
+                            clearTimeout(bubbleReadyFallbackTimerRef.current);
+                            bubbleReadyFallbackTimerRef.current = null;
+                          }
                           setBubbleVideoReady(true);
                           setIsBuffering(false);
                         }}
+                        onLoad={() => {
+                          // 兜底：若部分机型不触发 onReadyForDisplay，则在 800ms 后直接显示
+                          if (bubbleReadyFallbackTimerRef.current) {
+                            clearTimeout(bubbleReadyFallbackTimerRef.current);
+                          }
+                          bubbleReadyFallbackTimerRef.current = setTimeout(() => {
+                            setBubbleVideoReady(true);
+                            setIsBuffering(false);
+                          }, 800);
+                        }}
                         onBuffer={(e: any) => {
-                          setIsBuffering(!!e?.isBuffering);
+                          const now = Date.now();
+                          const next = !!e?.isBuffering;
+                          if (next) {
+                            if (now - lastBufferUpdateRef.current < 300) return;
+                            lastBufferUpdateRef.current = now;
+                            setIsBuffering(true);
+                          } else {
+                            lastBufferUpdateRef.current = now;
+                            setIsBuffering(false);
+                          }
                         }}
                         onError={() => {
                           setBubbleVideoReady(false);
@@ -400,14 +455,22 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
                         {...(Platform.OS === 'android'
                           ? {
                               useTextureView: false,
+                              shutterColor: 'transparent',
+                              minLoadRetryCount: 2,
                               bufferConfig: {
-                                minBufferMs: 15000,
-                                maxBufferMs: 60000,
-                                bufferForPlaybackMs: 2000,
-                                bufferForPlaybackAfterRebufferMs: 4000,
+                                minBufferMs: 5000,
+                                maxBufferMs: 20000,
+                                bufferForPlaybackMs: 300,
+                                bufferForPlaybackAfterRebufferMs: 1500,
                               },
                             }
-                          : {})}
+                          : {
+                              // iOS 播放更快出现首帧，减少卡顿
+                              preferredForwardBufferDuration: 1.5,
+                              automaticallyWaitsToMinimizeStalling: false,
+                            })}
+                        playInBackground={false}
+                        playWhenInactive={false}
                       />
                       {(!bubbleVideoReady || isBuffering) && (
                         <View style={styles.videoLoadingOverlay}>
@@ -526,7 +589,9 @@ const styles = StyleSheet.create({
     borderRadius: 25,
   },
   messageContent: {
-    width: '70%',
+    flex: 1,
+    marginLeft: 8,
+    marginRight: 8,
   },
   videoWithTime: {
     flexDirection: 'row',

@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,7 @@ interface FullscreenModalsProps {
   // 全屏视频相关（可选）
   showFullscreenVideo?: boolean;
   fullscreenVideoUrl?: string;
+  fullscreenPosterUrl?: string;
   isVideoPlaying?: boolean;
   videoProgress?: number;
   videoDuration?: number;
@@ -49,6 +50,7 @@ const FullscreenModals: React.FC<FullscreenModalsProps> = ({
   // 全屏视频相关（可选）
   showFullscreenVideo = false,
   fullscreenVideoUrl = '',
+  fullscreenPosterUrl = '',
   isVideoPlaying = false,
   videoProgress = 0,
   videoDuration = 0,
@@ -77,8 +79,8 @@ const FullscreenModals: React.FC<FullscreenModalsProps> = ({
           onCloseFullscreenVideo();
           return;
         }
-        // 视为点击：切换播放/暂停
-        onToggleVideoPlayPause();
+        // 视为点击：切换显示/隐藏控件（返回/暂停/保存）
+        onToggleVideoControls();
       },
     })
   ).current;
@@ -87,6 +89,27 @@ const FullscreenModals: React.FC<FullscreenModalsProps> = ({
   const [isBuffering, setIsBuffering] = useState(true);
   const [isReadyForDisplay, setIsReadyForDisplay] = useState(false);
   const videoOpacity = useRef(new Animated.Value(0)).current;
+  const bufferUpdateRef = useRef<number>(0);
+  const readyFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (readyFallbackTimerRef.current) {
+        clearTimeout(readyFallbackTimerRef.current);
+        readyFallbackTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const makeReady = useCallback(() => {
+    setIsReadyForDisplay(true);
+    setIsBuffering(false);
+    Animated.timing(videoOpacity, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [videoOpacity]);
   
   // 格式化时间
   const formatTime = (seconds: number) => {
@@ -161,24 +184,55 @@ const FullscreenModals: React.FC<FullscreenModalsProps> = ({
                     source={{ uri: fullscreenVideoUrl }}
                     style={styles.fullscreenVideo}
                     resizeMode="contain"
+                    poster={fullscreenPosterUrl || undefined}
+                    posterResizeMode="cover"
                     onLoadStart={() => {
                       setIsBuffering(true);
                       setIsReadyForDisplay(false);
                       videoOpacity.setValue(0);
+                      if (readyFallbackTimerRef.current) {
+                        clearTimeout(readyFallbackTimerRef.current);
+                        readyFallbackTimerRef.current = null;
+                      }
                     }}
-                    onBuffer={({ isBuffering }) => setIsBuffering(isBuffering)}
+                    onBuffer={({ isBuffering }) => {
+                      const now = Date.now();
+                      if (isBuffering) {
+                        if (now - bufferUpdateRef.current < 300) return;
+                        bufferUpdateRef.current = now;
+                        setIsBuffering(true);
+                      } else {
+                        bufferUpdateRef.current = now;
+                        setIsBuffering(false);
+                      }
+                    }}
                     onReadyForDisplay={() => {
-                      setIsReadyForDisplay(true);
-                      setIsBuffering(false);
-                      Animated.timing(videoOpacity, {
-                        toValue: 1,
-                        duration: 200,
-                        useNativeDriver: true,
-                      }).start();
+                      if (readyFallbackTimerRef.current) {
+                        clearTimeout(readyFallbackTimerRef.current);
+                        readyFallbackTimerRef.current = null;
+                      }
+                      makeReady();
                     }}
-                    onProgress={onVideoProgress}
-                    onLoad={onVideoLoad}
+                    onProgress={(data) => {
+                      // 将进度上抛
+                      onVideoProgress && onVideoProgress(data);
+                    }}
+                    onLoad={(data) => {
+                      // 上抛 onLoad，并设置兜底：若 800ms 内未触发 onReadyForDisplay，则直接就绪
+                      onVideoLoad && onVideoLoad(data);
+                      if (readyFallbackTimerRef.current) {
+                        clearTimeout(readyFallbackTimerRef.current);
+                      }
+                      readyFallbackTimerRef.current = setTimeout(() => {
+                        makeReady();
+                      }, 800);
+                    }}
                     onEnd={onVideoEnd}
+                    onError={(e: any) => {
+                      console.log('❌ 全屏视频播放失败:', (e && (e.error || e)));
+                      setIsBuffering(false);
+                      setIsReadyForDisplay(false);
+                    }}
                     // 使用 rate 控制播放，避免切换 paused 带来的黑屏闪烁
                     paused={false}
                     rate={isVideoPlaying ? 1.0 : 0.0}
@@ -190,14 +244,18 @@ const FullscreenModals: React.FC<FullscreenModalsProps> = ({
                       ? {
                           useTextureView: false,
                           shutterColor: 'transparent',
+                          minLoadRetryCount: 2,
                           bufferConfig: {
-                            minBufferMs: 20000,
-                            maxBufferMs: 90000,
-                            bufferForPlaybackMs: 2000,
-                            bufferForPlaybackAfterRebufferMs: 4000,
+                            minBufferMs: 5000,
+                            maxBufferMs: 20000,
+                            bufferForPlaybackMs: 300,
+                            bufferForPlaybackAfterRebufferMs: 1500,
                           },
                         }
-                      : {})}
+                      : {
+                          preferredForwardBufferDuration: 1.5,
+                          automaticallyWaitsToMinimizeStalling: false,
+                        })}
                   />
                 </Animated.View>
                 {(isBuffering || !isReadyForDisplay) && (
