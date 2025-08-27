@@ -166,13 +166,37 @@ const HomeScreen: React.FC = () => {
       }
       
       if (refresh) {
-        setStaffData(data);
+        // 刷新：覆盖并去重
+        const uniqueMap = new Map<string, StaffMember>();
+        data.forEach((item: StaffMember) => {
+          const uniqueId = (item as any)._id || item.id;
+          if (uniqueId && !uniqueMap.has(uniqueId)) {
+            uniqueMap.set(uniqueId, item);
+          }
+        });
+        setStaffData(Array.from(uniqueMap.values()));
       } else if (currentPage === 1) {
-        setStaffData(data);
+        // 首次页：直接去重后设置
+        const uniqueMap = new Map<string, StaffMember>();
+        data.forEach((item: StaffMember) => {
+          const uniqueId = (item as any)._id || item.id;
+          if (uniqueId && !uniqueMap.has(uniqueId)) {
+            uniqueMap.set(uniqueId, item);
+          }
+        });
+        setStaffData(Array.from(uniqueMap.values()));
       } else {
+        // 分页：合并后去重
         setStaffData(prevData => {
-          const newData = [...prevData, ...data];
-          return newData;
+          const merged = [...prevData, ...data];
+          const uniqueMap = new Map<string, StaffMember>();
+          merged.forEach((item: StaffMember) => {
+            const uniqueId = (item as any)._id || item.id;
+            if (uniqueId && !uniqueMap.has(uniqueId)) {
+              uniqueMap.set(uniqueId, item);
+            }
+          });
+          return Array.from(uniqueMap.values());
         });
       }
       
@@ -203,7 +227,8 @@ const HomeScreen: React.FC = () => {
 
   // 加载更多数据
   const handleLoadMore = React.useCallback(() => {
-    if (!hasMoreData || loading || loadingMore) return;
+    // 正在刷新或加载时禁止触发，避免并发导致重复
+    if (!hasMoreData || loading || loadingMore || refreshing) return;
     
     setLoadingMore(true);
     setPage(prevPage => {
@@ -212,7 +237,7 @@ const HomeScreen: React.FC = () => {
       loadStaffData(false, false, newPage);
       return newPage;
     });
-  }, [hasMoreData, loading, loadingMore, loadStaffData]);
+  }, [hasMoreData, loading, loadingMore, refreshing, loadStaffData]);
 
   // 重试加载数据
   const handleRetry = React.useCallback(() => {
@@ -532,7 +557,7 @@ const HomeScreen: React.FC = () => {
           <FlatList
             data={staffData}
             renderItem={renderItem}
-            keyExtractor={item => item.id}
+            keyExtractor={(item: StaffMember) => (item as any)._id || item.id}
             numColumns={2}
             columnWrapperStyle={styles.columnWrapper}
             contentContainerStyle={styles.flatListContent}
