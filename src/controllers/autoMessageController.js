@@ -80,6 +80,8 @@ const triggerAutoMessages = asyncHandler(async (req, res) => {
   }
 
   let triggeredCount = 0;
+  // 获取全局 io 实例（server.js 挂载）
+  const io = req.app && req.app.get ? req.app.get('io') : null;
   for (const rule of rules) {
     try {
       // 确保有会话（若不存在则创建）
@@ -117,11 +119,28 @@ const triggerAutoMessages = asyncHandler(async (req, res) => {
           if (m.aspectRatio) messageData.aspectRatio = m.aspectRatio;
         }
 
-        await Message.create(messageData);
+        const created = await Message.create(messageData);
         conversation.lastMessage = messageData.content || m.contentType;
         conversation.lastMessageTime = Date.now();
         // 未读计数：增加用户未读
         conversation.unreadCountUser += 1;
+
+        // 实时广播给用户（前台显示横幅并震动；底部未读徽标更新）
+        if (io) {
+          try {
+            io.to(String(userId)).emit('receive_message', {
+              ...created.toObject(),
+              senderId: messageData.senderId,
+              senderRole: messageData.senderRole,
+              content: messageData.content,
+              conversationId: String(conversation._id),
+              timestamp: new Date(),
+              messageType: messageData.messageType || messageData.contentType || 'text',
+            });
+          } catch (e) {
+            console.warn('广播自动消息失败:', e.message);
+          }
+        }
       }
       await conversation.save();
       triggeredCount += 1;

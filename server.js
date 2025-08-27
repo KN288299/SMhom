@@ -49,6 +49,9 @@ const io = socketIO(server, {
   }
 });
 
+// 将 io 挂载到 app，供各个控制器通过 req.app.get('io') 获取并广播
+app.set('io', io);
+
 // 连接数据库
 connectDB();
 
