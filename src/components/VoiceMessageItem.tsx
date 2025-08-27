@@ -133,7 +133,15 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
           recommendations: recommendations
         });
         
-        // 如果有兼容性问题，记录警告但继续尝试播放
+        // 如果存在明显不兼容（如 iOS 播放 3gp/amr/opus），直接给出提示并避免崩溃
+        const fatalUnsupportedOnIOS = Platform.OS === 'ios' && ['3gp', 'amr', 'ogg', 'opus'].includes(compatInfo.sourceFormat);
+        if (fatalUnsupportedOnIOS) {
+          AudioCompatibility.logCompatibilityIssue(fullAudioUrl, 'iOS不支持的安卓音频格式');
+          Alert.alert('无法播放', '该语音采用安卓专用音频格式，iOS无法直接播放。请对方更新至最新版或重新发送语音。');
+          isStartingRef.current = false;
+          return;
+        }
+        // 非致命：记录警告但继续尝试播放
         if (!compatInfo.canPlayDirectly) {
           console.warn('⚠️ 音频格式可能存在兼容性问题，但仍会尝试播放');
           AudioCompatibility.logCompatibilityIssue(fullAudioUrl, '格式兼容性警告');

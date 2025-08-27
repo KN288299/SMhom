@@ -359,8 +359,19 @@ export const useVoiceRecorder = ({
             AVSampleRateKeyIOS: 44100,
           } as any);
         } else {
-          // Android：很多设备底层编码为 AAC，容器为 m4a(mp4)。保持路径后缀为 .m4a
-          result = await audioRecorderPlayerRef.current.startRecorder(audioPath);
+          // Android：强制使用 AAC 编码 + MPEG_4 容器，确保与 iOS 兼容
+          // 参考 MediaRecorder 常量：
+          // AudioEncoder.AAC = 3, OutputFormat.MPEG_4 = 2, AudioSource.MIC = 1
+          result = await audioRecorderPlayerRef.current.startRecorder(
+            audioPath,
+            {
+              AudioEncoderAndroid: 3,
+              OutputFormatAndroid: 2,
+              AudioSourceAndroid: 1,
+              AudioEncodingBitRateAndroid: 128000,
+              AudioSamplingRateAndroid: 44100,
+            } as any
+          );
         }
       } catch (startErr: any) {
         console.warn('首次启动录音失败，尝试回退路径:', startErr?.message || startErr);

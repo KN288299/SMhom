@@ -69,6 +69,12 @@ class AudioCompatibility {
       sourceFormat = 'wav';
     } else if (url.includes('.aac')) {
       sourceFormat = 'aac';
+    } else if (url.includes('.3gp') || url.includes('.3gpp')) {
+      sourceFormat = '3gp';
+    } else if (url.includes('.amr')) {
+      sourceFormat = 'amr';
+    } else if (url.includes('.ogg') || url.includes('.opus')) {
+      sourceFormat = url.includes('.opus') ? 'opus' : 'ogg';
     }
 
     const targetFormat = this.getPreferredAudioFormat();
@@ -114,7 +120,9 @@ class AudioCompatibility {
         'm4a',    // 大多数设备支持
         'aac',    // 原生支持
         'wav',    // 支持但文件大
-        'ogg'     // Android特有
+        'ogg',    // Android特有
+        '3gp',    // 某些安卓录音器使用
+        'opus'    // 某些安卓设备/应用生成
       ];
     }
   }

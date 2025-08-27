@@ -258,6 +258,12 @@ const audioStorage = multer.diskStorage({
       ext = '.m4a';
     } else if (type === 'audio/wav' || type === 'audio/x-wav') {
       ext = '.wav';
+    } else if (type === 'audio/3gpp' || type === 'audio/3gp' || originalExt === '.3gp') {
+      // 部分安卓设备/应用产生 3GP 容器
+      ext = '.3gp';
+    } else if (type === 'audio/amr' || type === 'audio/amr-wb' || originalExt === '.amr') {
+      // AMR 窄带/宽带
+      ext = '.amr';
     } else if (originalExt === '.mp3') {
       ext = '.mp3';
     } else if (originalExt === '.wav') {
