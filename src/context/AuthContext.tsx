@@ -144,13 +144,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     try {
       console.log('正在刷新用户信息...');
-      const response = await axios.get(`${API_URL}/users/profile`, {
+      
+      // 根据token前缀判断用户类型
+      let endpoint = '';
+      if (userToken.startsWith('CS_')) {
+        // 客服用户
+        endpoint = `${API_URL}/customer-service/profile`;
+      } else {
+        // 普通用户
+        endpoint = `${API_URL}/users/profile`;
+      }
+      
+      const response = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${userToken}` }
       });
       
       if (response.data) {
         console.log('用户信息刷新成功:', response.data);
-        console.log('VIP状态:', response.data.isVip, 'VIP到期时间:', response.data.vipExpiryDate);
+        if (response.data.isVip !== undefined) {
+          console.log('VIP状态:', response.data.isVip, 'VIP到期时间:', response.data.vipExpiryDate);
+        }
         setUserInfo(response.data);
         await AsyncStorage.setItem('userInfo', JSON.stringify(response.data));
         return true;

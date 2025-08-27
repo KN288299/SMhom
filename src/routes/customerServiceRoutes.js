@@ -8,6 +8,7 @@ const {
   deleteCustomerService,
   uploadAvatar,
   updateStatus,
+  getCustomerServiceProfile,
   upload
 } = require('../controllers/customerServiceController');
 const { protectAdmin } = require('../middleware/adminMiddleware');
@@ -18,6 +19,9 @@ const router = express.Router();
 
 // 公共路由
 router.post('/login', loginCustomerService);
+
+// 客服个人资料获取
+router.get('/profile', protectCustomerService, getCustomerServiceProfile);
 
 // 用户可访问的客服列表（只返回在线的客服）
 router.get('/active', protect, getAllCustomerServices);

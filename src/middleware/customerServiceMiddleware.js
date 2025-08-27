@@ -59,6 +59,9 @@ const protectCustomerService = asyncHandler(async (req, res, next) => {
         throw new Error('账号已被禁用');
       }
 
+      // 为了与用户中间件保持一致，也设置req.user
+      req.user = req.customerService;
+
       next();
     } catch (error) {
       console.error(error);

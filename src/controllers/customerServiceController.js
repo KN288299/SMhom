@@ -330,6 +330,31 @@ const uploadAvatar = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    获取客服个人资料
+// @route   GET /api/customer-service/profile
+// @access  Private/CustomerService
+const getCustomerServiceProfile = asyncHandler(async (req, res) => {
+  const customerService = await CustomerService.findById(req.user.id);
+
+  if (customerService) {
+    res.json({
+      _id: customerService._id,
+      phoneNumber: customerService.phoneNumber,
+      name: customerService.name,
+      avatar: customerService.avatar,
+      status: customerService.status,
+      userType: 'customerService', // 添加用户类型标识
+      role: 'customerService',
+      isActive: customerService.isActive,
+      lastActiveTime: customerService.lastActiveTime,
+      serviceStats: customerService.serviceStats,
+    });
+  } else {
+    res.status(404);
+    throw new Error('客服不存在');
+  }
+});
+
 // @desc    更新客服状态（在线/离线/忙碌）
 // @route   PUT /api/customer-service/:id/status
 // @access  Private/CustomerService
@@ -376,6 +401,7 @@ module.exports = {
   deleteCustomerService,
   uploadAvatar,
   updateStatus,
+  getCustomerServiceProfile,
   upload,
   generateCustomerServiceToken
 }; 
