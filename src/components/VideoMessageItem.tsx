@@ -95,8 +95,9 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
   });
 
   const screenWidth = Dimensions.get('window').width;
-  // 气泡宽度固定为屏幕70%（减去容器左右内边距）
-  const bubbleMaxWidthPx = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(screenWidth * 0.7) - 32);
+  // 气泡宽度固定为消息区域70%（减去容器左右内边距）；iOS 端整体再等比缩小30%
+  const baseMaxWidth = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(screenWidth * 0.7) - 32);
+  const bubbleMaxWidthPx = Platform.OS === 'ios' ? Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(baseMaxWidth * 0.7)) : baseMaxWidth;
 
   // 渲染头像
   const renderAvatar = () => {
@@ -367,6 +368,11 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
               let displayWidth = innerMax;
               // 保持宽高比得到高度
               let displayHeight = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayWidth / aspect));
+              // iOS 再整体缩小30%（宽高等比），与安卓一致的视觉比例
+              if (Platform.OS === 'ios') {
+                displayWidth = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayWidth * 0.7));
+                displayHeight = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayHeight * 0.7));
+              }
               return (
                 <View style={[styles.videoContainer, { width: displayWidth, height: displayHeight }]}>                    
                   {shouldAutoplayInBubble ? (
