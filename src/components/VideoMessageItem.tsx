@@ -49,6 +49,10 @@ interface VideoMessageItemProps {
   isRead?: boolean;
   // 仅允许最新的短视频自动播放
   autoplayEligible?: boolean;
+  // 新增：用于在组件挂载瞬间就按比例显示与渲染缩略图
+  initialWidth?: number;
+  initialHeight?: number;
+  initialThumbnail?: string | null;
 }
 
 const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
@@ -64,11 +68,14 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
   userAvatar,
   isRead,
   autoplayEligible = false,
+  initialWidth,
+  initialHeight,
+  initialThumbnail,
 }) => {
-  const [videoWidth, setVideoWidth] = useState(CONSTANTS.DEFAULT_VIDEO_WIDTH);
-  const [videoHeight, setVideoHeight] = useState(CONSTANTS.DEFAULT_VIDEO_HEIGHT);
-  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [videoWidth, setVideoWidth] = useState(initialWidth || CONSTANTS.DEFAULT_VIDEO_WIDTH);
+  const [videoHeight, setVideoHeight] = useState(initialHeight || CONSTANTS.DEFAULT_VIDEO_HEIGHT);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(initialThumbnail || null);
+  const [loading, setLoading] = useState(!initialThumbnail);
   const [thumbnailError, setThumbnailError] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [showActionSheet, setShowActionSheet] = useState(false);
@@ -90,6 +97,20 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
     }
   };
 
+  // 若父组件给了初始缩略图，直接展示
+  useEffect(() => {
+    if (initialThumbnail) {
+      fadeAnim.setValue(1);
+      setLoading(false);
+    }
+    if (initialWidth && initialHeight) {
+      setVideoWidth(initialWidth);
+      setVideoHeight(initialHeight);
+    }
+    // 仅在初次挂载时依据初值处理
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // 生成视频缩略图
   useEffect(() => {
     let isMounted = true;
@@ -98,6 +119,20 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
       if (!videoUrl) {
         if (isMounted) {
           setLoading(false);
+        }
+        return;
+      }
+
+      // 如果是上传中的视频，且已提供初始缩略图，直接使用避免二次生成
+      if (isUploading && initialThumbnail) {
+        if (isMounted) {
+          setThumbnailUrl(initialThumbnail);
+          if (initialWidth && initialHeight) {
+            setVideoWidth(initialWidth);
+            setVideoHeight(initialHeight);
+          }
+          setLoading(false);
+          fadeAnim.setValue(1);
         }
         return;
       }

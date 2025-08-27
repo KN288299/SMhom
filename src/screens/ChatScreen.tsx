@@ -209,7 +209,7 @@ const ChatScreen: React.FC = () => {
     };
   }, []);
 
-  // 轻微上移量（单位：pt）。要求“往上移一点点”，取 4pt。
+  // 轻微上移量（单位：pt）。要求"往上移一点点"，取 4pt。
   const slightLift = 4;
   // iOS键盘显示时减少底部间距，键盘隐藏时保持原有间距
   const bottomPadding = isIOS ? (isKeyboardVisible ? 0 : Math.max(insets.bottom, 0) + slightLift) : 0;
@@ -1656,7 +1656,9 @@ const ChatScreen: React.FC = () => {
       videoUrl: effectiveUri,
       localFileUri: Platform.OS === 'ios' ? effectiveUri : undefined,
       isUploading: true,
-      uploadProgress: 0
+      uploadProgress: 0,
+      videoWidth: effectiveAsset.width || undefined,
+      videoHeight: effectiveAsset.height || undefined,
     };
     
     addMessage(newMessage);
@@ -1687,7 +1689,35 @@ const ChatScreen: React.FC = () => {
         }
       }
       
-      console.log('✅ [视频发送] Socket连接已建立，开始上传...');
+      console.log('✅ [视频发送] Socket连接已建立，开始生成缩略图与上传...');
+
+      // 先本地生成缩略图，便于消息列表即刻显示
+      let thumbPath: string | null = null;
+      try {
+        const thumb = await require('react-native-create-thumbnail').createThumbnail({
+          url: effectiveUri,
+          timeStamp: 800,
+          cacheName: `send_${Date.now()}`,
+        });
+        if (thumb?.path) {
+          thumbPath = thumb.path;
+          const aspect = Math.max(0.1, (thumb.width || 1) / Math.max(1, thumb.height || 1));
+          let vw = effectiveAsset.width || thumb.width || 0;
+          let vh = effectiveAsset.height || thumb.height || 0;
+          if (!vw || !vh) {
+            // 用缩略图尺寸兜底
+            vw = Math.floor(240 * aspect);
+            vh = Math.max(1, Math.floor(vw / Math.max(0.1, aspect)));
+          }
+          updateMessage(tempMessageId, {
+            videoThumbLocalPath: thumbPath,
+            videoWidth: vw,
+            videoHeight: vh,
+          });
+        }
+      } catch (e) {
+        console.log('⚠️ 生成视频缩略图失败，继续上传:', e);
+      }
       
       // 计算视频时长（如果可用）
       let videoDuration = '未知';
@@ -1773,7 +1803,11 @@ const ChatScreen: React.FC = () => {
               contentType: 'video',
               fileUrl: videoUrl,
               videoUrl: videoUrl,
-              videoDuration: videoDuration
+              videoDuration: videoDuration,
+              // 可选：将尺寸与比例发给后端，便于接收端首屏定比例
+              videoWidth: effectiveAsset.width || undefined,
+              videoHeight: effectiveAsset.height || undefined,
+              aspectRatio: (effectiveAsset.width && effectiveAsset.height) ? (effectiveAsset.width / Math.max(1, effectiveAsset.height)) : undefined,
             },
             {
               headers: {

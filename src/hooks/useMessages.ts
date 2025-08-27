@@ -27,6 +27,8 @@ interface Message {
   fileUrl?: string;
   // 仅本地使用：iOS 自发视频的本地路径，用于预览/播放回退
   localFileUri?: string;
+  // 新增：本地缩略图路径（发送/接收时用于立即渲染）
+  videoThumbLocalPath?: string | null;
   isCallRecord?: boolean;
   callerId?: string;
   callDuration?: string;

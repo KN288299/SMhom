@@ -169,6 +169,9 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
             isUploading={true}
             uploadProgress={item.uploadProgress || 0}
             localFileUri={item.localFileUri}
+            initialWidth={item.videoWidth}
+            initialHeight={item.videoHeight}
+            initialThumbnail={(item as any).videoThumbLocalPath}
             contactAvatar={contactAvatar}
             userAvatar={userAvatar}
             isRead={item.isRead}
@@ -204,6 +207,9 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
               }
             }}
             localFileUri={item.localFileUri}
+            initialWidth={item.videoWidth}
+            initialHeight={item.videoHeight}
+            initialThumbnail={(item as any).videoThumbLocalPath}
             contactAvatar={contactAvatar}
             userAvatar={userAvatar}
             isRead={item.isRead}
