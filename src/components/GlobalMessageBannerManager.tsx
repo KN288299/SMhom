@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, AppStateStatus, Platform } from 'react-native';
-import { useNavigation, useRoute, NavigationContainerRef } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import MessageBanner, { MessageBannerData } from './MessageBanner';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
@@ -12,7 +12,6 @@ const MESSAGE_HIDE_MS = 4500;
 
 const GlobalMessageBannerManager: React.FC = () => {
   const navigation = useNavigation<any>();
-  const route = useRoute<any>();
   const { userInfo } = useAuth();
   const { subscribeToMessages } = useSocket();
 
@@ -41,12 +40,15 @@ const GlobalMessageBannerManager: React.FC = () => {
   // 当前是否应抑制弹窗
   const shouldSuppress = useCallback((message: any): boolean => {
     try {
-      const currentRouteName: string | undefined = route?.name;
+      const navRef = (global as any)?.navigationRef;
+      const currentRoute = navRef?.getCurrentRoute ? navRef.getCurrentRoute() : undefined;
+      const currentRouteName: string | undefined = currentRoute?.name;
+      const params: any = (currentRoute as any)?.params || {};
+
       // 1) 消息列表页不弹
       if (currentRouteName === 'Message') return true;
       // 2) 正在对应聊天页不弹（若当前是Chat并且会话或联系人匹配）
       if (currentRouteName === 'Chat') {
-        const params = (route as any)?.params || {};
         const sameConversation = params?.conversationId && message?.conversationId && params.conversationId === message.conversationId;
         const sameContact = params?.contactId && message?.senderId && params.contactId === message.senderId;
         if (sameConversation || sameContact) return true;
@@ -55,7 +57,7 @@ const GlobalMessageBannerManager: React.FC = () => {
     } catch {
       return false;
     }
-  }, [route]);
+  }, []);
 
   // 清理计时器
   const clearTimer = useCallback(() => {
