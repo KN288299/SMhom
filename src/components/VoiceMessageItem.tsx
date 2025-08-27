@@ -30,6 +30,7 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPosition, setCurrentPosition] = useState('00:00');
   const audioPlayerRef = useRef<AudioRecorderPlayer>(new AudioRecorderPlayer());
+  const isStartingRef = useRef(false);
   const [localCachedPath, setLocalCachedPath] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   
@@ -72,6 +73,9 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
   }, [isPlaying]);
 
   const handlePlayPause = async () => {
+    // 并发防护：避免快速连点导致原生崩溃
+    if (isStartingRef.current) return;
+    isStartingRef.current = true;
     // 解析远程音频文件名与扩展名（使用响应头或启发式）
     const resolveRemoteAudioFileName = async (url: string): Promise<string> => {
       try {
@@ -114,6 +118,7 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
         if (!fullAudioUrl) {
           console.error('无效的音频URL，无法播放');
           Alert.alert('播放失败', '音频文件路径无效，无法播放');
+          isStartingRef.current = false;
           return;
         }
         
@@ -134,23 +139,13 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
           AudioCompatibility.logCompatibilityIssue(fullAudioUrl, '格式兼容性警告');
         }
         
-        // 🔧 iOS播放MP3特殊处理：确保音频会话针对MP3优化
-        if (Platform.OS === 'ios' && compatInfo.sourceFormat === 'mp3') {
-          console.log('🎵 iOS播放MP3格式语音，进行特殊优化...');
+        // 🔧 iOS播放前：简化音频会话准备，避免重复 reset 导致竞态
+        if (Platform.OS === 'ios') {
           try {
             const audioSession = IOSAudioSession.getInstance();
-            // 重置音频会话确保清理状态
-            await audioSession.reset();
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-            // 针对MP3播放的音频会话配置
-            await audioSession.prepareForPlayback('mp3');
-            console.log('✅ iOS MP3播放音频会话配置完成');
-            
-            // 额外等待确保音频会话稳定
-            await new Promise(resolve => setTimeout(resolve, 200));
-          } catch (mp3SessionError) {
-            console.warn('⚠️ iOS MP3音频会话配置失败，继续尝试播放:', mp3SessionError);
+            await audioSession.prepareForPlayback(compatInfo.sourceFormat);
+          } catch (sessionErr) {
+            console.warn('⚠️ iOS播放会话准备失败，继续尝试播放:', sessionErr);
           }
         }
         
@@ -158,29 +153,16 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
         setIsPlaying(true);
         
         try {
-          // iOS特定：强化音频播放会话管理
+          // iOS特定：仅设置必要的播放器参数
           if (Platform.OS === 'ios') {
-            console.log('🎵 iOS语音播放：初始化音频会话...');
-            const audioSession = IOSAudioSession.getInstance();
-            // 重置并准备播放会话
-            console.log('🔄 重置iOS播放音频会话...');
-            await audioSession.reset();
-            await new Promise(resolve => setTimeout(resolve, 100));
-            console.log('🔊 配置iOS播放音频会话...');
-            await audioSession.prepareForPlayback(compatInfo.sourceFormat);
-            await new Promise(resolve => setTimeout(resolve, 200));
-            // 配置播放器订阅
             try {
               await audioPlayerRef.current.setSubscriptionDuration(0.1);
-              console.log('✅ iOS音频播放器订阅配置完成');
             } catch (subscriptionError) {
               console.warn('⚠️ iOS播放器订阅配置警告:', subscriptionError);
             }
-            // 确保播放音量为最大，避免“播放成功但声音很小/无声”的误判
             try {
               await audioPlayerRef.current.setVolume(1.0);
             } catch {}
-            console.log('✅ iOS音频播放环境准备完成');
           }
 
           // iOS 优化：远程URL优先走本地缓存 + file:// 播放，避免"播放成功但无声"
@@ -282,33 +264,12 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
               }
               setIsDownloading(false);
 
-              // 🔧 iOS首次使用修复：再次准备音频会话（针对本地文件播放），优先使用初始化管理器
+              // 🔧 简化：直接准备播放会话
               try {
-                const IOSInitializationManager = require('../services/IOSInitializationManager').default;
-                const initManager = IOSInitializationManager.getInstance();
-                
-                // 检查初始化管理器是否可用并已准备音频会话
-                if (!initManager.isAudioSessionReady()) {
-                  console.log('🔧 [VoiceMessage] 通过初始化管理器配置播放音频会话...');
-                  await initManager.initializeAudioSessionAfterPermission();
-                  console.log('✅ [VoiceMessage] iOS初始化管理器音频会话配置完成');
-                } else {
-                  console.log('✅ [VoiceMessage] iOS初始化管理器音频会话已就绪');
-                }
-              } catch (managerError) {
-                console.warn('⚠️ [VoiceMessage] 初始化管理器不可用，使用兜底方案:', managerError);
-                
-                // 🛡️ 兜底：直接使用IOSAudioSession
                 const audioSession = IOSAudioSession.getInstance();
-                // 获取音频格式用于优化
                 const fileFormat = fileName.split('.').pop()?.toLowerCase() || 'unknown';
-                if (audioSession.getCurrentMode() !== 'playback') {
-                  await audioSession.reset();
-                  await audioSession.prepareForPlayback(fileFormat);
-                } else if (!audioSession.isActive()) {
-                  await audioSession.prepareForPlayback(fileFormat);
-                }
-              }
+                await audioSession.prepareForPlayback(fileFormat);
+              } catch {}
 
               const iosLocalTarget = Platform.OS === 'ios' ? `file://${cachePath}` : cachePath;
               console.log('🎵 使用本地缓存文件播放语音:', iosLocalTarget);
@@ -341,6 +302,7 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
                   setCurrentPosition('00:00');
                 }
               });
+              isStartingRef.current = false;
               return;
             } catch (iosFallbackErr) {
               console.error('iOS缓存播放失败:', iosFallbackErr);
@@ -363,6 +325,8 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
       console.error('处理语音播放失败:', error);
       Alert.alert('错误', `语音播放操作失败: ${error.message || '未知错误'}`);
       setIsPlaying(false);
+    } finally {
+      isStartingRef.current = false;
     }
   };
 

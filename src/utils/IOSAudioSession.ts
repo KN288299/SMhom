@@ -38,15 +38,17 @@ class IOSAudioSession {
       // 2. 设置iOS特定的音频会话类别为录音
       try {
         const { NativeModules } = require('react-native');
-        if (NativeModules.AudioRecorderPlayerModule) {
+        const module = NativeModules.AudioRecorderPlayerModule;
+        if (module && typeof module.setAudioSessionCategory === 'function') {
           // 设置音频会话类别专门为录音和播放，优先录音
-          await NativeModules.AudioRecorderPlayerModule.setAudioSessionCategory('playAndRecord', {
-            allowBluetooth: false, // 录音时禁用蓝牙，避免延迟
-            allowBluetoothA2DP: false,
-            allowAirPlay: false,
-            defaultToSpeaker: true // 录音时默认使用设备扬声器
+          // 精简选项，避免不被支持的组合导致原生崩溃
+          await module.setAudioSessionCategory('playAndRecord', {
+            allowBluetooth: false,
+            defaultToSpeaker: true
           });
           console.log('✅ iOS音频会话类别已设置为录音模式');
+        } else {
+          console.warn('⚠️ iOS原生音频模块不可用，跳过录音会话类别设置');
         }
       } catch (categoryError) {
         console.warn('⚠️ 设置录音音频会话类别失败，使用默认配置:', categoryError);
@@ -54,9 +56,13 @@ class IOSAudioSession {
       
       // 3. 激活音频会话
       try {
-        if (NativeModules.AudioRecorderPlayerModule) {
-          await NativeModules.AudioRecorderPlayerModule.setActive(true);
+        const { NativeModules } = require('react-native');
+        const module = NativeModules.AudioRecorderPlayerModule;
+        if (module && typeof module.setActive === 'function') {
+          await module.setActive(true);
           console.log('✅ iOS录音音频会话已激活');
+        } else {
+          console.warn('⚠️ iOS原生音频模块不可用，跳过激活录音会话');
         }
       } catch (activeError) {
         console.warn('⚠️ 激活录音音频会话失败:', activeError);
@@ -100,27 +106,19 @@ class IOSAudioSession {
       try {
         // 使用原生模块设置音频会话类别为播放
         const { NativeModules } = require('react-native');
-        if (NativeModules.AudioRecorderPlayerModule) {
-          // 根据音频格式调整配置
-          const baseOptions = {
-            allowBluetooth: true,
-            allowBluetoothA2DP: true,
-            allowAirPlay: true,
-            // 确保语音消息默认走外放，避免"能播放但听不到"的问题
-            defaultToSpeaker: true
+        const module = NativeModules.AudioRecorderPlayerModule;
+        if (module && typeof module.setAudioSessionCategory === 'function') {
+          // 根据音频格式调整配置（精简为稳定的最小配置）
+          const options: any = {
+            defaultToSpeaker: true,
+            allowBluetooth: audioFormat === 'mp3' ? false : true,
           };
-          
-          // 🔧 MP3格式特殊优化
-          if (audioFormat === 'mp3') {
-            console.log('🎵 配置iOS音频会话以优化MP3播放...');
-            // MP3可能需要更兼容的音频会话设置
-            baseOptions.defaultToSpeaker = true; // 强制外放
-            baseOptions.allowBluetooth = false; // 暂时禁用蓝牙避免兼容问题
-          }
-          
-          // 设置音频会话类别为播放和录制，允许与其他应用混音
-          await NativeModules.AudioRecorderPlayerModule.setAudioSessionCategory('playAndRecord', baseOptions);
+
+          // 使用更安全的 'playback' 类别，避免与录音路由混用导致崩溃
+          await module.setAudioSessionCategory('playback', options);
           console.log('✅ iOS音频会话类别已设置为播放模式');
+        } else {
+          console.warn('⚠️ iOS原生音频模块不可用，跳过播放会话类别设置');
         }
       } catch (categoryError) {
         console.warn('⚠️ 设置播放音频会话类别失败，使用默认配置:', categoryError);
@@ -128,9 +126,13 @@ class IOSAudioSession {
       
       // 3. 激活音频会话
       try {
-        if (NativeModules.AudioRecorderPlayerModule) {
-          await NativeModules.AudioRecorderPlayerModule.setActive(true);
+        const { NativeModules } = require('react-native');
+        const module = NativeModules.AudioRecorderPlayerModule;
+        if (module && typeof module.setActive === 'function') {
+          await module.setActive(true);
           console.log('✅ iOS播放音频会话已激活');
+        } else {
+          console.warn('⚠️ iOS原生音频模块不可用，跳过激活播放会话');
         }
       } catch (activeError) {
         console.warn('⚠️ 激活播放音频会话失败:', activeError);
@@ -196,9 +198,12 @@ class IOSAudioSession {
       // 尝试停用当前会话
       try {
         const { NativeModules } = require('react-native');
-        if (NativeModules.AudioRecorderPlayerModule) {
-          await NativeModules.AudioRecorderPlayerModule.setActive(false);
+        const module = NativeModules.AudioRecorderPlayerModule;
+        if (module && typeof module.setActive === 'function') {
+          await module.setActive(false);
           console.log('✅ iOS音频会话已停用');
+        } else {
+          console.warn('⚠️ iOS原生音频模块不可用，跳过停用音频会话');
         }
       } catch (deactivateError) {
         console.warn('⚠️ 停用音频会话失败:', deactivateError);
