@@ -88,10 +88,10 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
   const [bubbleVideoReady, setBubbleVideoReady] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
   const [mediaAspectRatio, setMediaAspectRatio] = useState<number>(() => {
-    if (initialWidth && initialHeight) {
-      return Math.max(0.1, initialWidth / Math.max(1, initialHeight));
-    }
-    return 16 / 9; // 默认16:9，避免正方形占位
+    // 按真实视频宽高比初始化（若父级已提供初始尺寸则直接使用）
+    const width = initialWidth || videoWidth || CONSTANTS.DEFAULT_VIDEO_WIDTH;
+    const height = initialHeight || videoHeight || CONSTANTS.DEFAULT_VIDEO_HEIGHT;
+    return Math.max(0.1, width / Math.max(1, height));
   });
 
   const screenWidth = Dimensions.get('window').width;
