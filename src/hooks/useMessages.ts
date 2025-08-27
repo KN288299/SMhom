@@ -207,8 +207,11 @@ export const useMessages = ({
             const sortedHistoryMessages = formattedMessages.sort((a: any, b: any) => 
               new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
             );
+            // 去重：过滤掉已存在于 prev 中的消息（按 _id）
+            const existingIds = new Set(prev.map(m => m._id));
+            const filteredHistory = sortedHistoryMessages.filter((m: any) => !existingIds.has(m._id));
             // 历史消息添加到末尾，因为在倒序数组中更早的消息在后面
-            const newMessages = [...prev, ...sortedHistoryMessages];
+            const newMessages = [...prev, ...filteredHistory];
             return newMessages;
           });
         }
@@ -251,10 +254,21 @@ export const useMessages = ({
   // 添加新消息（带内存限制和倒序排序）
   const addMessage = useCallback((message: Message) => {
     setMessages(prev => {
-      const newMessage = {
-      ...message,
-      _id: message._id || generateUniqueId(),
-      timestamp: message.timestamp || new Date(),
+      const stableId = message._id || generateUniqueId();
+      // 去重：如果已存在相同 _id 的消息，执行合并更新而不是新增
+      const existedIndex = prev.findIndex(m => m._id === stableId);
+      if (existedIndex !== -1) {
+        const merged = { ...prev[existedIndex], ...message, _id: stableId } as Message;
+        const updated = [...prev];
+        updated[existedIndex] = merged;
+        // 维持倒序排序
+        return updated.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      }
+
+      const newMessage: Message = {
+        ...message,
+        _id: stableId,
+        timestamp: message.timestamp || new Date(),
       };
       
       // 将新消息插入到正确位置以保持时间倒序排序（最新的在前面）
@@ -273,9 +287,29 @@ export const useMessages = ({
 
   // 更新消息
   const updateMessage = useCallback((messageId: string, updates: Partial<Message>) => {
-    setMessages(prev => prev.map(msg => 
-      msg._id === messageId ? { ...msg, ...updates } : msg
-    ));
+    setMessages(prev => {
+      const newId = (updates && (updates as any)._id) ? (updates as any)._id as string : messageId;
+      // 找到可合并的基准消息（原ID或目标新ID）
+      const base = prev.find(m => m._id === messageId) || prev.find(m => m._id === newId);
+      const merged: Message = {
+        ...(base || ({ _id: newId, timestamp: new Date() } as Message)),
+        ...updates,
+        _id: newId,
+      } as Message;
+
+      // 移除旧的可能重复项（原ID和新ID都移除）
+      const remaining = prev.filter(m => m._id !== messageId && m._id !== newId);
+
+      // 重新插入并按时间倒序排序
+      const result = [merged, ...remaining].sort((a, b) => 
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      );
+
+      // 维持内存上限
+      return result.length > MAX_MESSAGES_IN_MEMORY
+        ? result.slice(0, MAX_MESSAGES_IN_MEMORY)
+        : result;
+    });
   }, []);
 
   // 当conversationId变化时重新获取消息

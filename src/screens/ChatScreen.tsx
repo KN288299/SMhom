@@ -443,7 +443,8 @@ const ChatScreen: React.FC = () => {
         // 通话记录对双方都显示，但根据发送者决定显示位置
         addMessage({ 
           ...message,
-          _id: generateUniqueId(), // 使用兼容的ID生成函数
+          // 保留服务端ID，若缺失再生成本地ID
+          _id: (message as any)._id || generateUniqueId(),
           // 确保通话记录字段正确传递
           isCallRecord: true,
           callerId: message.callerId,
@@ -455,7 +456,8 @@ const ChatScreen: React.FC = () => {
         // 正常消息，添加到当前对话
         addMessage({ 
           ...message,
-          _id: generateUniqueId() // 使用兼容的ID生成函数
+          // 保留服务端ID，若缺失再生成本地ID
+          _id: (message as any)._id || generateUniqueId()
         });
       }
     });
@@ -1004,9 +1006,9 @@ const ChatScreen: React.FC = () => {
     // 格式化用户头像URL，确保客服端也能正确显示自己的头像
     const formattedUserAvatar = userInfo?.avatar ? formatMediaUrl(userInfo.avatar) : null;
     
-    // 仅让"最新的10秒内的视频"自动播放：
-    // - 必须是对方发来的消息（在气泡内自动播放时我们已在子组件限制了 !isMe）
-    // - 在 messages 倒序数组中，找到第一个满足 duration<=10s 的视频消息
+    // 仅让"最新的5秒内的视频"自动播放：
+    // - 必须是对方发来的消息
+    // - 在 messages 倒序数组中，找到第一个满足 duration<=5s 的视频消息
     // - 只有这条消息的 autoplayEligible 才为 true，其余为 false
     const getDurationSeconds = (duration?: string): number => {
       if (!duration) return 0;
@@ -1028,11 +1030,13 @@ const ChatScreen: React.FC = () => {
       return isNaN(num) ? 0 : num;
     };
     
-    const SHORT_VIDEO_SECONDS = 10;
+    const SHORT_VIDEO_SECONDS = 5;
     let latestShortVideoId: string | null = null;
     for (let i = 0; i < messages.length; i++) {
       const m = messages[i];
-      if ((m.messageType === 'video' || m.contentType === 'video') && !m.isUploading) {
+      // 仅考虑对方发送的、已完成上传的视频
+      const isOtherSide = m.senderId !== userInfo?._id;
+      if (isOtherSide && (m.messageType === 'video' || m.contentType === 'video') && !m.isUploading) {
         const sec = getDurationSeconds(m.videoDuration);
         if (sec > 0 && sec <= SHORT_VIDEO_SECONDS) {
           latestShortVideoId = m._id;
@@ -1656,28 +1660,10 @@ const ChatScreen: React.FC = () => {
     
     // 创建临时ID用于本地显示和后续更新
     const tempMessageId = generateUniqueId();
-    // 优先本地生成缩略图与尺寸，确保插入临时消息时即按比例显示
-    let initialThumbPath: string | null = null;
-    let initialVideoWidth: number | undefined = effectiveAsset.width || undefined;
-    let initialVideoHeight: number | undefined = effectiveAsset.height || undefined;
-    try {
-      const thumb = await require('react-native-create-thumbnail').createThumbnail({
-        url: effectiveUri,
-        timeStamp: 800,
-        cacheName: `send_${Date.now()}`,
-      });
-      if (thumb?.path) {
-        initialThumbPath = thumb.path;
-        if (!initialVideoWidth || !initialVideoHeight) {
-          initialVideoWidth = thumb.width || undefined;
-          initialVideoHeight = thumb.height || undefined;
-        }
-      }
-    } catch (e) {
-      console.log('⚠️ 本地生成视频缩略图失败（将继续上传）:', e);
-    }
+    // 直接插入上传中消息（不等待缩略图），用已知的资源尺寸（若可用）
+    const initialVideoWidth: number | undefined = effectiveAsset.width || undefined;
+    const initialVideoHeight: number | undefined = effectiveAsset.height || undefined;
 
-    // 创建新消息对象（带首帧缩略图与尺寸）
     const newMessage: Message = {
       _id: tempMessageId,
       senderId: userInfo?._id || '',
@@ -1691,10 +1677,31 @@ const ChatScreen: React.FC = () => {
       uploadProgress: 0,
       videoWidth: initialVideoWidth,
       videoHeight: initialVideoHeight,
-      videoThumbLocalPath: initialThumbPath,
+      videoThumbLocalPath: null,
     };
-    
+
     addMessage(newMessage);
+
+    // 异步生成首帧缩略图并更新消息（不阻塞插入）
+    (async () => {
+      try {
+        const { createThumbnail } = require('react-native-create-thumbnail');
+        const thumb = await createThumbnail({
+          url: effectiveUri,
+          timeStamp: 800,
+          cacheName: `send_${Date.now()}`,
+        });
+        if (thumb?.path) {
+          updateMessage(tempMessageId, {
+            videoThumbLocalPath: thumb.path,
+            videoWidth: initialVideoWidth ?? (thumb.width || undefined),
+            videoHeight: initialVideoHeight ?? (thumb.height || undefined),
+          });
+        }
+      } catch (e) {
+        console.log('⚠️ 本地生成视频缩略图失败（不影响发送）:', e);
+      }
+    })();
     
     try {
       // 🔧 首次发送修复：确保Socket连接已建立
@@ -1748,13 +1755,20 @@ const ChatScreen: React.FC = () => {
         effectiveUri,
         {
           token: userToken,
-          onProgress: (progress: number) => {
-            // 更新上传进度
-            updateMessage(tempMessageId, { 
-              uploadProgress: progress,
-              isUploading: true 
-            });
-          },
+          onProgress: (() => {
+            // 节流上传进度，降低频繁setState导致的卡顿
+            let lastEmit = 0;
+            return (progress: number) => {
+              const now = Date.now();
+              if (progress === 100 || now - lastEmit > 120) {
+                lastEmit = now;
+                updateMessage(tempMessageId, { 
+                  uploadProgress: progress,
+                  isUploading: true 
+                });
+              }
+            };
+          })(),
           maxRetries: 5,
           timeout: 600000, // 10分钟超时，支持大视频文件
           retryDelay: 5000
@@ -2298,8 +2312,8 @@ const ChatScreen: React.FC = () => {
             inverted={true} // 倒置列表，默认显示最新消息
             renderItem={renderMessageItem}
             keyExtractor={keyExtractor}
-            getItemLayout={getItemLayout}
             contentContainerStyle={getPlatformStyles(iOSChatStyles.messagesList, styles.messagesList)}
+            maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
             onViewableItemsChanged={useCallback((info: { viewableItems: Array<ViewToken>; changed: Array<ViewToken>; }) => {
               // 更新可见项集合
               const newVisible = new Set(visibleItemIdsRef.current);
@@ -2361,13 +2375,12 @@ const ChatScreen: React.FC = () => {
               // 滚动到底部的逻辑已在useEffect中处理
             }}
             scrollEventThrottle={32} // 降低滚动事件频率，减少重渲染
-            removeClippedSubviews={true} // 提升大列表性能
+            removeClippedSubviews={false}
             initialNumToRender={15} // 减少初始渲染数量
             maxToRenderPerBatch={5} // 减少每批渲染数量
             updateCellsBatchingPeriod={100} // 增加更新间隔，减少频繁更新
             windowSize={5} // 减小渲染窗口，节省内存
-            // 移除getItemLayout，避免计算错误导致跳动
-            // 移除maintainVisibleContentPosition，避免与手动滚动控制冲突
+            // 已移除getItemLayout，避免计算错误导致跳动
           />
         )}
         
