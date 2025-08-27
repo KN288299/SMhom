@@ -6,6 +6,7 @@ import { BASE_URL } from '../config/api';
 import IOSAudioSession from '../utils/IOSAudioSession';
 import AudioCompatibility from '../utils/AudioCompatibility';
 import RNFS from 'react-native-fs';
+import GlobalAudioPlayer from '../services/GlobalAudioPlayer';
 import { DEFAULT_AVATAR } from '../utils/DefaultAvatar';
 
 interface VoiceMessageItemProps {
@@ -107,8 +108,7 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
     try {
       if (isPlaying) {
         console.log('停止播放语音');
-        await audioPlayerRef.current.stopPlayer();
-        audioPlayerRef.current.removePlayBackListener();
+        await GlobalAudioPlayer.stop();
         setIsPlaying(false);
         setCurrentPosition('00:00');
       } else {
@@ -159,6 +159,35 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
         
         console.log('开始播放语音:', fullAudioUrl);
         setIsPlaying(true);
+        try {
+          await GlobalAudioPlayer.play(
+            fullAudioUrl,
+            (e) => {
+              const seconds = Math.floor(e.currentPosition / 1000);
+              const minutes = Math.floor(seconds / 60);
+              const remainingSeconds = seconds % 60;
+              setCurrentPosition(
+                `${minutes < 10 ? '0' + minutes : minutes}:${remainingSeconds < 10 ? '0' + remainingSeconds : remainingSeconds}`
+              );
+            },
+            () => {
+              setIsPlaying(false);
+              setCurrentPosition('00:00');
+            }
+          );
+          return;
+        } catch (playError: any) {
+          console.error('播放语音失败:', playError);
+          let errorMessage = '无法播放语音消息';
+          if (playError.message?.includes('Prepare failed')) {
+            errorMessage = '音频文件损坏或格式不支持';
+          } else if (playError.message?.includes('Network')) {
+            errorMessage = '网络连接失败，请检查网络设置';
+          }
+          Alert.alert('播放失败', errorMessage);
+          setIsPlaying(false);
+          return;
+        }
         
         try {
           // iOS特定：仅设置必要的播放器参数
