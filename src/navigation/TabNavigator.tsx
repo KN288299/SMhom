@@ -11,6 +11,7 @@ import YuZuTangScreen from '../screens/YuZuTangScreen';
 import MessageScreen from '../screens/MessageScreen';
 import PersonalInfoScreen from '../screens/PersonalInfoScreen';
 import { HomeIcon, OrderIcon, MessageIcon, UserIcon } from '../assets/icons';
+import { useSocket } from '../context/SocketContext';
 
 // 定义标签导航参数类型
 export type TabParamList = {
@@ -43,6 +44,7 @@ const MainTabNavigator = () => {
     centerButtonColor: '#ff6b81',
     bannerImages: []
   });
+  const { unreadMessageCount } = useSocket();
 
   // 加载页面配置
   useEffect(() => {
@@ -117,12 +119,22 @@ const MainTabNavigator = () => {
       <Tab.Screen 
         name="Message" 
         component={MessageScreen}
-        options={{
+        options={() => ({
           tabBarLabel: '消息',
           tabBarIcon: ({ color, focused }) => (
             <MessageIcon size={24} active={focused} color={color} />
           ),
-        }}
+          tabBarBadge: unreadMessageCount > 0 ? (unreadMessageCount > 99 ? '99+' : unreadMessageCount) : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: '#ff3b30',
+            minWidth: 18,
+            height: 18,
+            borderRadius: 9,
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: 4,
+          },
+        })}
       />
       <Tab.Screen 
         name="Profile" 
