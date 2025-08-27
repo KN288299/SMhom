@@ -91,12 +91,12 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
     if (initialWidth && initialHeight) {
       return Math.max(0.1, initialWidth / Math.max(1, initialHeight));
     }
-    return 1; // 未知时用正方形占位，避免拉伸感
+    return 16 / 9; // 默认16:9，避免正方形占位
   });
 
   const screenWidth = Dimensions.get('window').width;
-  // 估算气泡最大宽度：消息容器70%再减去内边距
-  const bubbleMaxWidthPx = Math.max(120, Math.min(CONSTANTS.MAX_VIDEO_SIZE + CONSTANTS.BUBBLE_PADDING * 2, Math.floor(screenWidth * 0.7) - 32));
+  // 气泡宽度固定为屏幕70%（减去容器左右内边距）
+  const bubbleMaxWidthPx = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(screenWidth * 0.7) - 32);
 
   // 渲染头像
   const renderAvatar = () => {
@@ -164,19 +164,8 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
               console.log('上传中视频缩略图生成成功:', result.path);
               setThumbnailUrl(result.path);
               const aspectRatio = Math.max(0.1, result.width / Math.max(1, result.height));
-              let newWidth = Math.min(CONSTANTS.MAX_VIDEO_SIZE, result.width);
-              let newHeight = newWidth / aspectRatio;
-              if (newHeight > CONSTANTS.MAX_VIDEO_SIZE) {
-                newHeight = CONSTANTS.MAX_VIDEO_SIZE;
-                newWidth = newHeight * aspectRatio;
-              }
-              // 保底最小尺寸
-              if (newWidth < CONSTANTS.MIN_VIDEO_SIZE) {
-                newWidth = CONSTANTS.MIN_VIDEO_SIZE;
-                newHeight = newWidth / aspectRatio;
-              }
-              setVideoWidth(newWidth);
-              setVideoHeight(newHeight);
+              setVideoWidth(result.width);
+              setVideoHeight(result.height);
               setMediaAspectRatio(aspectRatio);
             }
           } catch (thumbError) {
@@ -184,11 +173,6 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
           }
         }
         if (isMounted) {
-          if (!thumbnailUrl) {
-            setVideoWidth(CONSTANTS.DEFAULT_VIDEO_WIDTH);
-            setVideoHeight(CONSTANTS.DEFAULT_VIDEO_HEIGHT);
-            setMediaAspectRatio(1);
-          }
           setLoading(false);
         }
         return;
@@ -253,46 +237,8 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
         // 根据视频的宽高比计算缩略图尺寸
         const aspectRatio = Math.max(0.1, result.width / Math.max(1, result.height));
         
-        // 设置最大宽度和最大高度
-        const maxWidth = CONSTANTS.MAX_VIDEO_SIZE;
-        const maxHeight = CONSTANTS.MAX_VIDEO_SIZE;
-        
-        // 根据宽高比计算实际显示尺寸
-        let newWidth, newHeight;
-        
-        if (aspectRatio > 1) {
-          // 宽视频：以宽度为基准
-          newWidth = Math.min(maxWidth, result.width);
-          newHeight = newWidth / aspectRatio;
-          // 如果高度超过最大值，重新以高度为基准计算
-          if (newHeight > maxHeight) {
-            newHeight = maxHeight;
-            newWidth = newHeight * aspectRatio;
-          }
-        } else {
-          // 长视频：以高度为基准
-          newHeight = Math.min(maxHeight, result.height);
-          newWidth = newHeight * aspectRatio;
-          // 如果宽度超过最大值，重新以宽度为基准计算
-          if (newWidth > maxWidth) {
-            newWidth = maxWidth;
-            newHeight = newWidth / aspectRatio;
-          }
-        }
-        
-        // 确保最小尺寸，但保持宽高比
-        if (newWidth < CONSTANTS.MIN_VIDEO_SIZE && newHeight < CONSTANTS.MIN_VIDEO_SIZE) {
-          if (aspectRatio > 1) {
-            newWidth = CONSTANTS.MIN_VIDEO_SIZE;
-            newHeight = newWidth / aspectRatio;
-          } else {
-            newHeight = CONSTANTS.MIN_VIDEO_SIZE;
-            newWidth = newHeight * aspectRatio;
-          }
-        }
-        
-        setVideoWidth(newWidth);
-        setVideoHeight(newHeight);
+        setVideoWidth(result.width);
+        setVideoHeight(result.height);
         setMediaAspectRatio(aspectRatio);
         setLoading(false);
         
@@ -307,9 +253,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
         if (!isMounted) return;
         
         console.error('生成视频缩略图失败:', error);
-        // 设置一个默认尺寸
-        setVideoWidth(CONSTANTS.DEFAULT_VIDEO_WIDTH);
-        setVideoHeight(CONSTANTS.DEFAULT_VIDEO_HEIGHT);
+        // 失败时不强制设置默认正方形尺寸
         setLoading(false);
         setThumbnailError(true);
         
@@ -395,12 +339,8 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
               // 外层Touchable与内层容器同尺寸，避免加载前后尺寸跳变
               const innerMax = Math.max(1, bubbleMaxWidthPx);
               const aspect = Math.max(0.1, mediaAspectRatio);
-              let displayWidth = Math.min(innerMax, Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(videoWidth || innerMax)));
+              let displayWidth = innerMax;
               let displayHeight = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayWidth / aspect));
-              if (displayHeight > CONSTANTS.MAX_VIDEO_SIZE) {
-                displayHeight = CONSTANTS.MAX_VIDEO_SIZE;
-                displayWidth = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayHeight * aspect));
-              }
               return { width: displayWidth, height: displayHeight };
             })()}
             onPress={() => {
@@ -424,14 +364,9 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
               const innerMax = Math.max(1, bubbleMaxWidthPx);
               const aspect = Math.max(0.1, mediaAspectRatio);
               // 先按最大宽度计算显示宽度
-              let displayWidth = Math.min(innerMax, Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(videoWidth || innerMax)));
+              let displayWidth = innerMax;
               // 保持宽高比得到高度
               let displayHeight = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayWidth / aspect));
-              // 限制最大高度
-              if (displayHeight > CONSTANTS.MAX_VIDEO_SIZE) {
-                displayHeight = CONSTANTS.MAX_VIDEO_SIZE;
-                displayWidth = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayHeight * aspect));
-              }
               return (
                 <View style={[styles.videoContainer, { width: displayWidth, height: displayHeight }]}>                    
                   {shouldAutoplayInBubble ? (
@@ -507,13 +442,9 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
                             fadeDuration={0} // 禁用淡入动画，避免闪烁
                           />
                         </Animated.View>
-                      ) : (
-                        <View style={styles.videoPlaceholder}>
-                          <Text style={styles.videoPlaceholderText}>视频</Text>
-                        </View>
-                      )}
-                      {/* 加载缩略图时，仅覆盖一个轻量半透明层，不显示正方形黑色全屏 */}
-                      {loading && !thumbnailUrl && (
+                      ) : null}
+                      {/* 加载缩略图时，仅覆盖一个轻量半透明层 */}
+                      {loading && (
                         <View style={styles.videoLoadingOverlay}>
                           <ActivityIndicator size="small" color="#fff" />
                         </View>
@@ -526,22 +457,10 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
                           {videoDuration || '视频'}
                         </Text>
                       </View>
-                      {/* 上传时显示覆盖层，但当进度接近或达到100%时自动隐藏，避免一直转圈 */}
+                      {/* 上传时仅显示转圈，其余无感 */}
                       {isUploading && uploadProgress < 100 && (
                         <View style={styles.videoUploadingContainer}>
-                          {uploadProgress > 0 ? (
-                            <>
-                              <View style={styles.uploadProgressContainer}>
-                                <View style={[styles.uploadProgressBar, { width: `${Math.min(100, Math.max(0, Math.floor(uploadProgress)))}%` }]} />
-                              </View>
-                              <Text style={styles.uploadProgressText}>{`${Math.min(100, Math.max(0, Math.floor(uploadProgress)))}%`}</Text>
-                            </>
-                          ) : (
-                            <Text style={styles.uploadProgressText}>正在上传...</Text>
-                          )}
-                          {uploadProgress === 0 && (
-                            <ActivityIndicator size="small" color="#fff" style={styles.uploadingIndicator} />
-                          )}
+                          <ActivityIndicator size="small" color="#fff" />
                         </View>
                       )}
                     </>
@@ -602,7 +521,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
   },
   messageContent: {
-    maxWidth: '70%',
+    width: '70%',
   },
   videoWithTime: {
     flexDirection: 'row',
@@ -678,18 +597,7 @@ const styles = StyleSheet.create({
   uploadingIndicator: {
     marginTop: 4,
   },
-  videoPlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#333',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  videoPlaceholderText: {
-    color: '#fff',
-    fontSize: 12,
-  },
+  // 去除“视频”文字的正方形占位，保留加载转圈覆盖层
   videoPlayIconContainer: {
     position: 'absolute',
     top: 0,

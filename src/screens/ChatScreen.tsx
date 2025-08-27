@@ -166,6 +166,8 @@ interface Message {
   fileUrl?: string;  // 添加通用文件URL字段
   // 仅本地使用：iOS 自发视频的本地路径，用于预览/播放回退
   localFileUri?: string;
+  // 新增：本地缩略图路径（发送/接收时用于立即渲染）
+  videoThumbLocalPath?: string | null;
   isCallRecord?: boolean;  // 是否是通话记录
   callerId?: string;  // 通话发起者ID
   callDuration?: string;  // 通话时长
@@ -1654,8 +1656,28 @@ const ChatScreen: React.FC = () => {
     
     // 创建临时ID用于本地显示和后续更新
     const tempMessageId = generateUniqueId();
+    // 优先本地生成缩略图与尺寸，确保插入临时消息时即按比例显示
+    let initialThumbPath: string | null = null;
+    let initialVideoWidth: number | undefined = effectiveAsset.width || undefined;
+    let initialVideoHeight: number | undefined = effectiveAsset.height || undefined;
+    try {
+      const thumb = await require('react-native-create-thumbnail').createThumbnail({
+        url: effectiveUri,
+        timeStamp: 800,
+        cacheName: `send_${Date.now()}`,
+      });
+      if (thumb?.path) {
+        initialThumbPath = thumb.path;
+        if (!initialVideoWidth || !initialVideoHeight) {
+          initialVideoWidth = thumb.width || undefined;
+          initialVideoHeight = thumb.height || undefined;
+        }
+      }
+    } catch (e) {
+      console.log('⚠️ 本地生成视频缩略图失败（将继续上传）:', e);
+    }
 
-    // 创建新消息对象
+    // 创建新消息对象（带首帧缩略图与尺寸）
     const newMessage: Message = {
       _id: tempMessageId,
       senderId: userInfo?._id || '',
@@ -1667,8 +1689,9 @@ const ChatScreen: React.FC = () => {
       localFileUri: Platform.OS === 'ios' ? effectiveUri : undefined,
       isUploading: true,
       uploadProgress: 0,
-      videoWidth: effectiveAsset.width || undefined,
-      videoHeight: effectiveAsset.height || undefined,
+      videoWidth: initialVideoWidth,
+      videoHeight: initialVideoHeight,
+      videoThumbLocalPath: initialThumbPath,
     };
     
     addMessage(newMessage);
@@ -1699,35 +1722,7 @@ const ChatScreen: React.FC = () => {
         }
       }
       
-      console.log('✅ [视频发送] Socket连接已建立，开始生成缩略图与上传...');
-
-      // 先本地生成缩略图，便于消息列表即刻显示
-      let thumbPath: string | null = null;
-      try {
-        const thumb = await require('react-native-create-thumbnail').createThumbnail({
-          url: effectiveUri,
-          timeStamp: 800,
-          cacheName: `send_${Date.now()}`,
-        });
-        if (thumb?.path) {
-          thumbPath = thumb.path;
-          const aspect = Math.max(0.1, (thumb.width || 1) / Math.max(1, thumb.height || 1));
-          let vw = effectiveAsset.width || thumb.width || 0;
-          let vh = effectiveAsset.height || thumb.height || 0;
-          if (!vw || !vh) {
-            // 用缩略图尺寸兜底
-            vw = Math.floor(240 * aspect);
-            vh = Math.max(1, Math.floor(vw / Math.max(0.1, aspect)));
-          }
-          updateMessage(tempMessageId, {
-            videoThumbLocalPath: thumbPath,
-            videoWidth: vw,
-            videoHeight: vh,
-          });
-        }
-      } catch (e) {
-        console.log('⚠️ 生成视频缩略图失败，继续上传:', e);
-      }
+      console.log('✅ [视频发送] Socket连接已建立，开始上传...');
       
       // 计算视频时长（如果可用）
       let videoDuration = '未知';
