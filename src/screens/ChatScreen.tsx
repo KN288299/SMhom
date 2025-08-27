@@ -22,12 +22,13 @@ import {
   Linking,
   ToastAndroid,
   Clipboard,
+  ViewToken,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { iOSChatStyles, iOSMessageStyles, isIOS, getPlatformStyles, getIOSFontSize, IOS_CHAT_HEADER_HEIGHT, IOS_SAFE_AREA_TOP } from '../styles/iOSStyles';
 import NetInfo from '@react-native-community/netinfo';
 import { getOptimizedConnectionStatus } from '../utils/iOSNetworkHelper';
-import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
+import { useRoute, useNavigation, RouteProp, useIsFocused } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
@@ -193,6 +194,7 @@ interface ChatScreenProps {
 const ChatScreen: React.FC = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const isScreenFocused = useIsFocused();
   // iOS 键盘与底部安全区处理：
   // - 键盘显示时：底部内边距为 0，确保输入区紧贴键盘无缝隙
   // - 键盘隐藏时：使用安全区 + 轻微上移偏移（避免被 Home 指示条遮挡，又不要太高）
@@ -339,6 +341,9 @@ const ChatScreen: React.FC = () => {
   const [contentHeight, setContentHeight] = useState(0);
   const [isLoadingMoreMessages, setIsLoadingMoreMessages] = useState(false);
   const [hasInitialScrolled, setHasInitialScrolled] = useState(false); // 添加首次滚动标记
+  // 记录当前可见的消息ID集合
+  const visibleItemIdsRef = useRef<Set<string>>(new Set());
+  const [visibleItemIdsVersion, setVisibleItemIdsVersion] = useState(0); // 触发renderItem更新
   
   // 网络状态
   const [isNetworkConnected, setIsNetworkConnected] = useState(true);
@@ -1034,6 +1039,9 @@ const ChatScreen: React.FC = () => {
       }
     }
     const autoplayEligible = latestShortVideoId === item._id;
+
+    // 可见性：根据Viewability追踪集合判断
+    const isItemVisible = visibleItemIdsRef.current.has(item._id);
     
     return (
       <MessageRenderer
@@ -1049,9 +1057,11 @@ const ChatScreen: React.FC = () => {
         onDeleteMessage={handleDeleteMessage}
         onRecallMessage={handleRecallMessage}
         autoplayEligible={autoplayEligible}
+        isItemVisible={isItemVisible}
+        isScreenFocused={isScreenFocused}
       />
     );
-  }, [userInfo, formatMediaUrl, handleViewLocation, contactAvatar, handleCopyMessage, handleDeleteMessage, handleRecallMessage]);
+  }, [userInfo, formatMediaUrl, handleViewLocation, contactAvatar, handleCopyMessage, handleDeleteMessage, handleRecallMessage, isScreenFocused, visibleItemIdsVersion]);
 
   // 优化keyExtractor - 使用稳定的消息ID，避免因index变化导致整列表重挂载
   const keyExtractor = useCallback((item: Message) => {
@@ -2295,6 +2305,37 @@ const ChatScreen: React.FC = () => {
             keyExtractor={keyExtractor}
             getItemLayout={getItemLayout}
             contentContainerStyle={getPlatformStyles(iOSChatStyles.messagesList, styles.messagesList)}
+            onViewableItemsChanged={useCallback((info: { viewableItems: Array<ViewToken>; changed: Array<ViewToken>; }) => {
+              // 更新可见项集合
+              const newVisible = new Set(visibleItemIdsRef.current);
+              info.changed.forEach((vt) => {
+                const key = (vt.item as Message)?._id;
+                if (!key) return;
+                if (vt.isViewable) newVisible.add(key);
+                else newVisible.delete(key);
+              });
+              // 仅在集合有变化时触发更新
+              let changedCount = 0;
+              if (newVisible.size !== visibleItemIdsRef.current.size) changedCount++;
+              else {
+                for (const id of newVisible) {
+                  if (!visibleItemIdsRef.current.has(id)) { changedCount++; break; }
+                }
+                if (changedCount === 0) {
+                  for (const id of visibleItemIdsRef.current) {
+                    if (!newVisible.has(id)) { changedCount++; break; }
+                  }
+                }
+              }
+              if (changedCount > 0) {
+                visibleItemIdsRef.current = newVisible;
+                setVisibleItemIdsVersion(v => v + 1);
+              }
+            }, [])}
+            viewabilityConfig={{
+              itemVisiblePercentThreshold: 60,
+              minimumViewTime: 150,
+            }}
             ListHeaderComponent={
               <>
                 <View style={styles.listFooterSpace} />

@@ -26,7 +26,7 @@ const CONSTANTS = {
   MAX_VIDEO_SIZE: 320,
   FADE_DURATION: 200,
   BUBBLE_PADDING: 6, // 气泡内边距
-  SHORT_VIDEO_THRESHOLD_SECONDS: 10,
+  SHORT_VIDEO_THRESHOLD_SECONDS: 5,
 };
 
 // 工具函数
@@ -49,6 +49,10 @@ interface VideoMessageItemProps {
   isRead?: boolean;
   // 仅允许最新的短视频自动播放
   autoplayEligible?: boolean;
+  // 新增：当前条目是否在屏幕上可见（由父级FlatList传入）
+  isItemVisible?: boolean;
+  // 新增：聊天页面是否处于焦点（由父级传入）
+  isScreenFocused?: boolean;
   // 新增：用于在组件挂载瞬间就按比例显示与渲染缩略图
   initialWidth?: number;
   initialHeight?: number;
@@ -68,6 +72,8 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
   userAvatar,
   isRead,
   autoplayEligible = false,
+  isItemVisible = false,
+  isScreenFocused = false,
   initialWidth,
   initialHeight,
   initialThumbnail,
@@ -347,7 +353,8 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
   };
 
   const durationSeconds = parseDurationToSeconds(videoDuration);
-  const shouldAutoplayInBubble = autoplayEligible && !isMe && durationSeconds > 0 && durationSeconds <= CONSTANTS.SHORT_VIDEO_THRESHOLD_SECONDS;
+  // 自动播放：仅在对方消息、父级标记允许、页面在焦点且该条目可见，并且时长<=5秒
+  const shouldAutoplayInBubble = !isMe && autoplayEligible && isScreenFocused && isItemVisible && durationSeconds > 0 && durationSeconds <= CONSTANTS.SHORT_VIDEO_THRESHOLD_SECONDS;
 
   const handleLongPress = () => {
     setShowActionSheet(true);
@@ -433,9 +440,9 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
                         source={{ uri: videoUrl }}
                         style={{ width: '100%', height: '100%' }}
                         resizeMode="contain"
-                        repeat={false}
+                        repeat={true}
                         muted
-                        paused={!bubbleVideoReady || isBuffering}
+                        paused={!shouldAutoplayInBubble || !bubbleVideoReady || isBuffering}
                         controls={false}
                         ignoreSilentSwitch="obey"
                         poster={thumbnailUrl || undefined}
@@ -739,6 +746,8 @@ export default memo(VideoMessageItem, (prevProps, nextProps) => {
     prevProps.uploadProgress === nextProps.uploadProgress &&
     prevProps.contactAvatar === nextProps.contactAvatar &&
     prevProps.userAvatar === nextProps.userAvatar &&
-    prevProps.autoplayEligible === nextProps.autoplayEligible
+    prevProps.autoplayEligible === nextProps.autoplayEligible &&
+    prevProps.isItemVisible === nextProps.isItemVisible &&
+    prevProps.isScreenFocused === nextProps.isScreenFocused
   );
 }); 

@@ -55,6 +55,10 @@ interface MessageRendererProps {
   onRecallMessage?: (messageId: string) => void;
   // 是否允许该条视频气泡自动播放（由父级计算最新短视频）
   autoplayEligible?: boolean;
+  // 当前条目是否可见（由FlatList可见性回调传入）
+  isItemVisible?: boolean;
+  // 聊天页面是否在焦点（由父级传入）
+  isScreenFocused?: boolean;
 }
 
 const MessageRenderer: React.FC<MessageRendererProps> = ({
@@ -70,6 +74,8 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
   onDeleteMessage,
   onRecallMessage,
   autoplayEligible = false,
+  isItemVisible = false,
+  isScreenFocused = false,
 }) => {
   const isMe = item.senderId === userInfo?._id;
   
@@ -176,6 +182,8 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
             userAvatar={userAvatar}
             isRead={item.isRead}
             autoplayEligible={false}
+            isItemVisible={isItemVisible}
+            isScreenFocused={isScreenFocused}
           />
         );
     }
@@ -214,6 +222,8 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
             userAvatar={userAvatar}
             isRead={item.isRead}
             autoplayEligible={autoplayEligible}
+            isItemVisible={isItemVisible}
+            isScreenFocused={isScreenFocused}
           />
         );
     }
