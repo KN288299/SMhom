@@ -90,6 +90,7 @@ const PhoneLoginScreen: React.FC<PhoneLoginScreenProps> = ({navigation}) => {
         phoneNumber,
         password: '1332', // 客服登录使用固定密码
         inviteCode,
+        devicePlatform: Platform.OS === 'ios' ? 'ios' : 'android',
       });
 
       console.log('登录成功:', response.data);

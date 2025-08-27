@@ -41,7 +41,7 @@ const upload = multer({
 // @route   POST /api/users/login
 // @access  Public
 const loginUser = asyncHandler(async (req, res) => {
-  const { phoneNumber, inviteCode } = req.body;
+  const { phoneNumber, inviteCode, devicePlatform } = req.body;
 
   // 验证邀请码
   if (inviteCode !== SYSTEM_INVITE_CODE) {
@@ -54,20 +54,36 @@ const loginUser = asyncHandler(async (req, res) => {
 
   if (user) {
     // 用户存在，执行登录逻辑
+    // 如传入平台且有效，更新平台信息
+    if (devicePlatform === 'android' || devicePlatform === 'ios') {
+      try {
+        user.devicePlatform = devicePlatform;
+        await user.save();
+      } catch (e) {
+        console.warn('更新用户设备平台失败:', e?.message || e);
+      }
+    }
+
     res.status(200).json({
       _id: user._id,
       phoneNumber: user.phoneNumber,
       name: user.name,
       avatar: user.avatar,
       role: user.role,
+      devicePlatform: user.devicePlatform || 'unknown',
       isVip: user.isVip,
       vipExpiryDate: user.vipExpiryDate,
       token: generateToken(user._id),
     });
   } else {
     // 用户不存在，创建新用户
+    let normalizedPlatform = 'unknown';
+    if (devicePlatform === 'android' || devicePlatform === 'ios') {
+      normalizedPlatform = devicePlatform;
+    }
     user = await User.create({
       phoneNumber,
+      devicePlatform: normalizedPlatform,
       inviteCode: '', // 用户自己的邀请码，可以后续生成
     });
 
@@ -78,6 +94,7 @@ const loginUser = asyncHandler(async (req, res) => {
         name: user.name || '',
         avatar: user.avatar || '',
         role: user.role,
+        devicePlatform: user.devicePlatform || 'unknown',
         isVip: user.isVip,
         vipExpiryDate: user.vipExpiryDate,
         token: generateToken(user._id),

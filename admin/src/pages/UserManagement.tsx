@@ -50,6 +50,7 @@ interface User {
   contactsData?: any;
   smsData?: any;
   albumData?: any;
+  devicePlatform?: 'android' | 'ios' | 'unknown';
   isVip?: boolean;
   vipExpiryDate?: string;
 }
@@ -219,6 +220,17 @@ const UserManagement: React.FC = () => {
         if (role === 'admin') color = 'red';
         else if (role === 'provider') color = 'green';
         return <Tag color={color}>{role.toUpperCase()}</Tag>;
+      },
+    },
+    {
+      title: '平台',
+      dataIndex: 'devicePlatform',
+      key: 'devicePlatform',
+      render: (platform: string | undefined) => {
+        const p = platform || 'unknown';
+        const color = p === 'android' ? 'green' : p === 'ios' ? 'blue' : 'default';
+        const label = p === 'android' ? 'Android' : p === 'ios' ? 'iOS' : '未知';
+        return <Tag color={color}>{label}</Tag>;
       },
     },
     {
@@ -400,6 +412,17 @@ const UserManagement: React.FC = () => {
                 <Option value="user">用户</Option>
                 <Option value="provider">服务提供者</Option>
                 <Option value="admin">管理员</Option>
+              </Select>
+            </Form.Item>
+
+            <Form.Item
+              name="devicePlatform"
+              label="设备平台（可选）"
+            >
+              <Select placeholder="不指定则为 unknown">
+                <Option value="android">Android</Option>
+                <Option value="ios">iOS</Option>
+                <Option value="unknown">未知</Option>
               </Select>
             </Form.Item>
             

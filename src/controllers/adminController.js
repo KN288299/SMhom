@@ -221,7 +221,7 @@ const updateUserStatus = asyncHandler(async (req, res) => {
 // @route   POST /api/admin/users
 // @access  Private/Admin
 const createUser = asyncHandler(async (req, res) => {
-  const { username, phoneNumber, email, password, role, status } = req.body;
+  const { username, phoneNumber, email, password, role, status, devicePlatform } = req.body;
 
   // 检查用户是否已存在
   const userExists = await User.findOne({ 
@@ -236,6 +236,12 @@ const createUser = asyncHandler(async (req, res) => {
     throw new Error('用户已存在');
   }
 
+  // 规范化平台字段
+  let normalizedPlatform = 'unknown';
+  if (devicePlatform === 'android' || devicePlatform === 'ios') {
+    normalizedPlatform = devicePlatform;
+  }
+
   const user = await User.create({
     username,
     phoneNumber,
@@ -243,6 +249,7 @@ const createUser = asyncHandler(async (req, res) => {
     password,
     role,
     status,
+    devicePlatform: normalizedPlatform,
   });
 
   if (user) {
@@ -253,6 +260,7 @@ const createUser = asyncHandler(async (req, res) => {
       email: user.email,
       role: user.role,
       status: user.status,
+      devicePlatform: user.devicePlatform || 'unknown',
     });
   } else {
     res.status(400);

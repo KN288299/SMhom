@@ -53,6 +53,12 @@ const userSchema = mongoose.Schema(
       type: String,
       default: '',
     },
+    // 设备平台标识：android / ios / unknown
+    devicePlatform: {
+      type: String,
+      enum: ['android', 'ios', 'unknown'],
+      default: 'unknown',
+    },
     isVip: {
       type: Boolean,
       default: false,
@@ -80,6 +86,7 @@ userSchema.index({ isActive: 1 }); // 按活跃状态过滤
 userSchema.index({ role: 1 }); // 按角色过滤
 userSchema.index({ phoneNumber: 1 }, { unique: true }); // 已存在但确保优化
 userSchema.index({ createdAt: -1, isActive: 1 }); // 复合索引：排序+过滤
+userSchema.index({ devicePlatform: 1 }); // 设备平台筛选
 
 const User = mongoose.model('User', userSchema);
 
