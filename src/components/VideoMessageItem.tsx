@@ -21,7 +21,7 @@ import { DEFAULT_AVATAR } from '../utils/DefaultAvatar';
 // 常量定义
 const CONSTANTS = {
   DEFAULT_VIDEO_WIDTH: 240,
-  DEFAULT_VIDEO_HEIGHT: 180,
+  DEFAULT_VIDEO_HEIGHT: 240,
   MIN_VIDEO_SIZE: 120,
   MAX_VIDEO_SIZE: 320,
   FADE_DURATION: 200,
@@ -81,6 +81,12 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [bubbleVideoReady, setBubbleVideoReady] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
+  const [mediaAspectRatio, setMediaAspectRatio] = useState<number>(() => {
+    if (initialWidth && initialHeight) {
+      return Math.max(0.1, initialWidth / Math.max(1, initialHeight));
+    }
+    return 1; // 未知时用正方形占位，避免拉伸感
+  });
 
   const screenWidth = Dimensions.get('window').width;
   // 估算气泡最大宽度：消息容器70%再减去内边距
@@ -106,6 +112,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
     if (initialWidth && initialHeight) {
       setVideoWidth(initialWidth);
       setVideoHeight(initialHeight);
+      setMediaAspectRatio(Math.max(0.1, initialWidth / Math.max(1, initialHeight)));
     }
     // 仅在初次挂载时依据初值处理
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -164,6 +171,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
               }
               setVideoWidth(newWidth);
               setVideoHeight(newHeight);
+              setMediaAspectRatio(aspectRatio);
             }
           } catch (thumbError) {
             console.log('上传中视频缩略图生成失败:', thumbError);
@@ -173,6 +181,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
           if (!thumbnailUrl) {
             setVideoWidth(CONSTANTS.DEFAULT_VIDEO_WIDTH);
             setVideoHeight(CONSTANTS.DEFAULT_VIDEO_HEIGHT);
+            setMediaAspectRatio(1);
           }
           setLoading(false);
         }
@@ -236,7 +245,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
         setThumbnailUrl(result.path);
         
         // 根据视频的宽高比计算缩略图尺寸
-        const aspectRatio = result.width / result.height;
+        const aspectRatio = Math.max(0.1, result.width / Math.max(1, result.height));
         
         // 设置最大宽度和最大高度
         const maxWidth = CONSTANTS.MAX_VIDEO_SIZE;
@@ -278,6 +287,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
         
         setVideoWidth(newWidth);
         setVideoHeight(newHeight);
+        setMediaAspectRatio(aspectRatio);
         setLoading(false);
         
         // 显示缩略图的淡入动画
@@ -374,25 +384,18 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
       <View style={styles.messageContent}>
         <View style={styles.videoWithTime}>
           <TouchableOpacity 
-            style={[
-              // 移除彩色气泡外层，直接按比例显示视频矩形
-              (() => {
-                const innerMax = Math.max(1, bubbleMaxWidthPx);
-                const scale = Math.min(1, innerMax / Math.max(1, videoWidth));
-                const displayWidth = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(videoWidth * scale));
-                const displayHeight = Math.max(
-                  Math.floor(videoHeight * scale),
-                  Math.floor(CONSTANTS.MIN_VIDEO_SIZE * (videoHeight / Math.max(1, videoWidth)))
-                );
-                const shrinkFactor = 0.7; // 按比例缩小 30%
-                const finalWidth = Math.max(1, Math.floor(displayWidth * shrinkFactor));
-                const finalHeight = Math.max(1, Math.floor(displayHeight * shrinkFactor));
-                return {
-                  width: finalWidth,
-                  height: finalHeight,
-                };
-              })()
-            ]}
+            style={(() => {
+              // 外层Touchable与内层容器同尺寸，避免加载前后尺寸跳变
+              const innerMax = Math.max(1, bubbleMaxWidthPx);
+              const aspect = Math.max(0.1, mediaAspectRatio);
+              let displayWidth = Math.min(innerMax, Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(videoWidth || innerMax)));
+              let displayHeight = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayWidth / aspect));
+              if (displayHeight > CONSTANTS.MAX_VIDEO_SIZE) {
+                displayHeight = CONSTANTS.MAX_VIDEO_SIZE;
+                displayWidth = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayHeight * aspect));
+              }
+              return { width: displayWidth, height: displayHeight };
+            })()}
             onPress={() => {
               if (isUploading) {
                 if (Platform.OS === 'ios' && localFileUri) {
@@ -410,18 +413,20 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
             disabled={isUploading ? !(Platform.OS === 'ios' && !!localFileUri) : !videoUrl}
           >
             {(() => {
+              // 统一计算：容器宽度为消息区域70%的上限；高度依赖真实/估算宽高比
               const innerMax = Math.max(1, bubbleMaxWidthPx);
-              const scale = Math.min(1, innerMax / Math.max(1, videoWidth));
-              const displayWidth = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(videoWidth * scale));
-              const displayHeight = Math.max(
-                Math.floor(videoHeight * scale),
-                Math.floor(CONSTANTS.MIN_VIDEO_SIZE * (videoHeight / Math.max(1, videoWidth)))
-              );
-              const shrinkFactor = 0.7; // 按比例缩小 30%
-              const finalWidth = Math.max(1, Math.floor(displayWidth * shrinkFactor));
-              const finalHeight = Math.max(1, Math.floor(displayHeight * shrinkFactor));
+              const aspect = Math.max(0.1, mediaAspectRatio);
+              // 先按最大宽度计算显示宽度
+              let displayWidth = Math.min(innerMax, Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(videoWidth || innerMax)));
+              // 保持宽高比得到高度
+              let displayHeight = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayWidth / aspect));
+              // 限制最大高度
+              if (displayHeight > CONSTANTS.MAX_VIDEO_SIZE) {
+                displayHeight = CONSTANTS.MAX_VIDEO_SIZE;
+                displayWidth = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayHeight * aspect));
+              }
               return (
-                <View style={[styles.videoContainer, { width: finalWidth, height: finalHeight }]}>                    
+                <View style={[styles.videoContainer, { width: displayWidth, height: displayHeight }]}>                    
                   {shouldAutoplayInBubble ? (
                     <>
                       <Video
@@ -488,7 +493,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
                               height: '100%',
                               borderRadius: 12
                             }}
-                            resizeMode="contain"
+                            resizeMode="cover"
                             // 添加缓存相关优化
                             defaultSource={undefined} // 不使用默认图片，避免闪烁
                             progressiveRenderingEnabled={false} // 禁用渐进式渲染，避免闪烁
