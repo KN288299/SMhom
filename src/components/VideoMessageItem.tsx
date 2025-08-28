@@ -31,6 +31,26 @@ const CONSTANTS = {
 };
 
 // 工具函数
+const normalizeThumbnailUri = (uri?: string | null): string | null => {
+  if (!uri) return null;
+  const value = String(uri);
+  if (
+    value.startsWith('http://') ||
+    value.startsWith('https://') ||
+    value.startsWith('file://') ||
+    value.startsWith('ph://') ||
+    value.startsWith('assets-library://') ||
+    value.startsWith('content://')
+  ) {
+    return value;
+  }
+  // 绝对路径（无协议）默认视为本地文件
+  if (value.startsWith('/')) {
+    return `file://${value}`;
+  }
+  return value;
+};
+
 const formatMessageTime = (timestamp: Date): string => {
   return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
@@ -85,7 +105,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
   const [videoWidth, setVideoWidth] = useState(initialWidth || CONSTANTS.DEFAULT_VIDEO_WIDTH);
   const [videoHeight, setVideoHeight] = useState(initialHeight || CONSTANTS.DEFAULT_VIDEO_HEIGHT);
   // 优先使用服务器缩略图，其次是本地初始缩略图
-  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(videoThumbnailUrl || initialThumbnail || null);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(normalizeThumbnailUri(videoThumbnailUrl || initialThumbnail || null));
   const [loading, setLoading] = useState(!(videoThumbnailUrl || initialThumbnail));
   const [thumbnailError, setThumbnailError] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -117,7 +137,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
     if (videoThumbnailUrl || initialThumbnail) {
       fadeAnim.setValue(1);
       setLoading(false);
-      setThumbnailUrl(videoThumbnailUrl || initialThumbnail || null);
+      setThumbnailUrl(normalizeThumbnailUri(videoThumbnailUrl || initialThumbnail || null));
     }
     if (initialWidth && initialHeight) {
       setVideoWidth(initialWidth);
@@ -165,7 +185,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
       // 如果已有服务器缩略图，直接使用无需生成
       if (videoThumbnailUrl) {
         if (isMounted) {
-          setThumbnailUrl(videoThumbnailUrl);
+          setThumbnailUrl(normalizeThumbnailUri(videoThumbnailUrl));
           setLoading(false);
           fadeAnim.setValue(1);
         }
@@ -199,7 +219,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
             });
             if (isMounted && result?.path) {
               console.log('上传中视频缩略图生成成功:', result.path);
-              setThumbnailUrl(result.path);
+              setThumbnailUrl(normalizeThumbnailUri(result.path));
               const aspectRatio = Math.max(0.1, result.width / Math.max(1, result.height));
               setVideoWidth(result.width);
               setVideoHeight(result.height);
@@ -229,7 +249,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
         }
         const cachedThumb = await VideoCacheManager.getCachedThumbnailPath(lookupKey);
         if (cachedThumb && isMounted) {
-          setThumbnailUrl(`file://${cachedThumb}`);
+          setThumbnailUrl(normalizeThumbnailUri(`file://${cachedThumb}`));
           setLoading(false);
           setThumbnailError(false);
           fadeAnim.setValue(1);
@@ -338,12 +358,12 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
         try {
           const saved = await VideoCacheManager.saveThumbnailForUrl(lookupKey, result.path);
           if (saved) {
-            setThumbnailUrl(`file://${saved}`);
+            setThumbnailUrl(normalizeThumbnailUri(`file://${saved}`));
           } else {
-            setThumbnailUrl(result.path);
+            setThumbnailUrl(normalizeThumbnailUri(result.path));
           }
         } catch {
-          setThumbnailUrl(result.path);
+          setThumbnailUrl(normalizeThumbnailUri(result.path));
         }
         
         // 根据视频的宽高比计算缩略图尺寸

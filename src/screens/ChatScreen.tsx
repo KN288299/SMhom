@@ -1685,6 +1685,8 @@ const ChatScreen: React.FC = () => {
     
     // 创建临时ID用于本地显示和后续更新
     const tempMessageId = generateUniqueId();
+    // 记录已上传到服务器的缩略图URL，用于Socket与持久化保存
+    let uploadedVideoThumbnailUrl: string | undefined = undefined;
     // 直接插入上传中消息（不等待缩略图），用已知的资源尺寸（若可用）
     const initialVideoWidth: number | undefined = effectiveAsset.width || undefined;
     const initialVideoHeight: number | undefined = effectiveAsset.height || undefined;
@@ -1745,6 +1747,7 @@ const ChatScreen: React.FC = () => {
             if (thumbnailResponse.ok) {
               const thumbnailResult = await thumbnailResponse.json();
               const thumbnailUrl = thumbnailResult.imageUrl;
+              uploadedVideoThumbnailUrl = thumbnailUrl;
               
               // 更新消息包含服务器缩略图URL
               updateMessage(tempMessageId, {
@@ -1860,7 +1863,7 @@ const ChatScreen: React.FC = () => {
         videoHeight: effectiveAsset.height || undefined,
         aspectRatio: (effectiveAsset.width && effectiveAsset.height) ? (effectiveAsset.width / Math.max(1, effectiveAsset.height)) : undefined,
         // 如果缩略图已上传，包含缩略图URL
-        videoThumbnailUrl: undefined, // 这里先设置为undefined，后续通过updateMessage更新
+        videoThumbnailUrl: uploadedVideoThumbnailUrl, // 若已上传成功则透传
       };
       
       // 再次确认Socket连接状态
@@ -1895,6 +1898,8 @@ const ChatScreen: React.FC = () => {
               videoWidth: effectiveAsset.width || undefined,
               videoHeight: effectiveAsset.height || undefined,
               aspectRatio: (effectiveAsset.width && effectiveAsset.height) ? (effectiveAsset.width / Math.max(1, effectiveAsset.height)) : undefined,
+              // 若有服务器缩略图，持久化到后端
+              videoThumbnailUrl: uploadedVideoThumbnailUrl,
             },
             {
               headers: {
