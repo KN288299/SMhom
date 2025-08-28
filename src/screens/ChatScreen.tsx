@@ -55,6 +55,7 @@ import { useSocket } from '../context/SocketContext';
 import LocationPickerModal from '../components/LocationPickerModal';
 import LocationViewerModal from '../components/LocationViewerModal';
 import MediaUploadService from '../services/MediaUploadService';
+import VideoCacheManager from '../utils/VideoCacheManager';
 
 // 常量定义
 const CONSTANTS = {
@@ -1072,7 +1073,7 @@ const ChatScreen: React.FC = () => {
         item={item}
         userInfo={userInfo}
         onOpenFullscreenImage={(imageUrl: string) => openFullscreenImage(imageUrl)}
-        onOpenFullscreenVideo={(videoUrl: string) => openFullscreenVideo(videoUrl)}
+        onOpenFullscreenVideo={(videoUrl: string, posterUrl?: string | null) => openFullscreenVideo(videoUrl, posterUrl)}
         onViewLocation={handleViewLocation}
         formatMediaUrl={formatMediaUrl}
         contactAvatar={contactAvatar}
@@ -1810,7 +1811,11 @@ const ChatScreen: React.FC = () => {
         content: '视频消息',
         messageType: 'video',
         videoUrl: videoUrl,
-        videoDuration: videoDuration
+        videoDuration: videoDuration,
+        // 透传尺寸与比例，便于接收端首屏按比例渲染
+        videoWidth: effectiveAsset.width || undefined,
+        videoHeight: effectiveAsset.height || undefined,
+        aspectRatio: (effectiveAsset.width && effectiveAsset.height) ? (effectiveAsset.width / Math.max(1, effectiveAsset.height)) : undefined,
       };
       
       // 再次确认Socket连接状态
@@ -2064,25 +2069,44 @@ const ChatScreen: React.FC = () => {
     setShowFullscreenImage(false);
   };
   
-  // 打开全屏视频播放器
-  const openFullscreenVideo = (videoUrl: string, posterUrl?: string | null) => {
-    console.log('打开全屏视频播放器，URL:', videoUrl);
-    setFullscreenVideoUrl(videoUrl);
-    setFullscreenPosterUrl(posterUrl || '');
-    setShowFullscreenVideo(true);
-    setIsVideoPlaying(true); // 修改为true，实现自动播放
-    setVideoProgress(0);
-    setVideoDuration(0);
-    setVideoCurrentTime(0);
-    setShowVideoControls(true);
-    
-    // 3秒后自动隐藏控制器
-    if (videoControlsTimerRef.current) {
-      clearTimeout(videoControlsTimerRef.current);
+  // 打开全屏视频播放器（优先使用本地缓存）
+  const openFullscreenVideo = async (videoUrl: string, posterUrl?: string | null) => {
+    try {
+      console.log('打开全屏视频播放器，URL:', videoUrl);
+      let effectiveUrl = videoUrl;
+      // iOS 本地/相册路径直接使用；HTTP 尝试读取缓存
+      if (videoUrl && (videoUrl.startsWith('http') || videoUrl.startsWith('/'))) {
+        const formatted = formatMediaUrl(videoUrl);
+        const cachedPath = await VideoCacheManager.getCachedPath(formatted);
+        effectiveUrl = cachedPath ? `file://${cachedPath}` : formatted;
+      }
+      setFullscreenVideoUrl(effectiveUrl);
+      setFullscreenPosterUrl(posterUrl || '');
+      setShowFullscreenVideo(true);
+      setIsVideoPlaying(true);
+      setVideoProgress(0);
+      setVideoDuration(0);
+      setVideoCurrentTime(0);
+      setShowVideoControls(true);
+    } catch (e) {
+      console.log('打开全屏视频失败，回退到原URL', e);
+      setFullscreenVideoUrl(videoUrl);
+      setFullscreenPosterUrl(posterUrl || '');
+      setShowFullscreenVideo(true);
+      setIsVideoPlaying(true);
+      setVideoProgress(0);
+      setVideoDuration(0);
+      setVideoCurrentTime(0);
+      setShowVideoControls(true);
+    } finally {
+      // 3秒后自动隐藏控制器
+      if (videoControlsTimerRef.current) {
+        clearTimeout(videoControlsTimerRef.current);
+      }
+      videoControlsTimerRef.current = setTimeout(() => {
+        setShowVideoControls(false);
+      }, 3000);
     }
-    videoControlsTimerRef.current = setTimeout(() => {
-      setShowVideoControls(false);
-    }, 3000);
   };
 
   // 关闭全屏视频播放器
@@ -2355,6 +2379,33 @@ const ChatScreen: React.FC = () => {
               if (changedCount > 0) {
                 visibleItemIdsRef.current = newVisible;
                 setVisibleItemIdsVersion(v => v + 1);
+              }
+
+              // 轻量预取：对新可见的视频执行小文件预取（WiFi下<=15MB）
+              try {
+                const newlyVisibleIds: string[] = [];
+                info.changed.forEach((vt) => {
+                  const mi = vt.item as Message;
+                  if (vt.isViewable && mi && (mi.messageType === 'video' || mi.contentType === 'video') && !mi.isUploading) {
+                    newlyVisibleIds.push(mi._id);
+                  }
+                });
+                if (newlyVisibleIds.length > 0) {
+                  const urlSet = new Set<string>();
+                  newlyVisibleIds.forEach(id => {
+                    const m = messages.find(mm => mm._id === id);
+                    const url = (m?.videoUrl || m?.fileUrl || '');
+                    if (url) urlSet.add(formatMediaUrl(url));
+                  });
+                  urlSet.forEach(async (url) => {
+                    // 避免阻塞UI：异步预取
+                    setTimeout(() => {
+                      VideoCacheManager.prefetch(url, { wifiOnly: true, maxSizeMB: 15, timeoutMs: 6000 });
+                    }, 0);
+                  });
+                }
+              } catch (e) {
+                // 忽略预取异常
               }
             }, [])}
             viewabilityConfig={{

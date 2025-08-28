@@ -111,12 +111,7 @@ const FullscreenModals: React.FC<FullscreenModalsProps> = ({
     }).start();
   }, [videoOpacity]);
   
-  // 格式化时间
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-  };
+  // 去除时间条与倒计时显示逻辑
 
   const handleSaveImage = useCallback(async () => {
     if (!fullscreenImageUrl) return;
@@ -264,63 +259,38 @@ const FullscreenModals: React.FC<FullscreenModalsProps> = ({
                   </View>
                 )}
               </View>
-              
               {showVideoControls && (
                 <View style={styles.videoControlsContainer}>
-                  <View style={styles.videoControlsBottom}>
-                    <View style={styles.videoProgressContainer}>
-                      <View style={styles.videoProgressBar}>
-                        <View 
-                          style={[
-                            styles.videoProgressFill, 
-                            { width: `${videoProgress * 100}%` }
-                          ]} 
-                        />
-                      </View>
-                      <View style={styles.videoTimeContainer}>
-                        <Text style={styles.videoTimeText}>
-                          {formatTime(videoCurrentTime)}
-                        </Text>
-                        <Text style={styles.videoTimeText}>
-                          {formatTime(videoDuration)}
-                        </Text>
-                      </View>
-                    </View>
-                    
-                    <View style={styles.videoControlButtons}>
-                      <TouchableOpacity 
-                        style={styles.videoControlButton}
-                        onPress={onCloseFullscreenVideo}
-                      >
-                        <Icon name="arrow-back" size={24} color="#fff" />
-                      </TouchableOpacity>
-                      
-                      <TouchableOpacity 
-                        style={styles.videoPlayPauseButton}
-                        onPress={onToggleVideoPlayPause}
-                      >
-                        <Icon 
-                          name={isVideoPlaying ? "pause" : "play"} 
-                          size={32} 
-                          color="#fff" 
-                        />
-                      </TouchableOpacity>
-                      
-                      <TouchableOpacity 
-                        style={styles.videoControlButton}
-                        onPress={async () => {
-                          if (!fullscreenVideoUrl) return;
-                          try {
-                            await saveVideoToGallery(fullscreenVideoUrl);
-                            console.log('✅ 视频已保存到相册');
-                          } catch (e) {
-                            console.log('❌ 保存视频失败:', e);
-                          }
-                        }}
-                      >
-                        <Icon name="download" size={24} color="#fff" />
-                      </TouchableOpacity>
-                    </View>
+                  <View style={styles.simpleControls}>
+                    <TouchableOpacity 
+                      style={styles.circleBtn}
+                      onPress={onCloseFullscreenVideo}
+                      accessibilityLabel="关闭"
+                    >
+                      <Icon name="close" size={26} color="#fff" />
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.circleBtn, styles.playBtn]}
+                      onPress={onToggleVideoPlayPause}
+                      accessibilityLabel="播放或暂停"
+                    >
+                      <Icon name={isVideoPlaying ? 'pause' : 'play'} size={30} color="#fff" />
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.circleBtn}
+                      onPress={async () => {
+                        if (!fullscreenVideoUrl) return;
+                        try {
+                          await saveVideoToGallery(fullscreenVideoUrl);
+                          console.log('✅ 视频已保存到相册');
+                        } catch (e) {
+                          console.log('❌ 保存视频失败:', e);
+                        }
+                      }}
+                      accessibilityLabel="保存"
+                    >
+                      <Icon name="download" size={24} color="#fff" />
+                    </TouchableOpacity>
                   </View>
                 </View>
               )}
@@ -385,42 +355,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
   },
-  videoControlsBottom: {
-    backgroundColor: 'rgba(0,0,0,0.3)',
+  simpleControls: {
+    paddingTop: 40,
+    paddingBottom: 36,
     paddingHorizontal: 20,
-    paddingBottom: 40,
-    paddingTop: 20,
-  },
-  videoProgressContainer: {
-    marginBottom: 15,
-  },
-  videoProgressBar: {
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 2,
-    marginBottom: 8,
-  },
-  videoProgressFill: {
-    height: '100%',
-    backgroundColor: '#ff6b81',
-    borderRadius: 2,
-  },
-  videoTimeContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  videoTimeText: {
-    color: '#fff',
-    fontSize: 12,
-  },
-  videoControlButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  videoControlButton: {
+  circleBtn: {
     width: 44,
     height: 44,
     justifyContent: 'center',
@@ -428,13 +373,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     borderRadius: 22,
   },
-  videoPlayPauseButton: {
-    width: 60,
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 30,
+  playBtn: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
   },
   bufferingOverlay: {
     position: 'absolute',

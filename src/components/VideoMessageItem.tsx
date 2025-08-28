@@ -10,7 +10,6 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
-import Video from 'react-native-video';
 import MessageActionSheet from './MessageActionSheet';
 import { saveVideoToGallery } from '../utils/saveImage';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -85,10 +84,6 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
   const [thumbnailError, setThumbnailError] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [showActionSheet, setShowActionSheet] = useState(false);
-  const [bubbleVideoReady, setBubbleVideoReady] = useState(false);
-  const [isBuffering, setIsBuffering] = useState(false);
-  const lastBufferUpdateRef = useRef<number>(0);
-  const bubbleReadyFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mediaAspectRatio, setMediaAspectRatio] = useState<number>(() => {
     // 按真实视频宽高比初始化（若父级已提供初始尺寸则直接使用）
     const width = initialWidth || videoWidth || CONSTANTS.DEFAULT_VIDEO_WIDTH;
@@ -305,19 +300,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
     };
   }, [videoUrl, isUploading, fadeAnim, isItemVisible, videoDuration]);
 
-  // 卸载时清理全屏就绪兜底定时器
-  useEffect(() => {
-    return () => {
-      if (bubbleReadyFallbackTimerRef.current) {
-        clearTimeout(bubbleReadyFallbackTimerRef.current);
-        bubbleReadyFallbackTimerRef.current = null;
-      }
-    };
-  }, []);
-
-  const durationSeconds = parseDurationToSeconds(videoDuration);
-  // 自动播放：仅在对方消息、父级标记允许、页面在焦点且该条目可见，并且时长<=5秒
-  const shouldAutoplayInBubble = !isMe && autoplayEligible && isScreenFocused && isItemVisible && durationSeconds > 0 && durationSeconds <= CONSTANTS.SHORT_VIDEO_THRESHOLD_SECONDS;
+  // 取消气泡内自动播放，统一使用封面+播放图标
 
   const handleLongPress = () => {
     setShowActionSheet(true);
@@ -360,9 +343,9 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
                 const aspect = Math.max(0.1, mediaAspectRatio);
                 let displayWidth = innerMax;
                 let displayHeight = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayWidth / aspect));
-                // iOS和Android都应用70%缩放，保持一致的视觉效果
-                displayWidth = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayWidth * 0.7));
-                displayHeight = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayHeight * 0.7));
+                // 统一0.6缩放，避免遮挡聊天内容
+                displayWidth = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayWidth * 0.6));
+                displayHeight = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayHeight * 0.6));
                 return { width: displayWidth, height: displayHeight };
               })()}
             onPress={() => {
@@ -389,150 +372,59 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
               let displayWidth = innerMax;
               // 保持宽高比得到高度
               let displayHeight = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayWidth / aspect));
-              // iOS和Android都应用70%缩放，保持一致的视觉效果
-              displayWidth = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayWidth * 0.7));
-              displayHeight = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayHeight * 0.7));
+              // 统一0.6缩放，避免遮挡聊天内容
+              displayWidth = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayWidth * 0.6));
+              displayHeight = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayHeight * 0.6));
               return (
                 <View style={[styles.videoContainer, { width: displayWidth, height: displayHeight }]}>                    
-                  {shouldAutoplayInBubble ? (
-                    <>
-                      <Video
-                        key={videoUrl}
-                        source={{ uri: videoUrl }}
-                        style={{ width: '100%', height: '100%' }}
-                        resizeMode="contain"
-                        repeat={true}
-                        muted
-                        // 使用 rate 控制播放，避免切换 paused 导致的黑屏闪烁
-                        paused={false}
-                        rate={shouldAutoplayInBubble && bubbleVideoReady ? 1.0 : 0.0}
-                        controls={false}
-                        ignoreSilentSwitch="obey"
-                        poster={thumbnailUrl || undefined}
-                        posterResizeMode="cover"
-                        onLoadStart={() => {
-                          setBubbleVideoReady(false);
-                          setIsBuffering(true);
-                          if (bubbleReadyFallbackTimerRef.current) {
-                            clearTimeout(bubbleReadyFallbackTimerRef.current);
-                            bubbleReadyFallbackTimerRef.current = null;
-                          }
-                        }}
-                        onReadyForDisplay={() => {
-                          if (bubbleReadyFallbackTimerRef.current) {
-                            clearTimeout(bubbleReadyFallbackTimerRef.current);
-                            bubbleReadyFallbackTimerRef.current = null;
-                          }
-                          setBubbleVideoReady(true);
-                          setIsBuffering(false);
-                        }}
-                        onLoad={() => {
-                          // 兜底：若部分机型不触发 onReadyForDisplay，则在 800ms 后直接显示
-                          if (bubbleReadyFallbackTimerRef.current) {
-                            clearTimeout(bubbleReadyFallbackTimerRef.current);
-                          }
-                          bubbleReadyFallbackTimerRef.current = setTimeout(() => {
-                            setBubbleVideoReady(true);
-                            setIsBuffering(false);
-                          }, 800);
-                        }}
-                        onBuffer={(e: any) => {
-                          const now = Date.now();
-                          const next = !!e?.isBuffering;
-                          if (next) {
-                            if (now - lastBufferUpdateRef.current < 300) return;
-                            lastBufferUpdateRef.current = now;
-                            setIsBuffering(true);
-                          } else {
-                            lastBufferUpdateRef.current = now;
-                            setIsBuffering(false);
-                          }
-                        }}
-                        onError={() => {
-                          setBubbleVideoReady(false);
-                          setIsBuffering(false);
-                        }}
-                        {...(Platform.OS === 'android'
-                          ? {
-                              useTextureView: false,
-                              shutterColor: 'transparent',
-                              minLoadRetryCount: 2,
-                              bufferConfig: {
-                                minBufferMs: 5000,
-                                maxBufferMs: 20000,
-                                bufferForPlaybackMs: 300,
-                                bufferForPlaybackAfterRebufferMs: 1500,
-                              },
-                            }
-                          : {
-                              // iOS 播放更快出现首帧，减少卡顿
-                              preferredForwardBufferDuration: 1.5,
-                              automaticallyWaitsToMinimizeStalling: false,
-                            })}
-                        playInBackground={false}
-                        playWhenInactive={false}
-                      />
-                      {(!bubbleVideoReady || isBuffering) && (
-                        <View style={styles.videoLoadingOverlay}>
-                          <ActivityIndicator size="small" color="#fff" />
-                        </View>
-                      )}
-                      <View style={styles.videoDurationContainer}>
-                        <Text style={styles.videoDurationText}>
-                          {videoDuration || `${durationSeconds}s`}
-                        </Text>
+                  <>
+                    {thumbnailUrl && !thumbnailError ? (
+                      <Animated.View style={{ 
+                        opacity: fadeAnim, 
+                        width: '100%', 
+                        height: '100%',
+                        borderRadius: 12,
+                        overflow: 'hidden'
+                      }}>
+                        <Image 
+                          source={{ 
+                            uri: thumbnailUrl,
+                            cache: 'force-cache' // 强制使用缓存
+                          }}
+                          style={{ 
+                            width: '100%', 
+                            height: '100%',
+                            borderRadius: 12
+                          }}
+                          resizeMode="cover"
+                          // 添加缓存相关优化
+                          defaultSource={undefined} // 不使用默认图片，避免闪烁
+                          progressiveRenderingEnabled={false} // 禁用渐进式渲染，避免闪烁
+                          fadeDuration={0} // 禁用淡入动画，避免闪烁
+                        />
+                      </Animated.View>
+                    ) : null}
+                    {/* 加载缩略图时，仅覆盖一个轻量半透明层 */}
+                    {loading && (
+                      <View style={styles.videoLoadingOverlay}>
+                        <ActivityIndicator size="small" color="#fff" />
                       </View>
-                    </>
-                  ) : (
-                    <>
-                      {thumbnailUrl && !thumbnailError ? (
-                        <Animated.View style={{ 
-                          opacity: fadeAnim, 
-                          width: '100%', 
-                          height: '100%',
-                          borderRadius: 12,
-                          overflow: 'hidden'
-                        }}>
-                          <Image 
-                            source={{ 
-                              uri: thumbnailUrl,
-                              cache: 'force-cache' // 强制使用缓存
-                            }}
-                            style={{ 
-                              width: '100%', 
-                              height: '100%',
-                              borderRadius: 12
-                            }}
-                            resizeMode="cover"
-                            // 添加缓存相关优化
-                            defaultSource={undefined} // 不使用默认图片，避免闪烁
-                            progressiveRenderingEnabled={false} // 禁用渐进式渲染，避免闪烁
-                            fadeDuration={0} // 禁用淡入动画，避免闪烁
-                          />
-                        </Animated.View>
-                      ) : null}
-                      {/* 加载缩略图时，仅覆盖一个轻量半透明层 */}
-                      {loading && (
-                        <View style={styles.videoLoadingOverlay}>
-                          <ActivityIndicator size="small" color="#fff" />
-                        </View>
-                      )}
-                      <View style={styles.videoPlayIconContainer}>
-                        <Icon name="play-circle" size={40} color="#fff" />
+                    )}
+                    <View style={styles.videoPlayIconContainer}>
+                      <Icon name="play-circle" size={40} color="#fff" />
+                    </View>
+                    <View style={styles.videoDurationContainer}>
+                      <Text style={styles.videoDurationText}>
+                        {videoDuration || '视频'}
+                      </Text>
+                    </View>
+                    {/* 上传时仅显示转圈，其余无感 */}
+                    {isUploading && uploadProgress < 100 && (
+                      <View style={styles.videoUploadingContainer}>
+                        <ActivityIndicator size="small" color="#fff" />
                       </View>
-                      <View style={styles.videoDurationContainer}>
-                        <Text style={styles.videoDurationText}>
-                          {videoDuration || '视频'}
-                        </Text>
-                      </View>
-                      {/* 上传时仅显示转圈，其余无感 */}
-                      {isUploading && uploadProgress < 100 && (
-                        <View style={styles.videoUploadingContainer}>
-                          <ActivityIndicator size="small" color="#fff" />
-                        </View>
-                      )}
-                    </>
-                  )}
+                    )}
+                  </>
                 </View>
               );
             })()}

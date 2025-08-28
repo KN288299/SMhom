@@ -30,8 +30,11 @@ const PlatformCallManager: React.FC = () => {
   const incomingCallInfoRef = useRef(incomingCallInfo);
   // 记录已处理/正在处理的来电，防止重复弹出
   const handledCallIdsRef = useRef<Set<string>>(new Set());
-  // 缩短本地去重TTL，避免同一callId短时间复用导致下一次来电被忽略
-  const PLATFORM_HANDLED_TTL_MS = 8 * 1000;
+  // 本地去重TTL：iOS适当延长，覆盖授权/音频初始化等耗时窗口
+  const PLATFORM_HANDLED_TTL_MS = Platform.OS === 'ios' ? 30 * 1000 : 8 * 1000;
+  // 接听中防抖：接听后到通话建立/状态回调前，忽略相同callId的重复来电
+  const isAcceptingRef = useRef(false);
+  const acceptedCallIdRef = useRef<string | null>(null);
 
   // 标记某个callId已被处理，带TTL自动过期
   const markCallHandled = useCallback((callId?: string) => {
@@ -109,6 +112,12 @@ const PlatformCallManager: React.FC = () => {
       return;
     }
     
+    // 接听中防抖：若正在接听且为同一通话ID，忽略重复incoming_call
+    if (isAcceptingRef.current && acceptedCallIdRef.current && callData.callId === acceptedCallIdRef.current) {
+      console.log('🛑 [PlatformCallManager] 接听中，忽略同一callId的重复incoming_call:', callData.callId);
+      return;
+    }
+
     // 去重：同一callId若已处理，直接忽略
     if (handledCallIdsRef.current.has(callData.callId)) {
       console.log('🛑 [PlatformCallManager] 重复的incoming_call，已忽略。callId:', callData.callId);
@@ -158,6 +167,10 @@ const PlatformCallManager: React.FC = () => {
       setIncomingCallInfo(null);
     }
     
+    // 清理接听中标记
+    isAcceptingRef.current = false;
+    acceptedCallIdRef.current = null;
+
     // 🔧 修复：使用统一的重置函数
     resetIncomingCallState(callId, '通话被拒绝');
   }, [resetIncomingCallState]);
@@ -181,9 +194,22 @@ const PlatformCallManager: React.FC = () => {
       setIncomingCallInfo(null);
     }
     
+    // 清理接听中标记
+    isAcceptingRef.current = false;
+    acceptedCallIdRef.current = null;
+
     // 🔧 修复：使用统一的重置函数
     resetIncomingCallState(callId, '通话已结束');
   }, [forceHideFloatingCall, resetIncomingCallState]);
+
+  // 处理通话已接听（对方或本端接听成功）
+  const handleCallAcceptedEvent = useCallback((data: any) => {
+    const { callId } = data || {};
+    console.log('📞 [PlatformCallManager] 通话已接听事件:', callId);
+    // 结束接听中防抖，但保留本地去重以避免后续重复incoming_call
+    isAcceptingRef.current = false;
+    acceptedCallIdRef.current = null;
+  }, []);
 
   // 接听来电
   const handleAcceptCall = () => {
@@ -196,8 +222,9 @@ const PlatformCallManager: React.FC = () => {
     // 标记本次callId为已处理，避免权限弹窗返回后再次收到重复incoming_call
     if (incomingCallInfo?.callId) {
       markCallHandled(incomingCallInfo.callId);
-      // 接听后立即释放全局incoming_call去重，避免下一次来电被吞
-      releaseIncomingCallDedup(incomingCallInfo.callId);
+      // 接听中防抖开启
+      isAcceptingRef.current = true;
+      acceptedCallIdRef.current = incomingCallInfo.callId;
     }
     
     // 导航到通话页面
@@ -262,6 +289,7 @@ const PlatformCallManager: React.FC = () => {
     
     socket.on('call_rejected', handleCallRejected);
     socket.on('call_ended', handleCallEnded);
+    socket.on('call_accepted', handleCallAcceptedEvent);
     // 直接监听取消事件，作为兜底，避免遗漏转发
     socket.on('call_cancelled', handleCallCancelled);
 
@@ -269,9 +297,10 @@ const PlatformCallManager: React.FC = () => {
       console.log('🧹 [PlatformCallManager] 清理通话状态监听');
       socket.off('call_rejected', handleCallRejected);
       socket.off('call_ended', handleCallEnded);
+      socket.off('call_accepted', handleCallAcceptedEvent);
       socket.off('call_cancelled', handleCallCancelled);
     };
-  }, [socket, userInfo, handleCallRejected, handleCallEnded, handleCallCancelled]);
+  }, [socket, userInfo, handleCallRejected, handleCallEnded, handleCallAcceptedEvent, handleCallCancelled]);
 
   // 监听应用状态变化（iOS特殊处理）
   useEffect(() => {

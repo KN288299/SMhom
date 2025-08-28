@@ -420,8 +420,8 @@ const VoiceCallScreen: React.FC = () => {
             }
             
             // 3. 关键延迟：确保音频系统完全稳定
-            console.log('⏱️ [VoiceCall] 等待iOS音频系统稳定...');
-            await new Promise(resolve => setTimeout(resolve, 300));
+            console.log('⏱️ [VoiceCall] 等待iOS音频系统稳定(授权后首启放宽到1s)...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
             
             console.log('✅ [VoiceCall] iOS音频系统完全就绪');
           } catch (audioError) {
@@ -440,45 +440,71 @@ const VoiceCallScreen: React.FC = () => {
           }
         }
         
-        // 等待全局Socket连接就绪，避免冷启动竞态
-        if (!globalSocket || !isConnected) {
-          console.log('全局Socket未连接，等待连接就绪...');
+        // 等待全局Socket连接就绪，避免冷启动竞态（事件驱动）
+        const socketCandidate = (global as any).socketRef?.current || globalSocket;
+        if (!socketCandidate || !socketCandidate.connected) {
+          console.log('全局Socket未连接，订阅connect事件等待就绪...');
           setCallStatus('connecting');
           await new Promise<void>((resolve, reject) => {
+            const s: any = (global as any).socketRef?.current || globalSocket;
+            if (s && s.connected) {
+              console.log('全局Socket已连接（检查时已连接）');
+              resolve();
+              return;
+            }
             let settled = false;
-            const timeoutId = setTimeout(() => {
+            let timeoutId: any = null;
+            const cleanup = () => {
+              if (timeoutId) clearTimeout(timeoutId);
+              if (!s) return;
+              s.off('connect', onConnect);
+              s.off('connect_error', onConnectError);
+              s.off('error', onError);
+            };
+            const onConnect = () => {
               if (settled) return;
               settled = true;
-              reject(new Error('等待Socket连接超时'));
-            }, 8000);
-
-            const tryResolve = () => {
+              cleanup();
+              console.log('收到connect事件，全局Socket就绪');
+              resolve();
+            };
+            const onConnectError = (err: any) => {
               if (settled) return;
-              if ((global as any).socketRef?.current && !(global as any).socketRef.current.disconnected) {
-                clearTimeout(timeoutId);
-                settled = true;
-                resolve();
-              }
+              settled = true;
+              cleanup();
+              console.warn('Socket连接错误:', err?.message || err);
+              reject(new Error('等待Socket连接失败'));
             };
-
-            // 轮询检查，因为此处只有引用而未直接访问事件
-            const intervalId = setInterval(() => {
-              tryResolve();
-            }, 150);
-
-            // 最终清理
-            const cleanup = () => {
-              clearInterval(intervalId);
-              clearTimeout(timeoutId);
+            const onError = (err: any) => {
+              if (settled) return;
+              settled = true;
+              cleanup();
+              console.warn('Socket错误:', err?.message || err);
+              reject(new Error('等待Socket连接失败'));
             };
-
-            // 当Promise settle时清理
-            const originalResolve = resolve;
-            resolve = (() => { cleanup(); originalResolve(); }) as any;
-            const originalReject = reject;
-            reject = ((e: any) => { cleanup(); originalReject(e); }) as any;
+            timeoutId = setTimeout(() => {
+              if (settled) return;
+              settled = true;
+              cleanup();
+              console.warn('等待Socket连接超时');
+              reject(new Error('等待Socket连接超时'));
+            }, 10000);
+            if (s) {
+              s.once('connect', onConnect);
+              s.once('connect_error', onConnectError);
+              s.once('error', onError);
+            } else {
+              // 如果此刻还拿不到socket实例，短延迟后再检查一次
+              setTimeout(() => {
+                const s2: any = (global as any).socketRef?.current || globalSocket;
+                if (s2) {
+                  s2.once('connect', onConnect);
+                  s2.once('connect_error', onConnectError);
+                  s2.once('error', onError);
+                }
+              }, 50);
+            }
           });
-          console.log('全局Socket已就绪');
         }
         
         // 设置Socket引用为全局Socket
@@ -641,6 +667,12 @@ const VoiceCallScreen: React.FC = () => {
       startCallTimer();
       
       try {
+        // 使用 call_accepted 携带的 callId 作为主叫端的权威 callId 来源
+        if (data && data.callId && !activeCallId) {
+          setActiveCallId(data.callId);
+          isCallIdReadyRef.current = true;
+          flushLocalIceCandidates(data.callId);
+        }
         // 重新标记远端未设置，等待answer到来
         remoteDescriptionSetRef.current = false;
         // 创建并发送offer
@@ -670,13 +702,12 @@ const VoiceCallScreen: React.FC = () => {
       }
     });
     
-    // 接收呼叫发起通知
+    // 移除对 call_initiated 的强依赖：改由 call_accepted / webrtc_offer / webrtc_answer 赋值
+    // 如服务器仍发送 call_initiated，这里也兼容但不再依赖其存在
     socketRef.current.on('call_initiated', (data: any) => {
-      console.log('呼叫已发起，等待对方接听:', data);
-      // 保存callId用于后续通信
-      if (data && data.callId) {
+      console.log('收到call_initiated（兼容）:', data);
+      if (data && data.callId && !activeCallId) {
         setActiveCallId(data.callId);
-        console.log('保存callId:', data.callId);
         isCallIdReadyRef.current = true;
         flushLocalIceCandidates(data.callId);
       }
@@ -941,7 +972,7 @@ const VoiceCallScreen: React.FC = () => {
           
           // 3. 关键：等待音频系统完全稳定（iOS需要这个延迟）
           console.log('⏱️ [VoiceCall] 等待iOS音频系统完全稳定...');
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 1000));
           console.log('✅ [VoiceCall] iOS音频系统稳定延迟完成');
           
         } catch (audioError) {

@@ -86,8 +86,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   // 去重：记录已处理的incoming_call的callId，避免重复弹窗/重复流程
   const handledIncomingCallIdsRef = useRef<Set<string>>(new Set());
-  // 来电去重TTL（过长会导致紧接着的下一次来电被吞掉；设置为8秒更安全）
-  const INCOMING_DEDUP_TTL_MS = 8 * 1000;
+  // 来电去重TTL：iOS延长以覆盖授权和音频初始化窗口，其它平台保持8s
+  const INCOMING_DEDUP_TTL_MS = Platform.OS === 'ios' ? 30 * 1000 : 8 * 1000;
   // 暂存回放：当无订阅者时暂存incoming_call，订阅者就位后回放
   const PENDING_REPLAY_TTL_MS = 8 * 1000;
   const pendingIncomingCallRef = useRef<{ data: any; timestamp: number } | null>(null);

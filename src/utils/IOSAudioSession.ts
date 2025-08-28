@@ -43,7 +43,7 @@ class IOSAudioSession {
           // 设置音频会话类别专门为录音和播放，优先录音
           // 精简选项，避免不被支持的组合导致原生崩溃
           await module.setAudioSessionCategory('playAndRecord', {
-            allowBluetooth: false,
+            allowBluetooth: true,
             defaultToSpeaker: true
           });
           console.log('✅ iOS音频会话类别已设置为录音模式');
@@ -68,8 +68,8 @@ class IOSAudioSession {
         console.warn('⚠️ 激活录音音频会话失败:', activeError);
       }
       
-      // 4. 等待音频会话稳定
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // 4. 等待音频会话稳定（首次授权后需要更长时间以避免建连卡住）
+      await new Promise(resolve => setTimeout(resolve, 800));
       
       this.isSessionActive = true;
       this.currentMode = 'recording';
