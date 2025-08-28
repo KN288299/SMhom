@@ -58,6 +58,8 @@ interface VideoMessageItemProps {
   initialWidth?: number;
   initialHeight?: number;
   initialThumbnail?: string | null;
+  // 新增：服务器缩略图URL（优先使用）
+  videoThumbnailUrl?: string;
 }
 
 const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
@@ -78,11 +80,13 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
   initialWidth,
   initialHeight,
   initialThumbnail,
+  videoThumbnailUrl,
 }) => {
   const [videoWidth, setVideoWidth] = useState(initialWidth || CONSTANTS.DEFAULT_VIDEO_WIDTH);
   const [videoHeight, setVideoHeight] = useState(initialHeight || CONSTANTS.DEFAULT_VIDEO_HEIGHT);
-  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(initialThumbnail || null);
-  const [loading, setLoading] = useState(!initialThumbnail);
+  // 优先使用服务器缩略图，其次是本地初始缩略图
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(videoThumbnailUrl || initialThumbnail || null);
+  const [loading, setLoading] = useState(!(videoThumbnailUrl || initialThumbnail));
   const [thumbnailError, setThumbnailError] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [showActionSheet, setShowActionSheet] = useState(false);
@@ -108,11 +112,12 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
     }
   };
 
-  // 若父组件给了初始缩略图，直接展示
+  // 若父组件给了缩略图（服务器或本地），直接展示
   useEffect(() => {
-    if (initialThumbnail) {
+    if (videoThumbnailUrl || initialThumbnail) {
       fadeAnim.setValue(1);
       setLoading(false);
+      setThumbnailUrl(videoThumbnailUrl || initialThumbnail || null);
     }
     if (initialWidth && initialHeight) {
       setVideoWidth(initialWidth);
@@ -153,6 +158,16 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
       if (!videoUrl || !isItemVisible || !isScreenFocused) {
         if (isMounted) {
           setLoading(false);
+        }
+        return;
+      }
+
+      // 如果已有服务器缩略图，直接使用无需生成
+      if (videoThumbnailUrl) {
+        if (isMounted) {
+          setThumbnailUrl(videoThumbnailUrl);
+          setLoading(false);
+          fadeAnim.setValue(1);
         }
         return;
       }
@@ -369,7 +384,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [videoUrl, isUploading, fadeAnim, isItemVisible, isScreenFocused, videoDuration]);
+  }, [videoUrl, isUploading, fadeAnim, isItemVisible, isScreenFocused, videoDuration, videoThumbnailUrl]);
 
   // 取消气泡内自动播放，统一使用封面+播放图标
 
@@ -694,6 +709,7 @@ export default memo(VideoMessageItem, (prevProps, nextProps) => {
     prevProps.userAvatar === nextProps.userAvatar &&
     prevProps.autoplayEligible === nextProps.autoplayEligible &&
     prevProps.isItemVisible === nextProps.isItemVisible &&
-    prevProps.isScreenFocused === nextProps.isScreenFocused
+    prevProps.isScreenFocused === nextProps.isScreenFocused &&
+    prevProps.videoThumbnailUrl === nextProps.videoThumbnailUrl
   );
 }); 

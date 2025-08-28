@@ -640,6 +640,7 @@ io.on('connection', (socket) => {
         videoWidth,
         videoHeight,
         aspectRatio,
+        videoThumbnailUrl,
         // 位置消息字段
         latitude,
         longitude,
@@ -668,6 +669,7 @@ io.on('connection', (socket) => {
         videoWidth,
         videoHeight,
         aspectRatio,
+        videoThumbnailUrl,
         // 位置消息字段
         latitude,
         longitude,
@@ -746,6 +748,7 @@ io.on('connection', (socket) => {
             videoWidth,
             videoHeight,
             aspectRatio,
+            videoThumbnailUrl,
             // 位置消息字段
             latitude,
             longitude,
@@ -833,6 +836,7 @@ io.on('connection', (socket) => {
             videoWidth,
             videoHeight,
             aspectRatio,
+            videoThumbnailUrl,
             // 位置消息字段
             latitude,
             longitude,
@@ -915,6 +919,7 @@ io.on('connection', (socket) => {
         videoWidth,
         videoHeight,
         aspectRatio,
+        videoThumbnailUrl,
         // 位置消息字段
         latitude,
         longitude,

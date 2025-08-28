@@ -29,6 +29,8 @@ interface Message {
   localFileUri?: string;
   // 新增：本地缩略图路径（发送/接收时用于立即渲染）
   videoThumbLocalPath?: string | null;
+  // 视频缩略图URL（从服务器获取）
+  videoThumbnailUrl?: string;
   isCallRecord?: boolean;
   callerId?: string;
   callDuration?: string;
@@ -171,6 +173,7 @@ export const useMessages = ({
             processedMsg.videoWidth = msg.videoWidth || 0;
             processedMsg.videoHeight = msg.videoHeight || 0;
             processedMsg.aspectRatio = msg.aspectRatio || 1.78;
+            processedMsg.videoThumbnailUrl = msg.videoThumbnailUrl || '';
             processedMsg.messageType = 'video';
           }
           

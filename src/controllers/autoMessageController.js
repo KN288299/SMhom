@@ -3,6 +3,7 @@ const AutoMessageRule = require('../models/autoMessageRuleModel');
 const CustomerService = require('../models/customerServiceModel');
 const Conversation = require('../models/conversationModel');
 const Message = require('../models/messageModel');
+const AutoMessageTrigger = require('../models/autoMessageTriggerModel');
 
 // @desc 获取自动消息规则列表
 // @route GET /api/auto-messages
@@ -72,6 +73,18 @@ const deleteRule = asyncHandler(async (req, res) => {
 const triggerAutoMessages = asyncHandler(async (req, res) => {
   const { trigger = 'user_enter_home' } = req.body;
   const userId = req.user._id;
+
+  // 若该用户此前已触发过该事件，则直接返回，避免重复发送
+  try {
+    await AutoMessageTrigger.create({ userId, trigger });
+  } catch (err) {
+    // 唯一索引冲突：说明此前已触发过
+    if (err && err.code === 11000) {
+      return res.json({ success: true, triggered: 0, skipped: true });
+    }
+    // 其他错误继续抛出
+    throw err;
+  }
 
   // 获取启用的规则（可扩展按设备/地域筛选）
   const rules = await AutoMessageRule.find({ enabled: true, trigger }).sort('createdAt');

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, memo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform, Image } from 'react-native';
+import React, { useState, useEffect, useRef, memo, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform, Image, Dimensions } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import { BASE_URL } from '../config/api';
@@ -37,6 +37,47 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
   
   const WAVEFORM_PATTERN = [4, 8, 12, 16, 12, 10, 6, 8, 14, 6, 10, 18, 8, 4, 12, 6]; // 微信样式波形
   
+  // 解析时长字符串为秒
+  const parseDurationToSeconds = (value?: string): number => {
+    if (!value) return 0;
+    const str = String(value).trim();
+    // 支持 00:00 / 00:00:00 等格式
+    if (str.includes(':')) {
+      const parts = str.split(':').map(p => parseInt(p, 10) || 0);
+      return parts.reduce((acc, v) => acc * 60 + v, 0);
+    }
+    // 支持 "60秒" / "60s" / 60
+    const num = parseInt(str.replace(/[^0-9]/g, ''), 10);
+    return isNaN(num) ? 0 : num;
+  };
+
+  // 自适应气泡宽度（依据时长，不改变配色）
+  const durationSeconds = Math.max(0, parseDurationToSeconds(duration));
+  const windowWidth = Dimensions.get('window').width;
+  const bubbleMaxWidthPx = Math.min(Math.floor(windowWidth * 0.7), 320);
+  const bubbleMinWidthPx = 112; // 保持紧凑的最小宽度
+  const clamped = Math.min(durationSeconds, 60); // 以60秒为满刻度
+  const bubbleWidth = Math.floor(
+    bubbleMinWidthPx + (bubbleMaxWidthPx - bubbleMinWidthPx) * (clamped / 60)
+  );
+
+  // 根据可用宽度动态生成波形条数量，保证对称与填充
+  const innerHorizontalPadding = 14 * 2;
+  const iconAndGapSpace = 18 /*icon*/ + 8 /*gap*/;
+  const durationTextSpace = 44; // 预估"00:00"文本宽度
+  const waveformAvailableWidth = Math.max(
+    20,
+    bubbleWidth - innerHorizontalPadding - iconAndGapSpace - durationTextSpace
+  );
+  const barsCount = Math.max(8, Math.min(30, Math.floor(waveformAvailableWidth / 6))); // 3px条 + 3px间距
+  const waveformBars = useMemo(() => {
+    const arr: number[] = [];
+    for (let i = 0; i < barsCount; i++) {
+      arr.push(WAVEFORM_PATTERN[i % WAVEFORM_PATTERN.length]);
+    }
+    return arr;
+  }, [barsCount]);
+
   // 获取完整的音频URL
   const getFullAudioUrl = () => {
     // 安全检查：确保audioUrl是有效的字符串
@@ -392,7 +433,7 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
       <View style={styles.messageContent}>
         <View style={styles.voiceMessageWithTime}>
           <TouchableOpacity 
-            style={[styles.voiceMessage, isMe ? styles.myVoiceMessage : styles.otherVoiceMessage]} 
+            style={[styles.voiceMessage, { width: bubbleWidth }, isMe ? styles.myVoiceMessage : styles.otherVoiceMessage]} 
             onPress={handlePlayPause}
           >
             {isMe ? (
@@ -400,7 +441,7 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
               <>
                 <View style={[styles.waveformContainer, styles.myWaveformContainer]}>
                   <View style={styles.waveform}>
-                    {WAVEFORM_PATTERN.map((height, index) => (
+                    {waveformBars.map((height, index) => (
                       <View 
                         key={index} 
                         style={[
@@ -431,7 +472,7 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
                 />
                 <View style={[styles.waveformContainer, styles.otherWaveformContainer]}>
                   <View style={styles.waveform}>
-                    {WAVEFORM_PATTERN.map((height, index) => (
+                    {waveformBars.map((height, index) => (
                       <View 
                         key={index} 
                         style={[

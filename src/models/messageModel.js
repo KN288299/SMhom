@@ -66,6 +66,11 @@ const messageSchema = mongoose.Schema(
       type: Number,
       default: 1.78,
     },
+    // 视频缩略图字段
+    videoThumbnailUrl: {
+      type: String,
+      default: '',
+    },
     // 位置信息字段
     latitude: {
       type: Number,

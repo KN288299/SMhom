@@ -170,6 +170,8 @@ interface Message {
   localFileUri?: string;
   // 新增：本地缩略图路径（发送/接收时用于立即渲染）
   videoThumbLocalPath?: string | null;
+  // 视频缩略图URL（服务器）
+  videoThumbnailUrl?: string;
   isCallRecord?: boolean;  // 是否是通话记录
   callerId?: string;  // 通话发起者ID
   callDuration?: string;  // 通话时长
@@ -1715,11 +1717,47 @@ const ChatScreen: React.FC = () => {
           cacheName: `send_${Date.now()}`,
         });
         if (thumb?.path) {
+          // 更新本地消息显示缩略图
           updateMessage(tempMessageId, {
             videoThumbLocalPath: thumb.path,
             videoWidth: initialVideoWidth ?? (thumb.width || undefined),
             videoHeight: initialVideoHeight ?? (thumb.height || undefined),
           });
+          
+          // 异步上传缩略图到服务器
+          try {
+            const thumbnailFormData = new FormData();
+            thumbnailFormData.append('image', {
+              uri: thumb.path,
+              type: 'image/jpeg',
+              name: `thumb_${Date.now()}.jpg`,
+            } as any);
+            
+            const thumbnailResponse = await fetch(`${BASE_URL}/api/upload/image`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${userToken}`,
+                'Content-Type': 'multipart/form-data',
+              },
+              body: thumbnailFormData,
+            });
+            
+            if (thumbnailResponse.ok) {
+              const thumbnailResult = await thumbnailResponse.json();
+              const thumbnailUrl = thumbnailResult.imageUrl;
+              
+              // 更新消息包含服务器缩略图URL
+              updateMessage(tempMessageId, {
+                videoThumbnailUrl: thumbnailUrl,
+              });
+              
+              console.log('✅ 缩略图上传成功:', thumbnailUrl);
+            } else {
+              console.log('⚠️ 缩略图上传失败，但不影响视频发送');
+            }
+          } catch (uploadError) {
+            console.log('⚠️ 缩略图上传出错，但不影响视频发送:', uploadError);
+          }
         }
       } catch (e) {
         console.log('⚠️ 本地生成视频缩略图失败（不影响发送）:', e);
@@ -1821,6 +1859,8 @@ const ChatScreen: React.FC = () => {
         videoWidth: effectiveAsset.width || undefined,
         videoHeight: effectiveAsset.height || undefined,
         aspectRatio: (effectiveAsset.width && effectiveAsset.height) ? (effectiveAsset.width / Math.max(1, effectiveAsset.height)) : undefined,
+        // 如果缩略图已上传，包含缩略图URL
+        videoThumbnailUrl: undefined, // 这里先设置为undefined，后续通过updateMessage更新
       };
       
       // 再次确认Socket连接状态

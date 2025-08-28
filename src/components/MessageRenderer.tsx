@@ -30,6 +30,8 @@ interface Message {
   fileUrl?: string;
   // 仅本地使用：iOS 自发视频的本地路径，用于预览/播放回退
   localFileUri?: string;
+  // 视频缩略图URL（服务器）
+  videoThumbnailUrl?: string;
   isCallRecord?: boolean;
   callerId?: string;
   callDuration?: string;
@@ -178,6 +180,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
             initialWidth={item.videoWidth}
             initialHeight={item.videoHeight}
             initialThumbnail={(item as any).videoThumbLocalPath}
+            videoThumbnailUrl={item.videoThumbnailUrl}
             contactAvatar={contactAvatar}
             userAvatar={userAvatar}
             isRead={item.isRead}
@@ -218,6 +221,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
             initialWidth={item.videoWidth}
             initialHeight={item.videoHeight}
             initialThumbnail={(item as any).videoThumbLocalPath}
+            videoThumbnailUrl={item.videoThumbnailUrl}
             contactAvatar={contactAvatar}
             userAvatar={userAvatar}
             isRead={item.isRead}

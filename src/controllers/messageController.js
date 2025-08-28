@@ -81,6 +81,7 @@ const sendMessage = asyncHandler(async (req, res) => {
     videoWidth,
     videoHeight,
     aspectRatio,
+    videoThumbnailUrl,
     fileUrl,
     latitude,
     longitude,
@@ -148,10 +149,12 @@ const sendMessage = asyncHandler(async (req, res) => {
       if (videoWidth) messageData.videoWidth = videoWidth;
       if (videoHeight) messageData.videoHeight = videoHeight;
       if (aspectRatio) messageData.aspectRatio = aspectRatio;
+      if (videoThumbnailUrl) messageData.videoThumbnailUrl = videoThumbnailUrl;
       
       console.log('保存视频消息:', {
         fileUrl: messageData.fileUrl,
-        videoUrl: messageData.videoUrl
+        videoUrl: messageData.videoUrl,
+        videoThumbnailUrl: messageData.videoThumbnailUrl
       });
     }
   }

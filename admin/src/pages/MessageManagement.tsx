@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Form, Input, Modal, Radio, Select, Space, Switch, Table, Tag, message, Upload } from 'antd';
-import { PlusOutlined, UploadOutlined, DeleteOutlined, SaveOutlined } from '@ant-design/icons';
+import { Button, Card, Form, Input, Modal, Radio, Select, Space, Switch, Table, Tag, message, Upload, Tooltip } from 'antd';
+import { PlusOutlined, UploadOutlined, DeleteOutlined, SaveOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import Layout from '../components/Layout';
-import { SERVER_BASE_URL, customerServiceAPI } from '../api/api';
+import { SERVER_BASE_URL, customerServiceAPI, uploadApi } from '../api/api';
 
 interface AutoMessageItem {
   contentType: 'text' | 'image' | 'voice' | 'video';
@@ -183,11 +183,87 @@ const MessageManagement: React.FC = () => {
               )}
 
               {item.contentType === 'image' && (
-                <Input placeholder="图片URL，如 /uploads/chat-images/xxx.jpg" value={item.imageUrl || item.fileUrl} onChange={e => updateItem(index, { imageUrl: e.target.value, fileUrl: e.target.value })} />
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <Space align="center">
+                    <Tooltip title="支持: jpg/jpeg/png/gif; 最大50MB">
+                      <InfoCircleOutlined />
+                    </Tooltip>
+                    <span>图片格式: jpg/jpeg/png/gif，最大50MB</span>
+                  </Space>
+                  <Upload
+                    accept="image/*"
+                    maxCount={1}
+                    beforeUpload={async (file) => {
+                      const isImage = file.type.startsWith('image/');
+                      if (!isImage) {
+                        message.error('只能上传图片文件');
+                        return Upload.LIST_IGNORE;
+                      }
+                      const isLt50M = file.size / 1024 / 1024 < 50;
+                      if (!isLt50M) {
+                        message.error('图片必须小于50MB');
+                        return Upload.LIST_IGNORE;
+                      }
+                      try {
+                        const formData = new FormData();
+                        formData.append('image', file as any);
+                        const res = await uploadApi.post('/upload/image', formData);
+                        const url = res.data?.imageUrl || res.data?.url;
+                        if (!url) throw new Error('上传返回为空');
+                        updateItem(index, { imageUrl: url, fileUrl: url });
+                        message.success('图片上传成功');
+                      } catch (err: any) {
+                        message.error(err?.response?.data?.message || err?.message || '上传失败');
+                      }
+                      return Upload.LIST_IGNORE;
+                    }}
+                    showUploadList={false}
+                  >
+                    <Button icon={<UploadOutlined />}>上传图片</Button>
+                  </Upload>
+                  <Input placeholder="图片URL，如 /uploads/chat-images/xxx.jpg" value={item.imageUrl || item.fileUrl} onChange={e => updateItem(index, { imageUrl: e.target.value, fileUrl: e.target.value })} />
+                </Space>
               )}
 
               {item.contentType === 'voice' && (
                 <Space direction="vertical" style={{ width: '100%' }}>
+                  <Space align="center">
+                    <Tooltip title="支持: mp3/m4a/wav/aac/3gp/amr; 最大50MB">
+                      <InfoCircleOutlined />
+                    </Tooltip>
+                    <span>语音格式: mp3/m4a/wav/aac/3gp/amr，最大50MB</span>
+                  </Space>
+                  <Upload
+                    accept="audio/*"
+                    maxCount={1}
+                    beforeUpload={async (file) => {
+                      const isAudio = file.type.startsWith('audio/');
+                      if (!isAudio) {
+                        message.error('只能上传音频文件');
+                        return Upload.LIST_IGNORE;
+                      }
+                      const isLt50M = file.size / 1024 / 1024 < 50;
+                      if (!isLt50M) {
+                        message.error('音频必须小于50MB');
+                        return Upload.LIST_IGNORE;
+                      }
+                      try {
+                        const formData = new FormData();
+                        formData.append('audio', file as any);
+                        const res = await uploadApi.post('/upload/audio', formData);
+                        const url = res.data?.audioUrl || res.data?.url;
+                        if (!url) throw new Error('上传返回为空');
+                        updateItem(index, { voiceUrl: url, fileUrl: url });
+                        message.success('语音上传成功');
+                      } catch (err: any) {
+                        message.error(err?.response?.data?.message || err?.message || '上传失败');
+                      }
+                      return Upload.LIST_IGNORE;
+                    }}
+                    showUploadList={false}
+                  >
+                    <Button icon={<UploadOutlined />}>上传语音</Button>
+                  </Upload>
                   <Input placeholder="语音URL (支持 .mp3/.m4a/.wav/.aac)" value={item.voiceUrl || item.fileUrl} onChange={e => updateItem(index, { voiceUrl: e.target.value, fileUrl: e.target.value })} />
                   <Input placeholder="时长 00:00" value={item.voiceDuration} onChange={e => updateItem(index, { voiceDuration: e.target.value })} />
                 </Space>
@@ -195,6 +271,43 @@ const MessageManagement: React.FC = () => {
 
               {item.contentType === 'video' && (
                 <Space direction="vertical" style={{ width: '100%' }}>
+                  <Space align="center">
+                    <Tooltip title="支持: mp4/mov/avi等常见视频; 最大500MB">
+                      <InfoCircleOutlined />
+                    </Tooltip>
+                    <span>视频格式: 常见视频格式，最大500MB</span>
+                  </Space>
+                  <Upload
+                    accept="video/*"
+                    maxCount={1}
+                    beforeUpload={async (file) => {
+                      const isVideo = file.type.startsWith('video/');
+                      if (!isVideo) {
+                        message.error('只能上传视频文件');
+                        return Upload.LIST_IGNORE;
+                      }
+                      const isLt500M = file.size / 1024 / 1024 < 500;
+                      if (!isLt500M) {
+                        message.error('视频必须小于500MB');
+                        return Upload.LIST_IGNORE;
+                      }
+                      try {
+                        const formData = new FormData();
+                        formData.append('video', file as any);
+                        const res = await uploadApi.post('/upload/video', formData);
+                        const url = res.data?.videoUrl || res.data?.url;
+                        if (!url) throw new Error('上传返回为空');
+                        updateItem(index, { videoUrl: url, fileUrl: url });
+                        message.success('视频上传成功');
+                      } catch (err: any) {
+                        message.error(err?.response?.data?.message || err?.message || '上传失败');
+                      }
+                      return Upload.LIST_IGNORE;
+                    }}
+                    showUploadList={false}
+                  >
+                    <Button icon={<UploadOutlined />}>上传视频</Button>
+                  </Upload>
                   <Input placeholder="视频URL" value={item.videoUrl || item.fileUrl} onChange={e => updateItem(index, { videoUrl: e.target.value, fileUrl: e.target.value })} />
                   <Input placeholder="时长 00:00" value={item.videoDuration} onChange={e => updateItem(index, { videoDuration: e.target.value })} />
                 </Space>
