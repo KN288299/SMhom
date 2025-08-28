@@ -8,6 +8,7 @@ type PrefetchOptions = {
 };
 
 const VIDEO_CACHE_DIR = `${RNFS.CachesDirectoryPath}/video_cache_v2`;
+const THUMB_CACHE_DIR = `${RNFS.CachesDirectoryPath}/video_thumb_v1`;
 const DEFAULT_MAX_CACHE_BYTES = 300 * 1024 * 1024; // 300MB
 
 const ensureCacheDir = async (): Promise<void> => {
@@ -21,18 +22,74 @@ const ensureCacheDir = async (): Promise<void> => {
   }
 };
 
+const ensureThumbDir = async (): Promise<void> => {
+  try {
+    const exists = await RNFS.exists(THUMB_CACHE_DIR);
+    if (!exists) {
+      await RNFS.mkdir(THUMB_CACHE_DIR);
+    }
+  } catch (e) {
+    // 忽略目录创建失败
+  }
+};
+
+// 生成稳定且安全的缓存文件名：使用 FNV-1a 32-bit 哈希避免包含 '/' ':' 等无效字符
 const safeFileName = (url: string): string => {
-  // 将URL编码，并截断过长名称，保留扩展名（若可解析）
-  const uri = encodeURIComponent(url);
-  const parts = url.split('?')[0].split('#')[0].split('.');
-  const extCandidate = parts.length > 1 ? parts.pop() || '' : '';
-  const ext = (extCandidate || 'mp4').toLowerCase();
-  const base = uri.replace(/[^a-zA-Z0-9_%\-\.]/g, '_').slice(0, 100);
-  return `${base}.${ext}`;
+  const cleaned = url.split('#')[0];
+  const pathWithoutQuery = cleaned.split('?')[0];
+  const extMatch = pathWithoutQuery.match(/\.([a-zA-Z0-9]+)$/);
+  const ext = (extMatch ? extMatch[1] : 'mp4').toLowerCase();
+
+  // FNV-1a 32-bit hash
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < cleaned.length; i++) {
+    hash ^= cleaned.charCodeAt(i);
+    // 32-bit multiplication by FNV prime 16777619
+    hash = (hash + ((hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24))) >>> 0;
+  }
+  const hex = ('0000000' + hash.toString(16)).slice(-8);
+
+  // 额外包含文件名主体的哈希，避免同域多路径碰撞概率
+  const namePart = pathWithoutQuery.substring(pathWithoutQuery.lastIndexOf('/') + 1) || 'video';
+  let nameHash = 0x811c9dc5;
+  for (let i = 0; i < namePart.length; i++) {
+    nameHash ^= namePart.charCodeAt(i);
+    nameHash = (nameHash + ((nameHash << 1) + (nameHash << 4) + (nameHash << 7) + (nameHash << 8) + (nameHash << 24))) >>> 0;
+  }
+  const hex2 = ('0000000' + nameHash.toString(16)).slice(-8);
+
+  return `v_${hex}_${hex2}.${ext}`;
 };
 
 const pathForUrl = (url: string): string => {
   return `${VIDEO_CACHE_DIR}/${safeFileName(url)}`;
+};
+
+// 为缩略图生成稳定文件名（统一 jpg 扩展名）
+const thumbFileNameForUrl = (url: string): string => {
+  const cleaned = url.split('#')[0];
+  const pathWithoutQuery = cleaned.split('?')[0];
+  // 复用 FNV-1a 方案
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < cleaned.length; i++) {
+    hash ^= cleaned.charCodeAt(i);
+    hash = (hash + ((hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24))) >>> 0;
+  }
+  const hex = ('0000000' + hash.toString(16)).slice(-8);
+
+  const namePart = pathWithoutQuery.substring(pathWithoutQuery.lastIndexOf('/') + 1) || 'video';
+  let nameHash = 0x811c9dc5;
+  for (let i = 0; i < namePart.length; i++) {
+    nameHash ^= namePart.charCodeAt(i);
+    nameHash = (nameHash + ((nameHash << 1) + (nameHash << 4) + (nameHash << 7) + (nameHash << 8) + (nameHash << 24))) >>> 0;
+  }
+  const hex2 = ('0000000' + nameHash.toString(16)).slice(-8);
+
+  return `t_${hex}_${hex2}.jpg`;
+};
+
+const pathForThumb = (url: string): string => {
+  return `${THUMB_CACHE_DIR}/${thumbFileNameForUrl(url)}`;
 };
 
 const getCacheSize = async (): Promise<number> => {
@@ -107,6 +164,18 @@ export const getCachedPath = async (url: string): Promise<string | null> => {
   }
 };
 
+export const getCachedThumbnailPath = async (url: string): Promise<string | null> => {
+  try {
+    if (!url) return null;
+    await ensureThumbDir();
+    const toFile = pathForThumb(url);
+    const exists = await RNFS.exists(toFile);
+    return exists ? toFile : null;
+  } catch {
+    return null;
+  }
+};
+
 export const prefetch = async (url: string, opts: PrefetchOptions = {}): Promise<boolean> => {
   try {
     if (!url) return false;
@@ -157,6 +226,25 @@ export const prefetch = async (url: string, opts: PrefetchOptions = {}): Promise
   }
 };
 
+export const saveThumbnailForUrl = async (url: string, tempThumbPath: string): Promise<string | null> => {
+  try {
+    if (!url || !tempThumbPath) return null;
+    await ensureThumbDir();
+    const dest = pathForThumb(url);
+    try {
+      const exists = await RNFS.exists(dest);
+      if (exists) {
+        // 已存在则直接返回（避免重复拷贝）
+        return dest;
+      }
+    } catch {}
+    await RNFS.copyFile(tempThumbPath, dest);
+    return dest;
+  } catch {
+    return null;
+  }
+};
+
 export const clearAll = async (): Promise<void> => {
   try {
     const exists = await RNFS.exists(VIDEO_CACHE_DIR);
@@ -170,12 +258,17 @@ export const clearAll = async (): Promise<void> => {
 
 export default {
   ensureCacheDir,
+  // 视频文件缓存
   getCachedPath,
   prefetch,
   getCacheSize,
   cleanupLRU,
   clearAll,
   pathForUrl,
+  // 缩略图缓存
+  getCachedThumbnailPath,
+  saveThumbnailForUrl,
+  pathForThumb,
 };
 
 

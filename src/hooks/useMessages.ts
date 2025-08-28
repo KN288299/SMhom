@@ -165,7 +165,8 @@ export const useMessages = ({
           }
           
           if (msg.contentType === 'video' || msg.messageType === 'video') {
-            processedMsg.videoUrl = msg.videoUrl || msg.fileUrl || '';
+            // 统一：fileUrl 优先，保持向后兼容
+            processedMsg.videoUrl = msg.fileUrl || msg.videoUrl || '';
             processedMsg.videoDuration = msg.videoDuration || '00:00';
             processedMsg.videoWidth = msg.videoWidth || 0;
             processedMsg.videoHeight = msg.videoHeight || 0;

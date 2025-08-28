@@ -15,7 +15,9 @@ import { saveVideoToGallery } from '../utils/saveImage';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { createThumbnail } from 'react-native-create-thumbnail';
 import { BASE_URL } from '../config/api';
+import normalizeLocalUri from '../utils/normalizeLocalUri';
 import { DEFAULT_AVATAR } from '../utils/DefaultAvatar';
+import VideoCacheManager from '../utils/VideoCacheManager';
 
 // 常量定义
 const CONSTANTS = {
@@ -143,16 +145,12 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
     return isNaN(num) ? 0 : num;
   };
 
-  // 生成视频缩略图
+  // 生成/读取视频缩略图（带持久化缓存）
   useEffect(() => {
     let isMounted = true;
 
     const generateThumbnail = async () => {
-      // 仅对可见项生成，降低离屏开销
-      if (!isItemVisible) {
-        return;
-      }
-      if (!videoUrl) {
+      if (!videoUrl || !isItemVisible || !isScreenFocused) {
         if (isMounted) {
           setLoading(false);
         }
@@ -178,8 +176,9 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
         const localCandidate = localFileUri || videoUrl;
         if (localCandidate) {
           try {
+            const normalized = await normalizeLocalUri(localCandidate);
             const result = await createThumbnail({
-              url: localCandidate,
+              url: normalized,
               timeStamp: 300,
               cacheName: `upload_${Date.now()}`,
             });
@@ -201,13 +200,27 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
         return;
       }
 
-      if (isMounted && isItemVisible) {
+      if (isMounted && isItemVisible && isScreenFocused) {
         setLoading(true);
         setThumbnailError(false);
         fadeAnim.setValue(0);
       }
 
       try {
+        // 1) 优先读取持久化缩略图缓存（统一键：绝对URL）
+        let lookupKey = videoUrl;
+        if (videoUrl && !videoUrl.startsWith('http') && !videoUrl.startsWith('file://') && !videoUrl.startsWith('ph://') && !videoUrl.startsWith('assets-library://')) {
+          lookupKey = BASE_URL + (videoUrl.startsWith('/') ? videoUrl : `/${videoUrl}`);
+        }
+        const cachedThumb = await VideoCacheManager.getCachedThumbnailPath(lookupKey);
+        if (cachedThumb && isMounted) {
+          setThumbnailUrl(`file://${cachedThumb}`);
+          setLoading(false);
+          setThumbnailError(false);
+          fadeAnim.setValue(1);
+          return; // 命中缓存直接返回，避免重复生成
+        }
+
         // 解析用于生成缩略图的URL：支持 http、相对路径（拼 BASE_URL）、以及本地路径
         const isHttp = videoUrl.startsWith('http');
         const isRelative = videoUrl.startsWith('/');
@@ -236,19 +249,67 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
             localFileUri.startsWith('assets-library://') ||
             localFileUri.startsWith('ph://'))
         ) {
-          fullVideoUrl = localFileUri;
+          try {
+            const norm = await normalizeLocalUri(localFileUri);
+            fullVideoUrl = norm || localFileUri;
+          } catch {
+            fullVideoUrl = localFileUri;
+          }
           console.log('iOS视频使用本地路径生成缩略图:', fullVideoUrl);
         }
-        console.log('开始为视频生成缩略图:', fullVideoUrl);
+
+        // 优先使用已缓存的本地文件生成缩略图，提升稳定性
+        let sourceForThumb = fullVideoUrl;
+        try {
+          if (fullVideoUrl && fullVideoUrl.startsWith('http')) {
+            let cachedPath = await VideoCacheManager.getCachedPath(fullVideoUrl);
+            if (!cachedPath) {
+              // 主动预缓存，便于后续播放与缩略图生成
+              const ok = await VideoCacheManager.prefetch(fullVideoUrl, {
+                wifiOnly: false,
+                maxSizeMB: 50,
+                timeoutMs: 12000,
+              });
+              if (ok) {
+                cachedPath = await VideoCacheManager.getCachedPath(fullVideoUrl);
+              }
+            }
+            if (cachedPath) {
+              sourceForThumb = `file://${cachedPath}`;
+            }
+          }
+        } catch (e) {
+          // 忽略缓存失败，继续使用原URL
+        }
+
+        console.log('开始为视频生成缩略图:', sourceForThumb);
         
-        // 短视频优先抽取更靠前的帧，默认300ms，最长不超过500ms
-        const seconds = parseDurationToSeconds(videoDuration);
-        const dynamicTs = seconds > 0 ? Math.min(500, Math.max(200, Math.floor(seconds * 200))) : 300;
-        const result = await createThumbnail({
-          url: fullVideoUrl,
-          timeStamp: dynamicTs,
-          cacheName: videoUrl.split('/').pop(),
-        });
+        // 固定时间戳，简化逻辑并降低不确定性
+        const dynamicTs = 300;
+        
+        let result;
+        try {
+          result = await createThumbnail({
+            url: sourceForThumb,
+            timeStamp: dynamicTs,
+            cacheName: videoUrl.split('/').pop(),
+          });
+        } catch (primaryErr) {
+          // 回退到原URL再尝试一次
+          if (sourceForThumb !== fullVideoUrl) {
+            try {
+              result = await createThumbnail({
+                url: fullVideoUrl,
+                timeStamp: dynamicTs,
+                cacheName: videoUrl.split('/').pop(),
+              });
+            } catch (fallbackErr) {
+              throw fallbackErr;
+            }
+          } else {
+            throw primaryErr;
+          }
+        }
 
         if (!isMounted) return;
 
@@ -258,7 +319,17 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
           height: result.height
         });
         
-        setThumbnailUrl(result.path);
+        // 2) 保存到持久化缩略图缓存
+        try {
+          const saved = await VideoCacheManager.saveThumbnailForUrl(lookupKey, result.path);
+          if (saved) {
+            setThumbnailUrl(`file://${saved}`);
+          } else {
+            setThumbnailUrl(result.path);
+          }
+        } catch {
+          setThumbnailUrl(result.path);
+        }
         
         // 根据视频的宽高比计算缩略图尺寸
         const aspectRatio = Math.max(0.1, result.width / Math.max(1, result.height));
@@ -298,7 +369,7 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [videoUrl, isUploading, fadeAnim, isItemVisible, videoDuration]);
+  }, [videoUrl, isUploading, fadeAnim, isItemVisible, isScreenFocused, videoDuration]);
 
   // 取消气泡内自动播放，统一使用封面+播放图标
 
@@ -348,10 +419,15 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
                 displayHeight = Math.max(CONSTANTS.MIN_VIDEO_SIZE, Math.floor(displayHeight * 0.6));
                 return { width: displayWidth, height: displayHeight };
               })()}
-            onPress={() => {
+            onPress={async () => {
               if (isUploading) {
                 if (Platform.OS === 'ios' && localFileUri) {
-                  onPress(localFileUri);
+                  try {
+                    const norm = await normalizeLocalUri(localFileUri);
+                    onPress(norm || localFileUri);
+                  } catch {
+                    onPress(localFileUri);
+                  }
                 }
                 return;
               }
@@ -481,7 +557,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
   },
   messageContent: {
-    flex: 1,
+    maxWidth: '70%',
     marginLeft: 8,
     marginRight: 8,
   },

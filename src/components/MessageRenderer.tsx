@@ -161,7 +161,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
       return (
         <VideoMessageItem
             // iOS 自发视频上传中：内部会优先用 localFileUri
-            videoUrl={formatMediaUrl(item.videoUrl || item.fileUrl || item.localFileUri || '')}
+            videoUrl={formatMediaUrl(item.fileUrl || item.videoUrl || item.localFileUri || '')}
             timestamp={item.timestamp}
             isMe={isMe}
             videoDuration={item.videoDuration}
@@ -189,8 +189,8 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({
     }
     
         // 已上传完成的视频
-    // 优先使用videoUrl，如果不存在则尝试使用fileUrl
-    const videoUrl = item.videoUrl || item.fileUrl || '';
+    // 统一优先级：fileUrl 优先，其次 videoUrl
+    const videoUrl = item.fileUrl || item.videoUrl || '';
     if (videoUrl) {
       const fullVideoUrl = formatMediaUrl(videoUrl);
       // 调试日志已清理 - 视频消息URL

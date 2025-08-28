@@ -56,6 +56,7 @@ import LocationPickerModal from '../components/LocationPickerModal';
 import LocationViewerModal from '../components/LocationViewerModal';
 import MediaUploadService from '../services/MediaUploadService';
 import VideoCacheManager from '../utils/VideoCacheManager';
+import normalizeLocalUri from '../utils/normalizeLocalUri';
 
 // 常量定义
 const CONSTANTS = {
@@ -2079,9 +2080,19 @@ const ChatScreen: React.FC = () => {
       console.log('打开全屏视频播放器，URL:', videoUrl);
       let effectiveUrl = videoUrl;
       
-      // iOS 本地/相册路径直接使用；HTTP 尝试读取缓存或主动预缓存
-      if (videoUrl && (videoUrl.startsWith('http') || videoUrl.startsWith('/'))) {
-        const formatted = formatMediaUrl(videoUrl);
+      // iOS 本地/相册路径：先尝试归一为 file://
+      if (Platform.OS === 'ios' && videoUrl && (videoUrl.startsWith('ph://') || videoUrl.startsWith('assets-library://'))) {
+        try {
+          const norm = await normalizeLocalUri(videoUrl);
+          if (norm) {
+            effectiveUrl = norm;
+          }
+        } catch {}
+      }
+
+      // HTTP/相对路径：尝试读取缓存或主动预缓存
+      if (effectiveUrl && (effectiveUrl.startsWith('http') || effectiveUrl.startsWith('/'))) {
+        const formatted = formatMediaUrl(effectiveUrl);
         let cachedPath = await VideoCacheManager.getCachedPath(formatted);
         
         // 如果没有缓存，主动预缓存（更宽松的策略）
@@ -2401,16 +2412,16 @@ const ChatScreen: React.FC = () => {
                   const urlSet = new Set<string>();
                   newlyVisibleIds.forEach(id => {
                     const m = messages.find(mm => mm._id === id);
-                    const url = (m?.videoUrl || m?.fileUrl || '');
+                    const url = (m?.fileUrl || m?.videoUrl || '');
                     if (url) urlSet.add(formatMediaUrl(url));
                   });
                   urlSet.forEach(async (url) => {
                     // 避免阻塞UI：异步预取，更宽松的策略
                     setTimeout(() => {
                       VideoCacheManager.prefetch(url, { 
-                        wifiOnly: false,    // 允许移动网络预缓存
-                        maxSizeMB: 30,      // 增加到30MB
-                        timeoutMs: 8000     // 增加超时时间
+                        wifiOnly: true,     // 仅在Wi‑Fi下预取
+                        maxSizeMB: 20,      // 限制大小为20MB
+                        timeoutMs: 8000
                       });
                     }, 0);
                   });
