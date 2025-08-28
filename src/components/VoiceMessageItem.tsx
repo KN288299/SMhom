@@ -35,7 +35,7 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
   const [localCachedPath, setLocalCachedPath] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   
-  const WAVEFORM_PATTERN = [6, 10, 14, 18, 14, 12, 8, 10];
+  const WAVEFORM_PATTERN = [4, 8, 12, 16, 12, 10, 6, 8, 14, 6, 10, 18, 8, 4, 12, 6]; // 微信样式波形
   
   // 获取完整的音频URL
   const getFullAudioUrl = () => {
@@ -417,8 +417,8 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
                 </View>
                 <Icon 
                   name={isPlaying ? "pause" : "play"} 
-                  size={20} 
-                  color="#333" 
+                  size={18} 
+                  color="#2D5016" 
                 />
               </>
             ) : (
@@ -426,8 +426,8 @@ const VoiceMessageItem: React.FC<VoiceMessageItemProps> = ({
               <>
                 <Icon 
                   name={isPlaying ? "pause" : "play"} 
-                  size={20} 
-                  color="#333" 
+                  size={18} 
+                  color="#666666" 
                 />
                 <View style={[styles.waveformContainer, styles.otherWaveformContainer]}>
                   <View style={styles.waveform}>
@@ -494,54 +494,62 @@ const styles = StyleSheet.create({
   voiceMessage: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    minWidth: 120,
-    maxWidth: 240,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minWidth: 100,
+    maxWidth: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   myVoiceMessage: {
-    backgroundColor: '#EAF3FF',
+    backgroundColor: Platform.OS === 'ios' ? '#007AFF' : '#ff6b81', // iOS蓝色，Android粉色
+    borderBottomRightRadius: 6, // 微信样式的尖角
   },
   otherVoiceMessage: {
     backgroundColor: '#FFFFFF',
+    borderBottomLeftRadius: 6, // 微信样式的尖角
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
   },
   waveformContainer: {
     flex: 1,
   },
   myWaveformContainer: {
-    marginRight: 10,
+    marginRight: 8, // 减少间距使布局更紧凑
   },
   otherWaveformContainer: {
-    marginLeft: 10,
+    marginLeft: 8, // 减少间距使布局更紧凑
   },
   waveform: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 18,
+    height: 20, // 增加高度以适应更高的波形
     marginBottom: 2,
   },
   waveformBar: {
-    width: 2,
+    width: 3,
     marginHorizontal: 1,
-    borderRadius: 1,
+    borderRadius: 2,
   },
   myWaveformBar: {
-    backgroundColor: '#6B7280',
+    backgroundColor: Platform.OS === 'ios' ? '#FFFFFF' : '#FFFFFF', // 两个平台都使用白色波形
   },
   otherWaveformBar: {
-    backgroundColor: '#6B7280',
+    backgroundColor: '#9CA3AF', // 灰色波形
   },
   duration: {
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: '500',
   },
   myDuration: {
-    color: '#111',
+    color: '#FFFFFF', // 白色文字在蓝色/粉色背景上
   },
   otherDuration: {
-    color: '#374151',
+    color: '#666666', // 深灰色文字
   },
   timestamp: {
     fontSize: 10,

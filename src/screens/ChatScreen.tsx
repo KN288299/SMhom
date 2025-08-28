@@ -725,6 +725,7 @@ const ChatScreen: React.FC = () => {
     const socketData = {
       conversationId,
       receiverId: contactId,
+      senderId: userInfo?._id || '',  // 🔧 修复：添加发送者ID
       content: messageContent,
       messageType: messageData.messageType
     };
@@ -852,6 +853,7 @@ const ChatScreen: React.FC = () => {
       const voiceMessage = {
         conversationId,
         receiverId: contactId,
+        senderId: userInfo?._id || '',  // 🔧 修复：添加发送者ID
         content: '语音消息',
         messageType: 'voice',
         voiceDuration: duration,
@@ -1572,6 +1574,7 @@ const ChatScreen: React.FC = () => {
       const imageMessage = {
         conversationId,
         receiverId: contactId,
+        senderId: userInfo?._id || '',  // 🔧 修复：添加发送者ID
         content: '图片消息',
         messageType: 'image',
         imageUrl: imageUrl
@@ -1808,6 +1811,7 @@ const ChatScreen: React.FC = () => {
       const videoMessage = {
         conversationId,
         receiverId: contactId,
+        senderId: userInfo?._id || '',  // 🔧 修复：添加发送者ID
         content: '视频消息',
         messageType: 'video',
         videoUrl: videoUrl,
@@ -2074,12 +2078,30 @@ const ChatScreen: React.FC = () => {
     try {
       console.log('打开全屏视频播放器，URL:', videoUrl);
       let effectiveUrl = videoUrl;
-      // iOS 本地/相册路径直接使用；HTTP 尝试读取缓存
+      
+      // iOS 本地/相册路径直接使用；HTTP 尝试读取缓存或主动预缓存
       if (videoUrl && (videoUrl.startsWith('http') || videoUrl.startsWith('/'))) {
         const formatted = formatMediaUrl(videoUrl);
-        const cachedPath = await VideoCacheManager.getCachedPath(formatted);
+        let cachedPath = await VideoCacheManager.getCachedPath(formatted);
+        
+        // 如果没有缓存，主动预缓存（更宽松的策略）
+        if (!cachedPath) {
+          console.log('视频未缓存，开始预缓存:', formatted);
+          const prefetchSuccess = await VideoCacheManager.prefetch(formatted, { 
+            wifiOnly: false,    // 允许移动网络
+            maxSizeMB: 50,      // 增加到50MB
+            timeoutMs: 10000    // 增加超时时间
+          });
+          
+          if (prefetchSuccess) {
+            cachedPath = await VideoCacheManager.getCachedPath(formatted);
+            console.log('预缓存成功，使用缓存路径:', cachedPath);
+          }
+        }
+        
         effectiveUrl = cachedPath ? `file://${cachedPath}` : formatted;
       }
+      
       setFullscreenVideoUrl(effectiveUrl);
       setFullscreenPosterUrl(posterUrl || '');
       setShowFullscreenVideo(true);
@@ -2099,13 +2121,10 @@ const ChatScreen: React.FC = () => {
       setVideoCurrentTime(0);
       setShowVideoControls(true);
     } finally {
-      // 3秒后自动隐藏控制器
+      // 控制器永远显示，不再自动隐藏
       if (videoControlsTimerRef.current) {
         clearTimeout(videoControlsTimerRef.current);
       }
-      videoControlsTimerRef.current = setTimeout(() => {
-        setShowVideoControls(false);
-      }, 3000);
     }
   };
 
@@ -2131,23 +2150,10 @@ const ChatScreen: React.FC = () => {
     setIsVideoPlaying(!isVideoPlaying);
   };
 
-  // 切换视频控制器显示/隐藏
+  // 切换视频控制器显示/隐藏（现在控制器永远显示，此函数保留但不再自动隐藏）
   const toggleVideoControls = () => {
-    const newShowControls = !showVideoControls;
-    setShowVideoControls(newShowControls);
-    
-    // 清除现有定时器
-    if (videoControlsTimerRef.current) {
-      clearTimeout(videoControlsTimerRef.current);
-      videoControlsTimerRef.current = null;
-    }
-    
-    // 如果显示控制器，3秒后自动隐藏
-    if (newShowControls) {
-      videoControlsTimerRef.current = setTimeout(() => {
-        setShowVideoControls(false);
-      }, 3000);
-    }
+    // 控制器永远显示，此函数现在不执行任何操作
+    // 保留函数以避免破坏现有的点击事件绑定
   };
 
   // 视频播放进度回调（使用ref持久节流，避免每次渲染重置节流时间）
@@ -2175,9 +2181,9 @@ const ChatScreen: React.FC = () => {
     setIsVideoPlaying(false);
     setVideoProgress(1); // 设置为100%进度
     setVideoCurrentTime(videoDuration);
-    setShowVideoControls(true); // 播放完成后显示控制器
+    setShowVideoControls(true); // 播放完成后显示控制器（永远显示）
     
-    // 清除自动隐藏定时器
+    // 清除定时器（控制器现在永远显示）
     if (videoControlsTimerRef.current) {
       clearTimeout(videoControlsTimerRef.current);
       videoControlsTimerRef.current = null;
@@ -2222,6 +2228,7 @@ const ChatScreen: React.FC = () => {
       const socketData = {
         conversationId,
         receiverId: contactId,
+        senderId: userInfo?._id || '',  // 🔧 修复：添加发送者ID
         content: `📍 ${location.locationName || '位置'}`,
         messageType: 'location',
         latitude: location.latitude,
@@ -2381,7 +2388,7 @@ const ChatScreen: React.FC = () => {
                 setVisibleItemIdsVersion(v => v + 1);
               }
 
-              // 轻量预取：对新可见的视频执行小文件预取（WiFi下<=15MB）
+              // 改进预取策略：对新可见的视频执行更积极的预取
               try {
                 const newlyVisibleIds: string[] = [];
                 info.changed.forEach((vt) => {
@@ -2398,9 +2405,13 @@ const ChatScreen: React.FC = () => {
                     if (url) urlSet.add(formatMediaUrl(url));
                   });
                   urlSet.forEach(async (url) => {
-                    // 避免阻塞UI：异步预取
+                    // 避免阻塞UI：异步预取，更宽松的策略
                     setTimeout(() => {
-                      VideoCacheManager.prefetch(url, { wifiOnly: true, maxSizeMB: 15, timeoutMs: 6000 });
+                      VideoCacheManager.prefetch(url, { 
+                        wifiOnly: false,    // 允许移动网络预缓存
+                        maxSizeMB: 30,      // 增加到30MB
+                        timeoutMs: 8000     // 增加超时时间
+                      });
                     }, 0);
                   });
                 }

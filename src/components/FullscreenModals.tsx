@@ -193,9 +193,13 @@ const FullscreenModals: React.FC<FullscreenModalsProps> = ({
                     onBuffer={({ isBuffering }) => {
                       const now = Date.now();
                       if (isBuffering) {
-                        if (now - bufferUpdateRef.current < 300) return;
+                        // 增加频率控制，减少频繁转圈
+                        if (now - bufferUpdateRef.current < 800) return; // 从300ms增加到800ms
                         bufferUpdateRef.current = now;
-                        setIsBuffering(true);
+                        // 只有在播放开始后才显示缓冲转圈
+                        if (isReadyForDisplay) {
+                          setIsBuffering(true);
+                        }
                       } else {
                         bufferUpdateRef.current = now;
                         setIsBuffering(false);
@@ -220,7 +224,7 @@ const FullscreenModals: React.FC<FullscreenModalsProps> = ({
                       }
                       readyFallbackTimerRef.current = setTimeout(() => {
                         makeReady();
-                      }, 800);
+                      }, 300); // 减少到300ms，更快显示视频
                     }}
                     onEnd={onVideoEnd}
                     onError={(e: any) => {
@@ -240,16 +244,16 @@ const FullscreenModals: React.FC<FullscreenModalsProps> = ({
                           useTextureView: false,
                           shutterColor: 'transparent',
                           minLoadRetryCount: 2,
-                          bufferConfig: {
-                            minBufferMs: 5000,
-                            maxBufferMs: 20000,
-                            bufferForPlaybackMs: 300,
-                            bufferForPlaybackAfterRebufferMs: 1500,
-                          },
+                                  bufferConfig: {
+          minBufferMs: 8000,        // 增加最小缓冲时间到8秒
+          maxBufferMs: 30000,       // 增加最大缓冲时间到30秒
+          bufferForPlaybackMs: 2000, // 播放前缓冲2秒，减少初始转圈
+          bufferForPlaybackAfterRebufferMs: 3000, // 重新缓冲后播放前缓冲3秒
+        },
                         }
                       : {
-                          preferredForwardBufferDuration: 1.5,
-                          automaticallyWaitsToMinimizeStalling: false,
+                          preferredForwardBufferDuration: 3.0, // 增加iOS缓冲时长到3秒
+                          automaticallyWaitsToMinimizeStalling: true, // 启用iOS自动等待减少卡顿
                         })}
                   />
                 </Animated.View>
@@ -259,41 +263,40 @@ const FullscreenModals: React.FC<FullscreenModalsProps> = ({
                   </View>
                 )}
               </View>
-              {showVideoControls && (
-                <View style={styles.videoControlsContainer}>
-                  <View style={styles.simpleControls}>
-                    <TouchableOpacity 
-                      style={styles.circleBtn}
-                      onPress={onCloseFullscreenVideo}
-                      accessibilityLabel="关闭"
-                    >
-                      <Icon name="close" size={26} color="#fff" />
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={[styles.circleBtn, styles.playBtn]}
-                      onPress={onToggleVideoPlayPause}
-                      accessibilityLabel="播放或暂停"
-                    >
-                      <Icon name={isVideoPlaying ? 'pause' : 'play'} size={30} color="#fff" />
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={styles.circleBtn}
-                      onPress={async () => {
-                        if (!fullscreenVideoUrl) return;
-                        try {
-                          await saveVideoToGallery(fullscreenVideoUrl);
-                          console.log('✅ 视频已保存到相册');
-                        } catch (e) {
-                          console.log('❌ 保存视频失败:', e);
-                        }
-                      }}
-                      accessibilityLabel="保存"
-                    >
-                      <Icon name="download" size={24} color="#fff" />
-                    </TouchableOpacity>
-                  </View>
+              {/* 控制按钮永远显示在底部 */}
+              <View style={styles.videoControlsContainer}>
+                <View style={styles.bottomControls}>
+                  <TouchableOpacity 
+                    style={styles.circleBtn}
+                    onPress={onCloseFullscreenVideo}
+                    accessibilityLabel="关闭"
+                  >
+                    <Icon name="close" size={26} color="#fff" />
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.circleBtn, styles.playBtn]}
+                    onPress={onToggleVideoPlayPause}
+                    accessibilityLabel="播放或暂停"
+                  >
+                    <Icon name={isVideoPlaying ? 'pause' : 'play'} size={30} color="#fff" />
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.circleBtn}
+                    onPress={async () => {
+                      if (!fullscreenVideoUrl) return;
+                      try {
+                        await saveVideoToGallery(fullscreenVideoUrl);
+                        console.log('✅ 视频已保存到相册');
+                      } catch (e) {
+                        console.log('❌ 保存视频失败:', e);
+                      }
+                    }}
+                    accessibilityLabel="保存"
+                  >
+                    <Icon name="download" size={24} color="#fff" />
+                  </TouchableOpacity>
                 </View>
-              )}
+              </View>
             </>
           )}
         </View>
@@ -351,10 +354,17 @@ const styles = StyleSheet.create({
   },
   videoControlsContainer: {
     position: 'absolute',
-    top: 0,
+    bottom: 0,
     left: 0,
     right: 0,
-    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)', // 添加半透明背景
+  },
+  bottomControls: {
+    paddingBottom: 36,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
   },
   simpleControls: {
