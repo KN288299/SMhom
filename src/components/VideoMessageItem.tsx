@@ -293,28 +293,17 @@ const VideoMessageItem: React.FC<VideoMessageItemProps> = ({
           console.log('iOS视频使用本地路径生成缩略图:', fullVideoUrl);
         }
 
-        // 优先使用已缓存的本地文件生成缩略图，提升稳定性
+        // 优先使用已存在的本地缓存（若已被其它流程缓存），不再为缩略图触发整段预缓存
         let sourceForThumb = fullVideoUrl;
         try {
           if (fullVideoUrl && fullVideoUrl.startsWith('http')) {
-            let cachedPath = await VideoCacheManager.getCachedPath(fullVideoUrl);
-            if (!cachedPath) {
-              // 主动预缓存，便于后续播放与缩略图生成
-              const ok = await VideoCacheManager.prefetch(fullVideoUrl, {
-                wifiOnly: false,
-                maxSizeMB: 50,
-                timeoutMs: 12000,
-              });
-              if (ok) {
-                cachedPath = await VideoCacheManager.getCachedPath(fullVideoUrl);
-              }
-            }
+            const cachedPath = await VideoCacheManager.getCachedPath(fullVideoUrl);
             if (cachedPath) {
               sourceForThumb = `file://${cachedPath}`;
             }
           }
         } catch (e) {
-          // 忽略缓存失败，继续使用原URL
+          // 忽略缓存读取异常，回退到原URL
         }
 
         console.log('开始为视频生成缩略图:', sourceForThumb);

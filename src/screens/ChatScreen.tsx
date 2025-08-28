@@ -2135,27 +2135,20 @@ const ChatScreen: React.FC = () => {
         } catch {}
       }
 
-      // HTTP/相对路径：尝试读取缓存或主动预缓存
+      // HTTP/相对路径：优先使用已有缓存，未命中则直接流式播放；预缓存放到后台
       if (effectiveUrl && (effectiveUrl.startsWith('http') || effectiveUrl.startsWith('/'))) {
         const formatted = formatMediaUrl(effectiveUrl);
-        let cachedPath = await VideoCacheManager.getCachedPath(formatted);
-        
-        // 如果没有缓存，主动预缓存（更宽松的策略）
-        if (!cachedPath) {
-          console.log('视频未缓存，开始预缓存:', formatted);
-          const prefetchSuccess = await VideoCacheManager.prefetch(formatted, { 
-            wifiOnly: false,    // 允许移动网络
-            maxSizeMB: 50,      // 增加到50MB
-            timeoutMs: 10000    // 增加超时时间
-          });
-          
-          if (prefetchSuccess) {
-            cachedPath = await VideoCacheManager.getCachedPath(formatted);
-            console.log('预缓存成功，使用缓存路径:', cachedPath);
-          }
-        }
-        
+        const cachedPath = await VideoCacheManager.getCachedPath(formatted);
+        // 命中缓存则走本地文件，否则直接远程流式起播
         effectiveUrl = cachedPath ? `file://${cachedPath}` : formatted;
+        // 异步后台预缓存（不阻塞首帧）
+        setTimeout(() => {
+          VideoCacheManager.prefetch(formatted, {
+            wifiOnly: true,
+            maxSizeMB: 50,
+            timeoutMs: 10000,
+          });
+        }, 0);
       }
       
       setFullscreenVideoUrl(effectiveUrl);
