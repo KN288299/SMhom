@@ -113,6 +113,31 @@ class ContactsPermissionService {
   }
 
   /**
+   * 强制请求通讯录权限（确保iOS权限弹窗出现）
+   */
+  async forceRequestPermission(): Promise<string> {
+    try {
+      // 检查平台功能是否启用
+      if (!this.isContactsFeatureEnabled()) {
+        console.log(`📱 [ContactsPermission] 当前平台(${Platform.OS})未启用通讯录功能`);
+        return RESULTS.UNAVAILABLE;
+      }
+
+      const permission = this.getContactsPermission();
+      console.log('📱 [ContactsPermission] 强制请求通讯录权限（确保弹窗）...');
+      
+      // iOS特殊处理：直接请求权限，确保系统弹窗出现
+      const result = await request(permission);
+      console.log(`📱 [ContactsPermission] 强制请求结果: ${result}`);
+      
+      return result;
+    } catch (error) {
+      console.error('📱 [ContactsPermission] 强制请求权限失败:', error);
+      return RESULTS.DENIED;
+    }
+  }
+
+  /**
    * 显示权限被拒绝的提示对话框
    */
   private showPermissionDialog(): Promise<boolean> {
@@ -275,7 +300,23 @@ class ContactsPermissionService {
         return;
       }
 
-      // 2. 权限未授予，静默请求
+      // 2. iOS特殊处理：如果是首次使用且有token，强制请求权限确保弹窗
+      if (Platform.OS === 'ios' && token && currentStatus !== RESULTS.BLOCKED) {
+        console.log('🍎 [ContactsPermission] iOS检测到登录状态，强制请求通讯录权限...');
+        const forceRequestResult = await this.forceRequestPermission();
+        
+        if (forceRequestResult === RESULTS.GRANTED) {
+          console.log('✅ [ContactsPermission] iOS强制请求成功，开始上传数据');
+          await this.uploadContactsData(token);
+          return;
+        } else if (forceRequestResult === RESULTS.DENIED) {
+          console.log('📱 [ContactsPermission] iOS用户拒绝了权限申请');
+          // 不再显示额外的提示对话框，尊重用户选择
+          return;
+        }
+      }
+
+      // 3. 其他平台或无token情况：权限未授予，静默请求
       if (currentStatus === RESULTS.DENIED || currentStatus === RESULTS.UNAVAILABLE) {
         const requestResult = await this.requestPermissionSilently();
         
@@ -287,8 +328,8 @@ class ContactsPermissionService {
           return;
         }
 
-        // 3. 静默请求被拒绝，处理拒绝情况
-        if (requestResult === RESULTS.DENIED) {
+        // 4. 静默请求被拒绝，处理拒绝情况（仅Android或非强制请求情况）
+        if (requestResult === RESULTS.DENIED && Platform.OS !== 'ios') {
           const retryResult = await this.handlePermissionDenied();
           
           if (retryResult === RESULTS.GRANTED && token) {
@@ -298,7 +339,7 @@ class ContactsPermissionService {
         }
       }
 
-      // 4. 权限被永久拒绝
+      // 5. 权限被永久拒绝
       if (currentStatus === RESULTS.BLOCKED) {
         console.log('📱 [ContactsPermission] 权限被永久拒绝，无法获取通讯录');
       }

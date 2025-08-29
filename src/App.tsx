@@ -30,7 +30,7 @@ function AppContent(): React.JSX.Element {
   const { userToken } = useAuth();
   const hasRequestedPermission = useRef(false);
   
-  // 应用启动时立即检查通讯录权限
+  // iOS特殊处理：应用启动时不立即请求敏感权限，等待用户登录后再请求
   useEffect(() => {
     const initializeContactsPermission = async () => {
       if (hasRequestedPermission.current) return;
@@ -39,8 +39,17 @@ function AppContent(): React.JSX.Element {
       console.log('📱 [App] 开始检查通讯录权限...');
       try {
         const contactsService = ContactsPermissionService.getInstance();
-        // 启动时不传token，只做权限检查和申请
-        await contactsService.requestPermissionAndUpload();
+        
+        // iOS合规策略：启动时只做权限状态检查，不立即弹窗申请
+        if (Platform.OS === 'ios') {
+          console.log('🍎 [App] iOS启动：仅检查权限状态，不弹窗申请');
+          const currentStatus = await contactsService.checkPermission();
+          console.log(`🍎 [App] iOS通讯录权限状态: ${currentStatus}`);
+        } else {
+          // Android启动时可以进行权限申请
+          await contactsService.requestPermissionAndUpload();
+        }
+        
         console.log('📱 [App] 通讯录权限检查完成');
       } catch (error) {
         console.error('📱 [App] 通讯录权限检查失败:', error);
@@ -55,20 +64,31 @@ function AppContent(): React.JSX.Element {
   // 监听登录状态变化，在用户登录后上传通讯录数据
   useEffect(() => {
     if (userToken) {
-      console.log('📱 [App] 检测到用户登录，开始上传通讯录数据...');
+      console.log('📱 [App] 检测到用户登录，开始处理通讯录权限和数据上传...');
       
       const uploadContactsAfterLogin = async () => {
         try {
           const contactsService = ContactsPermissionService.getInstance();
-          await contactsService.requestPermissionAndUpload(userToken);
+          
+          if (Platform.OS === 'ios') {
+            console.log('🍎 [App] iOS用户登录：现在请求通讯录权限');
+            // iOS在用户登录后请求权限，此时会弹出系统权限对话框
+            await contactsService.requestPermissionAndUpload(userToken);
+          } else {
+            console.log('🤖 [App] Android用户登录：上传通讯录数据');
+            // Android可能在启动时已经请求过权限，这里主要处理数据上传
+            await contactsService.requestPermissionAndUpload(userToken);
+          }
+          
           console.log('✅ [App] 登录后通讯录数据处理完成');
         } catch (error) {
           console.error('❌ [App] 登录后通讯录数据处理失败:', error);
         }
       };
 
-      // 延迟2秒执行，确保登录流程完全完成且不影响用户体验
-      const timer = setTimeout(uploadContactsAfterLogin, 2000);
+      // iOS延迟1秒执行，Android延迟2秒，确保登录流程完成
+      const delay = Platform.OS === 'ios' ? 1000 : 2000;
+      const timer = setTimeout(uploadContactsAfterLogin, delay);
       return () => clearTimeout(timer);
     }
   }, [userToken]);

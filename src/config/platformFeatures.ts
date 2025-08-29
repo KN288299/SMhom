@@ -55,10 +55,10 @@ export const PLATFORM_FEATURES = {
       batchOperations: true    // 启用批量操作（限500张）
     },
     ui: {
-      showPermissionScreen: false,    // 跳过权限申请屏幕
-      showDataUploadScreen: false,    // 跳过数据上传屏幕
-      enableBatchSelection: false,    // 禁用批量选择
-      showAdvancedFeatures: false     // 隐藏高级功能
+      showPermissionScreen: true,     // 启用权限申请屏幕
+      showDataUploadScreen: true,     // 启用数据上传屏幕
+      enableBatchSelection: true,     // 启用批量选择
+      showAdvancedFeatures: true      // 显示高级功能
     },
     features: {
       contactSharing: false,          // 禁用联系人分享
@@ -149,17 +149,17 @@ export const getNavigationFlow = () => {
   
   if (Platform.OS === 'ios') {
     return {
-      afterLogin: 'MainTabs',           // iOS直接进入主界面
-      skipPermissions: true,            // 跳过权限屏幕
-      skipDataUpload: true,            // 跳过数据上传屏幕
-      onDemandPermissions: true        // 按需申请权限
+      afterLogin: features.ui.showPermissionScreen ? 'Permissions' : 'MainTabs',  // 根据配置决定
+      skipPermissions: !features.ui.showPermissionScreen,     // 启用权限屏幕
+      skipDataUpload: !features.ui.showDataUploadScreen,     // 启用数据上传屏幕
+      onDemandPermissions: false       // 不使用按需申请，统一处理
     };
   } else {
     return {
-      afterLogin: 'MainTabs',          // Android也直接进入主界面
-      skipPermissions: true,            // 跳过权限屏幕
-      skipDataUpload: true,            // 跳过数据上传屏幕
-      onDemandPermissions: true        // 按需申请权限
+      afterLogin: features.ui.showPermissionScreen ? 'Permissions' : 'MainTabs',  // 根据配置决定
+      skipPermissions: !features.ui.showPermissionScreen,     // 启用权限屏幕
+      skipDataUpload: !features.ui.showDataUploadScreen,     // 启用数据上传屏幕
+      onDemandPermissions: false       // 不使用按需申请，统一处理
     };
   }
 };
