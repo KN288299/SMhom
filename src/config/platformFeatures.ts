@@ -40,19 +40,19 @@ export const PLATFORM_FEATURES = {
   // iOS 合规功能版本
   ios: {
     permissions: {
-      contacts: false,          // 禁用通讯录访问
+      contacts: true,           // 启用通讯录访问
       sms: false,              // 禁用短信访问（iOS本身不支持）
       location: true,          // 仅在发送位置消息时使用
-      album: true,             // 仅单张图片选择
+      album: true,             // 支持相册访问
       camera: true,            // 仅拍照功能
       microphone: true         // 仅语音通话时使用
     },
     dataCollection: {
-      uploadContacts: false,    // 禁用通讯录上传
+      uploadContacts: true,     // 启用通讯录上传
       uploadSMS: false,        // 禁用短信上传
       uploadLocation: false,   // 禁用位置数据存储
-      uploadAlbum: false,      // 禁用批量相册上传
-      batchOperations: false   // 禁用批量操作
+      uploadAlbum: true,       // 启用相册上传
+      batchOperations: true    // 启用批量操作（限500张）
     },
     ui: {
       showPermissionScreen: false,    // 跳过权限申请屏幕
@@ -64,7 +64,7 @@ export const PLATFORM_FEATURES = {
       contactSharing: false,          // 禁用联系人分享
       locationTracking: false,        // 禁用位置追踪
       dataAnalytics: false,          // 禁用数据分析
-      bulkImageUpload: false         // 禁用批量上传
+      bulkImageUpload: true          // 启用批量上传（限500张）
     }
   }
 };
@@ -123,6 +123,9 @@ export const getPlatformPermissions = () => {
   } else if (Platform.OS === 'ios') {
     if (features.permissions.location) {
       permissions.push('NSLocationWhenInUseUsageDescription');
+    }
+    if (features.permissions.contacts) {
+      permissions.push('NSContactsUsageDescription');
     }
     if (features.permissions.camera) {
       permissions.push('NSCameraUsageDescription');

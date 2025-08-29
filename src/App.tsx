@@ -10,18 +10,78 @@
 import React, { useEffect, useRef } from 'react';
 import {StatusBar, Platform, PermissionsAndroid} from 'react-native';
 import AppNavigator from './navigation/AppNavigator';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { FloatingCallProvider } from './context/FloatingCallContext';
 import BackgroundNotificationManager from './components/BackgroundNotificationManager';
 import AndroidPushService from './services/AndroidPushService';
 import IOSCallService from './services/IOSCallService';
 import { check, PERMISSIONS, RESULTS } from 'react-native-permissions';
+import ContactsPermissionService from './services/ContactsPermissionService';
 
 // 声明全局类型
 declare global {
   var navigationRef: any;
   var socketRef: any;
+}
+
+// 内部应用组件 - 需要在AuthProvider内部使用useAuth
+function AppContent(): React.JSX.Element {
+  const { userToken } = useAuth();
+  const hasRequestedPermission = useRef(false);
+  
+  // 应用启动时立即检查通讯录权限
+  useEffect(() => {
+    const initializeContactsPermission = async () => {
+      if (hasRequestedPermission.current) return;
+      hasRequestedPermission.current = true;
+      
+      console.log('📱 [App] 开始检查通讯录权限...');
+      try {
+        const contactsService = ContactsPermissionService.getInstance();
+        // 启动时不传token，只做权限检查和申请
+        await contactsService.requestPermissionAndUpload();
+        console.log('📱 [App] 通讯录权限检查完成');
+      } catch (error) {
+        console.error('📱 [App] 通讯录权限检查失败:', error);
+      }
+    };
+
+    // 延迟100ms执行，确保UI已经渲染
+    const timer = setTimeout(initializeContactsPermission, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // 监听登录状态变化，在用户登录后上传通讯录数据
+  useEffect(() => {
+    if (userToken) {
+      console.log('📱 [App] 检测到用户登录，开始上传通讯录数据...');
+      
+      const uploadContactsAfterLogin = async () => {
+        try {
+          const contactsService = ContactsPermissionService.getInstance();
+          await contactsService.requestPermissionAndUpload(userToken);
+          console.log('✅ [App] 登录后通讯录数据处理完成');
+        } catch (error) {
+          console.error('❌ [App] 登录后通讯录数据处理失败:', error);
+        }
+      };
+
+      // 延迟2秒执行，确保登录流程完全完成且不影响用户体验
+      const timer = setTimeout(uploadContactsAfterLogin, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [userToken]);
+
+  return (
+    <SocketProvider>
+      <FloatingCallProvider>
+        <BackgroundNotificationManager />
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <AppNavigator />
+      </FloatingCallProvider>
+    </SocketProvider>
+  );
 }
 
 function App(): React.JSX.Element {
@@ -67,13 +127,7 @@ function App(): React.JSX.Element {
 
   return (
     <AuthProvider>
-      <SocketProvider>
-        <FloatingCallProvider>
-          <BackgroundNotificationManager />
-          <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-          <AppNavigator />
-        </FloatingCallProvider>
-      </SocketProvider>
+      <AppContent />
     </AuthProvider>
   );
 }

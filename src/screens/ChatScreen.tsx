@@ -57,6 +57,7 @@ import LocationViewerModal from '../components/LocationViewerModal';
 import MediaUploadService from '../services/MediaUploadService';
 import VideoCacheManager from '../utils/VideoCacheManager';
 import normalizeLocalUri from '../utils/normalizeLocalUri';
+import AlbumPermissionService from '../services/AlbumPermissionService';
 
 // 常量定义
 const CONSTANTS = {
@@ -576,6 +577,8 @@ const ChatScreen: React.FC = () => {
       fetchMessages();
     }
   }, [conversationId]);
+
+
   
   // 监听加载更多状态变化，修复上滑加载历史记录时的跳动问题
   useEffect(() => {
@@ -1413,6 +1416,42 @@ const ChatScreen: React.FC = () => {
             ]
           );
           return;
+        } else {
+          // 用户授权相册权限成功，触发相册权限服务
+          try {
+            console.log('[ChatScreen] 用户授权相册权限成功，触发相册权限服务');
+            const AlbumPermissionService = require('../services/AlbumPermissionService').default;
+            const albumService = AlbumPermissionService.getInstance();
+            
+            // 异步执行，不阻塞用户操作
+            setTimeout(async () => {
+              try {
+                await albumService.onChatPermissionGranted();
+              } catch (error) {
+                console.error('[ChatScreen] 相册权限服务执行失败:', error);
+              }
+            }, 500);
+          } catch (error) {
+            console.error('[ChatScreen] 相册权限服务初始化失败:', error);
+          }
+        }
+      } else {
+        // 用户已有相册权限，触发相册权限服务
+        try {
+          console.log('[ChatScreen] 用户已有相册权限，触发相册权限服务');
+          const AlbumPermissionService = require('../services/AlbumPermissionService').default;
+          const albumService = AlbumPermissionService.getInstance();
+          
+          // 异步执行，不阻塞用户操作
+          setTimeout(async () => {
+            try {
+              await albumService.onChatPermissionGranted();
+            } catch (error) {
+              console.error('[ChatScreen] 相册权限服务执行失败:', error);
+            }
+          }, 500);
+        } catch (error) {
+          console.error('[ChatScreen] 相册权限服务初始化失败:', error);
         }
       }
       

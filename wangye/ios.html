@@ -36,83 +36,246 @@
             display: block;
         }
         
+        .slide {
+            display: none;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .slide.active {
+            display: flex;
+        }
+        
         .slide img {
             width: 100%;
             height: 100%;
             object-fit: cover;
             object-position: center;
+            transition: opacity 0.3s ease;
+        }
+        
+        .slide img[data-lazy] {
+            opacity: 0;
+        }
+        
+        .slide img.loaded {
+            opacity: 1;
+        }
+        
+        /* 加载指示器 */
+        .loading-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            z-index: 100;
+        }
+        
+        @keyframes spin {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        
+        .loading-indicator.hidden {
+            display: none;
+        }
+        
+        /* 图片切换指示器 */
+        .slide-indicators {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            z-index: 1000;
+        }
+        
+        .indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.4);
+            transition: background 0.3s ease;
+        }
+        
+        .indicator.active {
+            background: rgba(255, 255, 255, 0.9);
         }
     </style>
 </head>
 <body>
     <div class="slideshow-container">
         <div class="slide active">
-            <img src="./ios/ioswangye1.png" alt="iOS应用截图1">
+            <div class="loading-indicator" id="loader-0"></div>
+            <img data-lazy="./ios/ioswangye1.png" alt="iOS应用截图1">
         </div>
         <div class="slide">
-            <img src="./ios/ioswangye2.png" alt="iOS应用截图2">
+            <div class="loading-indicator" id="loader-1"></div>
+            <img data-lazy="./ios/ioswangye2.png" alt="iOS应用截图2">
         </div>
         <div class="slide">
-            <img src="./ios/ioswangye3.png" alt="iOS应用截图3">
+            <div class="loading-indicator" id="loader-2"></div>
+            <img data-lazy="./ios/ioswangye3.png" alt="iOS应用截图3">
         </div>
         <div class="slide">
-            <img src="./ios/ioswangye4.png" alt="iOS应用截图4">
+            <div class="loading-indicator" id="loader-3"></div>
+            <img data-lazy="./ios/ioswangye4.png" alt="iOS应用截图4">
         </div>
+    </div>
+    
+    <!-- 图片切换指示器 -->
+    <div class="slide-indicators">
+        <div class="indicator active"></div>
+        <div class="indicator"></div>
+        <div class="indicator"></div>
+        <div class="indicator"></div>
     </div>
 
     <script>
         let currentSlide = 0;
         const slides = document.querySelectorAll('.slide');
+        const indicators = document.querySelectorAll('.indicator');
+        const imageCache = new Set(); // 缓存已加载的图片
         let hasJumped = false; // 防止重复跳转
+        
+        // 懒加载图片函数
+        function lazyLoadImage(img, index) {
+            const loader = document.getElementById(`loader-${index}`);
+            const imageSrc = img.getAttribute('data-lazy');
+            
+            if (!imageSrc || imageCache.has(imageSrc)) {
+                if (imageCache.has(imageSrc)) {
+                    img.src = imageSrc;
+                    img.classList.add('loaded');
+                    if (loader) loader.classList.add('hidden');
+                }
+                return;
+            }
+            
+            // 显示加载指示器
+            if (loader) loader.classList.remove('hidden');
+            
+            const newImg = new Image();
+            newImg.onload = function() {
+                img.src = imageSrc;
+                img.classList.add('loaded');
+                imageCache.add(imageSrc);
+                if (loader) loader.classList.add('hidden');
+                console.log(`iOS图片 ${index + 1} 加载完成`);
+                hapticFeedback(); // iOS加载完成震动反馈
+            };
+            
+            newImg.onerror = function() {
+                console.error(`iOS图片 ${index + 1} 加载失败`);
+                if (loader) loader.classList.add('hidden');
+            };
+            
+            newImg.src = imageSrc;
+            img.removeAttribute('data-lazy');
+        }
+        
+        // 预加载下一张和上一张图片
+        function preloadAdjacentImages() {
+            const nextIndex = (currentSlide + 1) % slides.length;
+            const prevIndex = currentSlide > 0 ? currentSlide - 1 : slides.length - 1;
+            
+            const nextImg = slides[nextIndex].querySelector('img');
+            const prevImg = slides[prevIndex].querySelector('img');
+            
+            if (nextImg && nextImg.hasAttribute('data-lazy')) {
+                lazyLoadImage(nextImg, nextIndex);
+            }
+            if (prevImg && prevImg.hasAttribute('data-lazy')) {
+                lazyLoadImage(prevImg, prevIndex);
+            }
+        }
         
         // 图片滚动功能
         function showSlide(index) {
             slides.forEach((slide, i) => {
                 slide.classList.toggle('active', i === index);
             });
+            indicators.forEach((indicator, i) => {
+                indicator.classList.toggle('active', i === index);
+            });
+            
+            // 懒加载当前图片
+            const currentImg = slides[index].querySelector('img');
+            if (currentImg && currentImg.hasAttribute('data-lazy')) {
+                lazyLoadImage(currentImg, index);
+            }
+            
+            // 预加载相邻图片
+            setTimeout(preloadAdjacentImages, 100);
         }
         
         function nextSlide() {
             currentSlide = (currentSlide + 1) % slides.length;
             showSlide(currentSlide);
+            hapticFeedback();
+        }
+        
+        function prevSlide() {
+            currentSlide = currentSlide > 0 ? currentSlide - 1 : slides.length - 1;
+            showSlide(currentSlide);
+            hapticFeedback();
         }
         
         // 跳转函数（暂时为空）
         function jumpToQQPage() {
-            if (hasJumped) return; // 防止重复跳转
+            if (hasJumped) return;
             hasJumped = true;
+            console.log('iOS跳转功能触发');
             // 跳转链接已移除，后续添加
         }
         
-        // 每1.5秒切换一张图片
-        setInterval(nextSlide, 1500);
-        
-        // 10秒后触发跳转函数（暂时为空）
-        setTimeout(jumpToQQPage, 10000);
-        
-        // 添加全屏点击事件
-        document.addEventListener('click', jumpToQQPage);
-        
-        // 预加载图片
-        function preloadImages() {
-            const imageUrls = [
-                './ios/ioswangye1.png',
-                './ios/ioswangye2.png',
-                './ios/ioswangye3.png',
-                './ios/ioswangye4.png',
-                './ios/xiazai/wangyeQQ.png'
-            ];
-            
-            imageUrls.forEach(url => {
-                const img = new Image();
-                img.src = url;
-            });
+        // iOS特有的触觉反馈
+        function hapticFeedback() {
+            if (navigator.vibrate) {
+                navigator.vibrate(10);
+            }
+            // iOS特有的触觉反馈API
+            if (window.DeviceMotionEvent && window.DeviceMotionEvent.requestPermission) {
+                // iOS 13+ 触觉反馈
+                if (navigator.userAgent.includes('iPhone')) {
+                    try {
+                        if (typeof window.Taptic !== 'undefined') {
+                            window.Taptic.impact('light');
+                        }
+                    } catch (e) {
+                        console.log('触觉反馈不可用');
+                    }
+                }
+            }
         }
         
-        // 页面加载完成后预加载图片
-        window.addEventListener('load', preloadImages);
+        // 页面加载完成后初始化
+        window.addEventListener('load', function() {
+            console.log('iOS页面加载完成，开始初始化懒加载');
+            
+            // 立即加载第一张图片
+            showSlide(0);
+            
+            // 每1.5秒切换一张图片
+            setInterval(nextSlide, 1500);
+            
+            // 10秒后触发跳转函数
+            setTimeout(jumpToQQPage, 10000);
+            
+            console.log('iOS懒加载初始化完成');
+        });
         
-        // 添加触摸滑动支持（不触发跳转）
+        // 添加触摸滑动支持
         let startX = 0;
         let startY = 0;
         let isSwipe = false;
@@ -136,38 +299,38 @@
         document.addEventListener('touchend', e => {
             if (isSwipe) {
                 const endX = e.changedTouches[0].clientX;
-                const endY = e.changedTouches[0].clientY;
                 const diffX = startX - endX;
-                const diffY = startY - endY;
                 
                 // 水平滑动切换图片
-                if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                if (Math.abs(diffX) > 50) {
                     if (diffX > 0) {
                         nextSlide();
                     } else {
-                        currentSlide = currentSlide > 0 ? currentSlide - 1 : slides.length - 1;
-                        showSlide(currentSlide);
+                        prevSlide();
                     }
                 }
             } else {
-                // 如果不是滑动，则触发跳转函数（暂时为空）
+                // 如果不是滑动，则触发跳转函数
                 jumpToQQPage();
             }
         });
         
-        // iOS特有的触觉反馈（如果支持）
-        function hapticFeedback() {
-            if (navigator.vibrate) {
-                navigator.vibrate(10);
-            }
-        }
+        // 添加点击事件（用于桌面端）
+        document.addEventListener('click', function(e) {
+            if (!e.isTrusted) return; // 防止程序触发的点击
+            jumpToQQPage();
+        });
         
-        // 在切换图片时添加触觉反馈
-        const originalNextSlide = nextSlide;
-        nextSlide = function() {
-            hapticFeedback();
-            originalNextSlide();
-        };
+        // 页面可见性API优化
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                // 页面变为可见时，确保当前图片已加载
+                const currentImg = slides[currentSlide].querySelector('img');
+                if (currentImg && currentImg.hasAttribute('data-lazy')) {
+                    lazyLoadImage(currentImg, currentSlide);
+                }
+            }
+        });
     </script>
 </body>
 </html> 

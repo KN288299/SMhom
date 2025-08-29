@@ -113,7 +113,7 @@
 	
 	<!-- 联系人权限描述 -->
 	<key>NSContactsUsageDescription</key>
-	<string>我们需要联系人权限来帮助您快速找到联系人</string>
+	<string>通讯录权限是用于添加客服好友，帮助您更好地联系我们的客服团队</string>
 	
 	<!-- Vector Icons字体配置 -->
 	<key>UIAppFonts</key>
