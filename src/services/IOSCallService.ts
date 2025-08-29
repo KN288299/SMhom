@@ -86,53 +86,12 @@ class IOSCallService {
     }
   }
 
-  // 配置iOS推送通知
+  // 移除iOS推送通知配置，避免权限冲突
+  // 保留app内通话功能，使用自定义弹窗而非系统通知
   private configurePushNotifications(): void {
-    // 配置iOS推送通知
-    PushNotification.configure({
-      // 权限请求
-      permissions: {
-        alert: true,
-        badge: true,
-        sound: true,
-      },
-      
-      // 权限授予回调
-      onRegister: function (token: any) {
-        console.log('📱 [IOSCallService] 推送令牌:', token);
-      },
-      
-      // 通知接收回调
-      onNotification: (notification: any) => {
-        console.log('📱 [IOSCallService] 收到推送通知:', notification);
-        
-        // 处理来电推送
-        if (notification.data?.type === 'incoming_call') {
-          this.handleIncomingCallPush(notification.data);
-        }
-      },
-      
-      // 通知打开回调
-      onAction: (notification: any) => {
-        console.log('📱 [IOSCallService] 用户点击通知:', notification);
-        
-        // 处理用户点击来电通知
-        if (notification.action === 'accept_call') {
-          this.handleCallAcceptFromPush(notification.data);
-        } else if (notification.action === 'reject_call') {
-          this.handleCallRejectFromPush(notification.data);
-        }
-      },
-      
-      // 权限状态回调
-      onRegistrationError: function(err: any) {
-        console.error('❌ [IOSCallService] 推送注册失败:', err);
-      },
-      
-      // 前台通知显示
-      popInitialNotification: true,
-      requestPermissions: true,
-    });
+    console.log('🍎 [IOSCallService] 跳过系统推送配置，使用app内通话功能');
+    // 不再配置系统推送通知，避免通知权限请求干扰通讯录权限
+    // app内的通话、弹窗、震动功能不受影响
   }
 
   // 设置应用状态监听
@@ -209,7 +168,7 @@ class IOSCallService {
       // 前台时显示本地弹窗
       this.showForegroundCallAlert(callData);
     } else {
-      // 后台时发送推送通知
+      // 跳过推送通知，使用app内通话功能
       this.sendCallPushNotification(callData);
     }
   }
@@ -226,33 +185,12 @@ class IOSCallService {
     );
   }
 
-  // 发送iOS推送通知
+  // 移除推送通知，使用app内通话界面
   private sendCallPushNotification(callData: CallData): void {
-    console.log('📞 [IOSCallService] 发送iOS来电推送通知');
+    console.log('📞 [IOSCallService] 跳过推送通知，使用app内通话界面:', callData);
     
-    // 创建本地推送通知
-    PushNotification.localNotification({
-      id: callData.callId,
-      title: '来电',
-      message: `${callData.callerName} 正在呼叫您`,
-      data: {
-        type: 'incoming_call',
-        ...callData
-      },
-      actions: ['拒绝', '接听'],
-      category: 'incoming_call',
-      soundName: 'ringtone.caf', // iOS默认铃声
-      playSound: true,
-      vibrate: true,
-      priority: 'high',
-      importance: 'high',
-      ongoing: true, // 持续显示直到用户操作
-      autoCancel: false,
-      largeIcon: callData.callerAvatar || 'ic_launcher',
-      bigText: `${callData.callerName} 正在呼叫您`,
-      subText: '语音通话',
-    });
-    
+    // 不再发送系统推送通知，通话功能完全在app内实现
+    // 使用VoiceCallScreen和Socket实现实时通话，不依赖系统通知权限
     this.currentCallId = callData.callId;
   }
 
@@ -309,8 +247,8 @@ class IOSCallService {
       this.currentCallId = null;
     }
     
-    // 清除本地通知
-    PushNotification.cancelLocalNotifications({ id: callId });
+    // 移除通知清除逻辑，改为app内状态管理
+    console.log('📱 [IOSCallService] 通话结束，app内状态已清理:', callId);
   }
 
   // 导航到通话页面

@@ -103,15 +103,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('上传FCM Token失败:', pushError);
       }
 
-      // iOS：登录后配置推送（以便来电通知在首启也可用）
-      try {
-        if (Platform.OS === 'ios') {
-          console.log('🍎 [Auth] 登录后配置iOS推送通知...');
-          await IOSCallService.configurePushNotificationsAfterLogin();
-        }
-      } catch (iosPushError) {
-        console.warn('⚠️ [Auth] iOS推送配置失败（不影响继续使用）:', iosPushError);
-      }
+      // 移除iOS推送通知权限请求，避免阻挡通讯录权限
+      // 保留app内通话和消息功能，不依赖系统推送权限
+      console.log('🍎 [Auth] 跳过iOS推送通知权限配置，使用app内功能');
     } catch (e) {
       console.log('登录保存失败', e);
     }
