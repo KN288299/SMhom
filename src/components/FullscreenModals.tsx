@@ -243,17 +243,17 @@ const FullscreenModals: React.FC<FullscreenModalsProps> = ({
                       ? {
                           useTextureView: false,
                           shutterColor: 'transparent',
-                          minLoadRetryCount: 2,
+                          minLoadRetryCount: 3,
                           bufferConfig: {
-                            minBufferMs: 3000, // 更快起播
-                            maxBufferMs: 15000,
-                            bufferForPlaybackMs: 500, // 降低起播缓冲
-                            bufferForPlaybackAfterRebufferMs: 800,
+                            minBufferMs: 15000,
+                            maxBufferMs: 60000,
+                            bufferForPlaybackMs: 1500,
+                            bufferForPlaybackAfterRebufferMs: 3000,
                           },
                         }
                       : {
-                          preferredForwardBufferDuration: 1.0, // 降低iOS前向缓冲
-                          automaticallyWaitsToMinimizeStalling: false, // 不等待以便更快起播
+                          preferredForwardBufferDuration: 4.0,
+                          automaticallyWaitsToMinimizeStalling: true,
                         })}
                   />
                 </Animated.View>

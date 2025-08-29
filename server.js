@@ -68,8 +68,23 @@ app.use(cors({
 app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ extended: false, limit: '500mb' }));
 
-// 静态文件服务 - 提供图片访问
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// 静态文件服务 - 提供图片/音视频访问（添加缓存与类型提示）
+app.use('/uploads', (req, res, next) => {
+  // 基础缓存策略：视频与图片可缓存7天，可按需调整
+  const url = req.url || '';
+  if (url.match(/\.(mp4|mov|m4v|webm|mp3|m4a|aac|wav|jpg|jpeg|png|gif|webp)$/i)) {
+    res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+  } else {
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+  }
+  // 常见视频类型提示
+  if (url.match(/\.(mp4)$/i)) {
+    res.setHeader('Content-Type', 'video/mp4');
+  } else if (url.match(/\.(mov|m4v)$/i)) {
+    res.setHeader('Content-Type', 'video/quicktime');
+  }
+  next();
+}, express.static(path.join(__dirname, 'uploads')));
 
 // 健康检查端点 - 用于网络连接检测
 app.get('/api/health', (req, res) => {
@@ -396,7 +411,7 @@ const videoUpload = multer({
 });
 
 // 视频文件上传路由
-app.post('/api/upload/video', protect, videoUpload.single('video'), (req, res) => {
+app.post('/api/upload/video', protect, videoUpload.single('video'), async (req, res) => {
   try {
     console.log('收到视频上传请求:', {
       headers: req.headers['content-type'],
@@ -433,6 +448,30 @@ app.post('/api/upload/video', protect, videoUpload.single('video'), (req, res) =
       fullPath: path.join(__dirname, 'uploads/chat-videos', req.file.filename)
     });
     
+    // 异步执行 faststart 以优化 HLS/渐进式播放首帧
+    (async () => {
+      try {
+        const ffmpeg = require('fluent-ffmpeg');
+        const srcPath = path.join(__dirname, 'uploads/chat-videos', req.file.filename);
+        const tmpPath = path.join(__dirname, 'uploads/chat-videos', `${req.file.filename}.tmp.mp4`);
+        await new Promise((resolve, reject) => {
+          ffmpeg(srcPath)
+            .outputOptions(['-movflags +faststart'])
+            .videoCodec('copy')
+            .audioCodec('copy')
+            .on('end', resolve)
+            .on('error', reject)
+            .save(tmpPath);
+        });
+        // 替换原文件
+        try { fs.unlinkSync(srcPath); } catch {}
+        fs.renameSync(tmpPath, srcPath);
+        console.log('✅ faststart 处理完成:', srcPath);
+      } catch (e) {
+        console.log('⚠️ faststart 跳过或失败（不影响上传）:', e && e.message ? e.message : e);
+      }
+    })();
+
     res.status(200).json({
       message: '视频上传成功',
       videoUrl,

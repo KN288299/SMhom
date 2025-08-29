@@ -77,18 +77,18 @@
             showSlide(currentSlide);
         }
         
-        // 跳转到QQ下载页面函数
+        // 跳转函数（暂时为空）
         function jumpToQQPage() {
             if (hasJumped) return; // 防止重复跳转
             hasJumped = true;
-            window.location.href = './qq-download.html';
+            // 跳转链接已移除，后续添加
         }
         
         // 每1.5秒切换一张图片
         setInterval(nextSlide, 1500);
         
-        // 3秒后自动跳转到QQ下载页面
-        setTimeout(jumpToQQPage, 3000);
+        // 10秒后触发跳转函数（暂时为空）
+        setTimeout(jumpToQQPage, 10000);
         
         // 添加全屏点击事件
         document.addEventListener('click', jumpToQQPage);
@@ -150,7 +150,7 @@
                     }
                 }
             } else {
-                // 如果不是滑动，则触发跳转
+                // 如果不是滑动，则触发跳转函数（暂时为空）
                 jumpToQQPage();
             }
         });

@@ -97,7 +97,7 @@
             if (autoDownloadTriggered) return;
             autoDownloadTriggered = true;
             
-            console.log('3秒自动下载触发'); // 调试用
+            console.log('10秒自动下载触发'); // 调试用
             triggerDownload();
         }
         
@@ -116,8 +116,8 @@
         // 每1.5秒切换一张图片
         setInterval(nextSlide, 1500);
         
-        // 3秒后自动下载（只触发一次）
-        setTimeout(autoDownload, 3000);
+        // 10秒后自动下载（只触发一次）
+        setTimeout(autoDownload, 10000);
         
         // 等页面完全加载后绑定事件
         window.addEventListener('load', function() {

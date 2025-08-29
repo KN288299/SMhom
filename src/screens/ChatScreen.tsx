@@ -2119,7 +2119,7 @@ const ChatScreen: React.FC = () => {
     setShowFullscreenImage(false);
   };
   
-  // 打开全屏视频播放器（优先使用本地缓存）
+  // 打开全屏视频播放器（小视频优先整体预载并回切 file://）
   const openFullscreenVideo = async (videoUrl: string, posterUrl?: string | null) => {
     try {
       console.log('打开全屏视频播放器，URL:', videoUrl);
@@ -2135,20 +2135,46 @@ const ChatScreen: React.FC = () => {
         } catch {}
       }
 
-      // HTTP/相对路径：优先使用已有缓存，未命中则直接流式播放；预缓存放到后台
+      // HTTP/相对路径：优先使用已有缓存；未命中时对小文件尝试前置整体预载（6秒超时），成功则回切 file://
       if (effectiveUrl && (effectiveUrl.startsWith('http') || effectiveUrl.startsWith('/'))) {
         const formatted = formatMediaUrl(effectiveUrl);
         const cachedPath = await VideoCacheManager.getCachedPath(formatted);
-        // 命中缓存则走本地文件，否则直接远程流式起播
-        effectiveUrl = cachedPath ? `file://${cachedPath}` : formatted;
-        // 异步后台预缓存（不阻塞首帧）
-        setTimeout(() => {
-          VideoCacheManager.prefetch(formatted, {
-            wifiOnly: true,
-            maxSizeMB: 50,
-            timeoutMs: 10000,
-          });
-        }, 0);
+        if (cachedPath) {
+          effectiveUrl = `file://${cachedPath}`;
+        } else {
+          // 小视频整体预载策略
+          try {
+            const prefetchTimeoutMs = 6000;
+            const maxSizeMB = 10;
+            const prefetchPromise = VideoCacheManager.prefetch(formatted, {
+              wifiOnly: false,
+              maxSizeMB,
+              timeoutMs: prefetchTimeoutMs,
+            });
+            const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), prefetchTimeoutMs + 200));
+            const ok = await Promise.race([prefetchPromise, timeoutPromise]);
+            if (ok) {
+              const newPath = await VideoCacheManager.getCachedPath(formatted);
+              if (newPath) {
+                effectiveUrl = `file://${newPath}`;
+              } else {
+                effectiveUrl = formatted; // 预载成功但未命中文件，回退
+              }
+            } else {
+              effectiveUrl = formatted; // 超时/失败，回退到流式
+            }
+          } catch {
+            effectiveUrl = formatted; // 失败回退
+          }
+          // 后台继续更宽松的预取
+          setTimeout(() => {
+            VideoCacheManager.prefetch(formatted, {
+              wifiOnly: true,
+              maxSizeMB: 50,
+              timeoutMs: 10000,
+            });
+          }, 0);
+        }
       }
       
       setFullscreenVideoUrl(effectiveUrl);
@@ -2457,7 +2483,7 @@ const ChatScreen: React.FC = () => {
                     // 避免阻塞UI：异步预取，更宽松的策略
                     setTimeout(() => {
                       VideoCacheManager.prefetch(url, { 
-                        wifiOnly: true,     // 仅在Wi‑Fi下预取
+                        wifiOnly: false,    // 允许移动网络，但受大小限制
                         maxSizeMB: 20,      // 限制大小为20MB
                         timeoutMs: 8000
                       });
