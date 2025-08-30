@@ -10,6 +10,8 @@ apply from: file("../node_modules/@react-native-community/cli-platform-android/n
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
+        // Use local tsbackgroundfetch maven repo bundled with react-native-background-fetch to avoid remote TLS issues
+        maven { url = uri(file("../node_modules/react-native-background-fetch/android/libs")) }
         mavenCentral()
         google()
         maven { url = uri("https://jitpack.io") }
