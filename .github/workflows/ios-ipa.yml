@@ -6,7 +6,7 @@ on:
       scheme:
         description: Xcode scheme to build
         required: false
-        default: HomSm
+        default: SMhom
       configuration:
         description: Build configuration
         required: false
@@ -17,13 +17,13 @@ jobs:
     runs-on: macos-14
     env:
       CI: true
-      XCODE_SCHEME: ${{ github.event.inputs.scheme || 'HomSm' }}
+      XCODE_SCHEME: ${{ github.event.inputs.scheme || 'SMhom' }}
       XCODE_CONFIGURATION: ${{ github.event.inputs.configuration || 'Release' }}
-      WORKSPACE_PATH: ios/HomSm.xcworkspace
-      ARCHIVE_PATH: build/HomSm.xcarchive
+      WORKSPACE_PATH: ios/SMhom.xcworkspace
+      ARCHIVE_PATH: build/SMhom.xcarchive
       EXPORT_PATH: build/ipa
       EXPORT_PLIST: ios/exportOptions.plist
-      APP_NAME: HomSm
+      APP_NAME: SMhom
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -126,7 +126,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-xcarchive
-          path: build/HomSm.xcarchive
+          path: build/SMhom.xcarchive
           if-no-files-found: warn
 
       - name: Upload build logs (if present)
