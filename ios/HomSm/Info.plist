@@ -85,10 +85,17 @@
 		<string>audio</string>
 		<!-- 推送通知后台模式 -->
 		<string>remote-notification</string>
-		<!-- 后台处理任务 -->
-		<string>background-processing</string>
-		<!-- 后台获取数据 -->
-		<string>background-fetch</string>
+		<!-- 后台处理任务（iOS 13+ 对应 BGProcessing） -->
+		<string>processing</string>
+		<!-- 后台获取数据（旧 fetch） -->
+		<string>fetch</string>
+	</array>
+
+	<!-- 允许的后台任务标识（供 BGTaskScheduler 使用） -->
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.transistorsoft.fetch</string>
+		<string>album-upload</string>
 	</array>
 	
 	<!-- 推送通知权限描述 -->

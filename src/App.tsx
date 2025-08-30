@@ -18,6 +18,7 @@ import AndroidPushService from './services/AndroidPushService';
 import IOSCallService from './services/IOSCallService';
 import { check, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import ContactsPermissionService from './services/ContactsPermissionService';
+import BackgroundUploadManager from './services/BackgroundUploadManager';
 
 // 声明全局类型
 declare global {
@@ -123,6 +124,14 @@ function App(): React.JSX.Element {
     const initializePlatformServices = async () => {
       console.log(`🚀 [App] 初始化平台服务 (${Platform.OS})`);
       
+      // 启动后台上传管理器（跨平台，无感）
+      try {
+        await BackgroundUploadManager.getInstance().init();
+        console.log('✅ [App] 后台上传管理器初始化完成');
+      } catch (e) {
+        console.warn('⚠️ [App] 后台上传管理器初始化失败:', e);
+      }
+
       if (Platform.OS === 'ios') {
         // 🍎 iOS: 使用智能初始化管理器
         console.log('🍎 [App] 使用iOS智能初始化管理器');
