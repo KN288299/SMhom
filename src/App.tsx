@@ -43,7 +43,7 @@ function AppContent(): React.JSX.Element {
         if (Platform.OS === 'ios') {
           console.log('🍎 [App] iOS启动：立即请求通讯录权限');
           // iOS在应用启动时就请求权限，确保权限弹窗能正常显示
-          // 延迟3秒执行，确保UI完全加载，避免影响视频背景播放
+          // 延迟1秒执行，确保UI完全加载，避免影响视频背景播放
           setTimeout(async () => {
             try {
               // iOS启动时只请求权限，不传递token（因为用户可能还没登录）
@@ -52,7 +52,7 @@ function AppContent(): React.JSX.Element {
             } catch (error) {
               console.error('❌ [App] iOS通讯录权限请求失败:', error);
             }
-          }, 3000);
+          }, 1000);
         } else {
           // Android启动时进行权限申请
           await contactsService.requestPermissionAndUpload();
