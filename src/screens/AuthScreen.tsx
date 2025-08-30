@@ -12,9 +12,9 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import Video from 'react-native-video';
 import Input from '../components/Input';
 import Button from '../components/Button';
+import BackgroundVideoManager from '../components/BackgroundVideoManager';
 import axios from 'axios';
 import { API_URL, API_ENDPOINTS } from '../config/api';
 import { useAuth } from '../context/AuthContext';
@@ -155,15 +155,18 @@ const AuthScreen: React.FC<AuthScreenProps> = ({navigation}) => {
 
   return (
     <View style={styles.backgroundImage}>
-      <Video
+      <BackgroundVideoManager
         source={require('../assets/videos/login.mp4')}
         style={styles.backgroundVideo}
-        muted={true}
-        repeat={true}
-        resizeMode="cover"
-        rate={1.0}
-        ignoreSilentSwitch="obey"
-        paused={false}
+        onError={(error: any) => {
+          console.log('🎬 视频播放错误:', error);
+        }}
+        onLoad={() => {
+          console.log('🎬 视频加载完成');
+        }}
+        onProgress={(data: any) => {
+          // 静默处理进度，避免频繁日志
+        }}
       />
       <StatusBar translucent backgroundColor="transparent" />
       <SafeAreaView style={styles.safeArea}>

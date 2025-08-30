@@ -92,7 +92,8 @@ target 'HomSm' do
     'Camera',
     'Microphone',
     'PhotoLibrary',
-    'LocationWhenInUse'
+    'LocationWhenInUse',
+    'Contacts'
   ])
 
   use_react_native!(

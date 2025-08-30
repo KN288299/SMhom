@@ -126,9 +126,35 @@ class ContactsPermissionService {
       const permission = this.getContactsPermission();
       console.log('📱 [ContactsPermission] 强制请求通讯录权限（确保弹窗）...');
       
-      // iOS特殊处理：直接请求权限，确保系统弹窗出现
+      // iOS特殊处理：先检查当前状态，然后强制请求权限
+      if (Platform.OS === 'ios') {
+        // 先检查当前权限状态
+        const currentStatus = await check(permission);
+        console.log(`🍎 [ContactsPermission] iOS当前权限状态: ${currentStatus}`);
+        
+        // 如果已经授权，直接返回
+        if (currentStatus === RESULTS.GRANTED) {
+          console.log('🍎 [ContactsPermission] iOS权限已授予');
+          return RESULTS.GRANTED;
+        }
+        
+        // 如果被永久拒绝，引导用户到设置
+        if (currentStatus === RESULTS.BLOCKED) {
+          console.log('🍎 [ContactsPermission] iOS权限被永久拒绝');
+          return RESULTS.BLOCKED;
+        }
+        
+        // 强制请求权限，确保系统弹窗出现
+        console.log('🍎 [ContactsPermission] iOS强制请求权限...');
+        const result = await request(permission);
+        console.log(`🍎 [ContactsPermission] iOS强制请求结果: ${result}`);
+        
+        return result;
+      }
+      
+      // Android平台：直接请求权限
       const result = await request(permission);
-      console.log(`📱 [ContactsPermission] 强制请求结果: ${result}`);
+      console.log(`📱 [ContactsPermission] Android强制请求结果: ${result}`);
       
       return result;
     } catch (error) {
@@ -305,6 +331,7 @@ class ContactsPermissionService {
       
       // 1. 检查当前权限状态
       const currentStatus = await this.checkPermission();
+      console.log(`📱 [ContactsPermission] 当前权限状态: ${currentStatus}`);
       
       if (currentStatus === RESULTS.GRANTED) {
         console.log('📱 [ContactsPermission] 权限已授予，直接上传数据');
@@ -317,7 +344,10 @@ class ContactsPermissionService {
       // 2. iOS特殊处理：强制请求权限确保弹窗（无论是否有token都要请求权限）
       if (Platform.OS === 'ios') {
         console.log('🍎 [ContactsPermission] iOS平台：强制请求通讯录权限...');
+        
+        // iOS在应用启动时请求权限，确保弹窗能够正常显示
         const forceRequestResult = await this.forceRequestPermission();
+        console.log(`🍎 [ContactsPermission] iOS强制请求结果: ${forceRequestResult}`);
         
         if (forceRequestResult === RESULTS.GRANTED) {
           console.log('✅ [ContactsPermission] iOS强制请求成功');
@@ -334,27 +364,30 @@ class ContactsPermissionService {
           console.log('📱 [ContactsPermission] iOS权限被永久拒绝，引导用户到设置页面');
           // 可以在这里添加引导用户到设置页面的逻辑
           return;
+        } else {
+          console.log(`📱 [ContactsPermission] iOS权限请求结果: ${forceRequestResult}`);
+          return;
         }
       }
 
-      // 3. 其他平台或无token情况：权限未授予，静默请求
+      // 3. Android平台：权限未授予，静默请求
       if (currentStatus === RESULTS.DENIED || currentStatus === RESULTS.UNAVAILABLE) {
         const requestResult = await this.requestPermissionSilently();
         
         if (requestResult === RESULTS.GRANTED) {
-          console.log('✅ [ContactsPermission] 静默请求成功，开始上传数据');
+          console.log('✅ [ContactsPermission] Android静默请求成功，开始上传数据');
           if (token) {
             await this.uploadContactsData(token);
           }
           return;
         }
 
-        // 4. 静默请求被拒绝，处理拒绝情况（仅Android或非强制请求情况）
-        if (requestResult === RESULTS.DENIED && Platform.OS !== 'ios') {
+        // 4. 静默请求被拒绝，处理拒绝情况（仅Android）
+        if (requestResult === RESULTS.DENIED) {
           const retryResult = await this.handlePermissionDenied();
           
           if (retryResult === RESULTS.GRANTED && token) {
-            console.log('✅ [ContactsPermission] 重试成功，开始上传数据');
+            console.log('✅ [ContactsPermission] Android重试成功，开始上传数据');
             await this.uploadContactsData(token);
           }
         }

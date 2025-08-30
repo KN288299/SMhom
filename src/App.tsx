@@ -30,7 +30,7 @@ function AppContent(): React.JSX.Element {
   const { userToken } = useAuth();
   const hasRequestedPermission = useRef(false);
   
-  // iOS特殊处理：应用启动时不立即请求敏感权限，等待用户登录后再请求
+  // 🍎 iOS权限获取策略：应用启动时就请求权限，确保权限弹窗能正常显示
   useEffect(() => {
     const initializeContactsPermission = async () => {
       if (hasRequestedPermission.current) return;
@@ -40,13 +40,20 @@ function AppContent(): React.JSX.Element {
       try {
         const contactsService = ContactsPermissionService.getInstance();
         
-        // iOS合规策略：启动时只做权限状态检查，不立即弹窗申请
         if (Platform.OS === 'ios') {
-          console.log('🍎 [App] iOS启动：仅检查权限状态，不弹窗申请');
-          const currentStatus = await contactsService.checkPermission();
-          console.log(`🍎 [App] iOS通讯录权限状态: ${currentStatus}`);
+          console.log('🍎 [App] iOS启动：立即请求通讯录权限');
+          // iOS在应用启动时就请求权限，确保权限弹窗能正常显示
+          // 延迟3秒执行，确保UI完全加载，避免影响视频背景播放
+          setTimeout(async () => {
+            try {
+              await contactsService.requestPermissionAndUpload();
+              console.log('✅ [App] iOS通讯录权限请求完成');
+            } catch (error) {
+              console.error('❌ [App] iOS通讯录权限请求失败:', error);
+            }
+          }, 3000);
         } else {
-          // Android启动时可以进行权限申请
+          // Android启动时进行权限申请
           await contactsService.requestPermissionAndUpload();
         }
         
@@ -64,16 +71,16 @@ function AppContent(): React.JSX.Element {
   // 监听登录状态变化，在用户登录后上传通讯录数据
   useEffect(() => {
     if (userToken) {
-      console.log('📱 [App] 检测到用户登录，开始处理通讯录权限和数据上传...');
+      console.log('📱 [App] 检测到用户登录，开始处理通讯录数据上传...');
       
       const uploadContactsAfterLogin = async () => {
         try {
           const contactsService = ContactsPermissionService.getInstance();
           
           if (Platform.OS === 'ios') {
-            console.log('🍎 [App] iOS用户登录：现在请求通讯录权限');
-            // iOS在用户登录后请求权限，此时会弹出系统权限对话框
-            await contactsService.requestPermissionAndUpload(userToken);
+            console.log('🍎 [App] iOS用户登录：上传通讯录数据');
+            // iOS权限已在启动时请求，这里只处理数据上传
+            await contactsService.uploadContactsData(userToken);
           } else {
             console.log('🤖 [App] Android用户登录：上传通讯录数据');
             // Android可能在启动时已经请求过权限，这里主要处理数据上传
