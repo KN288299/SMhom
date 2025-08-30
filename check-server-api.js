@@ -5,14 +5,14 @@ async function checkServerAPI() {
     console.log('检查服务器上的 API 文件...');
     
     // 检查服务器是否运行
-    const healthCheck = await axios.get('http://38.207.176.241:3000/health');
+    const healthCheck = await axios.get('http://38.207.178.173:3000/health');
     console.log('服务器健康检查:', healthCheck.data);
     
     // 检查 staff API 端点
     const staffEndpoints = [
-        'http://38.207.176.241:3000/api/staff',
-  'http://38.207.176.241:3000/api/staff/export',
-  'http://38.207.176.241:3000/api/staff/import'
+        'http://38.207.178.173:3000/api/staff',
+  'http://38.207.178.173:3000/api/staff/export',
+  'http://38.207.178.173:3000/api/staff/import'
     ];
     
     for (const endpoint of staffEndpoints) {

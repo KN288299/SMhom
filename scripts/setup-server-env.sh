@@ -201,7 +201,7 @@ print_step "11" "创建Nginx配置模板"
 cat > /etc/nginx/sites-available/homeservice << 'EOF'
 server {
     listen 80;
-    server_name 38.207.176.241;
+    server_name 38.207.178.173;
 
     # 增加客户端最大上传大小
     client_max_body_size 50M;

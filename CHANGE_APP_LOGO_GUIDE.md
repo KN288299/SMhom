@@ -52,7 +52,7 @@ node generate-icons.js
 - `android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png` (192x192)
 
 **iOS图标：**
-- `ios/HomSm/Images.xcassets/AppIcon.appiconset/` 目录下的所有PNG文件
+- `ios/SMhom/Images.xcassets/AppIcon.appiconset/` 目录下的所有PNG文件
 
 ### 第三步：测试更改
 
@@ -120,7 +120,7 @@ cd ..
 ### iOS IPA打包
 
 #### 使用Xcode打包
-1. 打开 `ios/HomSm.xcworkspace`
+1. 打开 `ios/SMhom.xcworkspace`
 2. 选择 "Product" → "Archive"
 3. 在Organizer中选择 "Distribute App"
 4. 选择分发方式（App Store、Ad Hoc等）

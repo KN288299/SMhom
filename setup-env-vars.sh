@@ -3,7 +3,7 @@
 echo "🔧 设置HomeSM环境变量..."
 
 # TURN服务器配置
-export TURN_HOST=38.207.176.241
+export TURN_HOST=38.207.178.173
 export TURN_STATIC_USER=webrtcuser
 export TURN_STATIC_PASS=webrtcpass
 

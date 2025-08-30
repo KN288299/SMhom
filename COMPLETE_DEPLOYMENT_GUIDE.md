@@ -2,7 +2,7 @@
 
 ## 📋 部署概览
 
-**目标服务器**: `38.207.176.241:55122`
+**目标服务器**: `38.207.178.173:55122`
 **应用类型**: 家政服务聊天APP
 **包含组件**:
 - React Native移动端APP (Android/iOS)
@@ -17,7 +17,7 @@
 
 ### 1.1 连接到服务器
 ```bash
-ssh root@38.207.176.241 -p 55122
+ssh root@38.207.178.173 -p 55122
 ```
 
 ### 1.2 安装必要软件
@@ -84,7 +84,7 @@ git clone [你的Git仓库地址] .
 tar --exclude=node_modules --exclude=android/app/build --exclude=ios/build --exclude=admin/node_modules --exclude=admin/dist -czf homeservice.tar.gz .
 
 # 上传到服务器
-scp -P 55122 homeservice.tar.gz root@38.207.176.241:/opt/homeservice/
+scp -P 55122 homeservice.tar.gz root@38.207.178.173:/opt/homeservice/
 
 # 在服务器上解压
 cd /opt/homeservice
@@ -139,7 +139,7 @@ JWT_SECRET=your_super_secure_jwt_secret_key_here
 UPLOAD_PATH=./uploads
 
 # CORS允许的域名
-CORS_ORIGINS=http://38.207.176.241:3000,http://38.207.176.241:8080,http://38.207.176.241
+CORS_ORIGINS=http://38.207.178.173:3000,http://38.207.178.173:8080,http://38.207.178.173
 
 # 环境设置
 NODE_ENV=production
@@ -184,7 +184,7 @@ nano /etc/nginx/sites-available/homeservice
 ```nginx
 server {
     listen 80;
-    server_name 38.207.176.241;
+    server_name 38.207.178.173;
 
     # API代理
     location /api/ {
@@ -351,12 +351,12 @@ CORS_ORIGINS=https://yourdomain.com,https://yourdomain.com:443
 ### 8.1 后端API测试
 ```bash
 # 测试API是否正常
-curl http://38.207.176.241:3000/api/health
+curl http://38.207.178.173:3000/api/health
 
 # 测试Socket.io连接
 node -e "
 const io = require('socket.io-client');
-const socket = io('http://38.207.176.241:3000');
+const socket = io('http://38.207.178.173:3000');
 socket.on('connect', () => {
   console.log('✅ Socket.io连接成功');
   socket.disconnect();
@@ -367,7 +367,7 @@ socket.on('connect', () => {
 ### 8.2 Web管理后台测试
 ```bash
 # 访问管理后台
-http://38.207.176.241/admin/
+http://38.207.178.173/admin/
 
 # 检查以下功能:
 # - 登录页面加载
@@ -502,6 +502,6 @@ nginx -s reload
 4. 系统资源: `htop`, `df -h`
 
 **部署完成后，你的应用将在以下地址可用:**
-- 移动端API: `http://38.207.176.241:3000/api`
-- Web管理后台: `http://38.207.176.241/admin`
-- Socket.io服务: `http://38.207.176.241:3000`
+- 移动端API: `http://38.207.178.173:3000/api`
+- Web管理后台: `http://38.207.178.173/admin`
+- Socket.io服务: `http://38.207.178.173:3000`

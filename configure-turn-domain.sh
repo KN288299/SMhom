@@ -32,7 +32,7 @@ PORT=3000
 NODE_ENV=production
 
 # TURN Server Configuration
-TURN_HOST=38.207.176.241
+TURN_HOST=38.207.178.173
 TURN_HOSTNAME=$DOMAIN
 TURN_SECRET=your-turn-secret-key
 TURN_TTL=600
@@ -58,7 +58,7 @@ grep "TURN_" "$ENV_FILE" || echo "未找到TURN配置"
 
 echo ""
 echo "📋 接下来的步骤:"
-echo "1. 确保域名 $DOMAIN 指向服务器IP: 38.207.176.241"
+echo "1. 确保域名 $DOMAIN 指向服务器IP: 38.207.178.173"
 echo "2. 为域名配置SSL证书（推荐使用Let's Encrypt）"
 echo "3. 配置coturn服务器支持TLS/DTLS:"
 echo "   - cert=/path/to/your/cert.pem"

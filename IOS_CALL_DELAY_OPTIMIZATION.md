@@ -173,7 +173,7 @@ class IOSCallKitService {
 #### **3. 集成PushKit VoIP推送**
 
 ```swift
-// ios/HomSm/AppDelegate.swift
+// ios/SMhom/AppDelegate.swift
 import PushKit
 
 class AppDelegate: RCTAppDelegate, PKPushRegistryDelegate {

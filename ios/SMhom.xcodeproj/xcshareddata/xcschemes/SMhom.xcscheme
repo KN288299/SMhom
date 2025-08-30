@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-               BuildableName = "HomSm.app"
-               BlueprintName = "HomSm"
-               ReferencedContainer = "container:HomSm.xcodeproj">
+               BuildableName = "SMhom.app"
+               BlueprintName = "SMhom"
+               ReferencedContainer = "container:SMhom.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "00E356ED1AD99517003FC87E"
-               BuildableName = "HomSmTests.xctest"
-               BlueprintName = "HomSmTests"
-               ReferencedContainer = "container:HomSm.xcodeproj">
+               BuildableName = "SMhomTests.xctest"
+               BlueprintName = "SMhomTests"
+               ReferencedContainer = "container:SMhom.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -55,9 +55,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "HomSm.app"
-            BlueprintName = "HomSm"
-            ReferencedContainer = "container:HomSm.xcodeproj">
+            BuildableName = "SMhom.app"
+            BlueprintName = "SMhom"
+            ReferencedContainer = "container:SMhom.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -72,9 +72,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "HomSm.app"
-            BlueprintName = "HomSm"
-            ReferencedContainer = "container:HomSm.xcodeproj">
+            BuildableName = "SMhom.app"
+            BlueprintName = "SMhom"
+            ReferencedContainer = "container:SMhom.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

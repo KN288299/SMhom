@@ -1032,7 +1032,7 @@ const VoiceCallScreen: React.FC = () => {
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:38.207.176.241:3478' },
+          { urls: 'stun:38.207.178.173:3478' },
           // 公共TURN服务器作为备用
           {
             urls: [
@@ -1046,9 +1046,9 @@ const VoiceCallScreen: React.FC = () => {
           // 私有TURN服务器
           {
             urls: [
-                      'turn:38.207.176.241:3478?transport=udp',
-        'turn:38.207.176.241:3478?transport=tcp',
-        'turn:38.207.176.241:443?transport=tcp',
+                      'turn:38.207.178.173:3478?transport=udp',
+        'turn:38.207.178.173:3478?transport=tcp',
+        'turn:38.207.178.173:443?transport=tcp',
             ],
             username: 'webrtcuser',
             credential: 'webrtcpass',

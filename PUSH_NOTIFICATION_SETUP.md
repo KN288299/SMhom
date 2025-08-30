@@ -44,7 +44,7 @@ npm install react-native-push-notification @react-native-community/push-notifica
 2. 下载 `google-services.json` (Android) 和 `GoogleService-Info.plist` (iOS)
 3. 将配置文件放到对应位置：
    - Android: `android/app/google-services.json`
-   - iOS: `ios/HomSm/GoogleService-Info.plist`
+   - iOS: `ios/SMhom/GoogleService-Info.plist`
 
 ### 第三步：原生代码配置
 

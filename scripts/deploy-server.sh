@@ -15,7 +15,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # 服务器配置
-SERVER_HOST="38.207.176.241"
+SERVER_HOST="38.207.178.173"
 SERVER_PORT="55122"
 APP_DIR="/opt/homeservice"
 

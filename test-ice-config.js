@@ -152,7 +152,7 @@ async function testStunServers() {
     'stun.l.google.com:19302',
     'stun1.l.google.com:19302', 
     'stun2.l.google.com:19302',
-    '38.207.176.241:3478'
+    '38.207.178.173:3478'
   ];
   
   for (const server of stunServers) {
@@ -170,7 +170,7 @@ async function testStunServers() {
 async function testTurnServers() {
   console.log('\n🔄 测试TURN服务器连通性...');
   
-  const turnHost = '38.207.176.241';
+  const turnHost = '38.207.178.173';
   const ports = [3478, 443];
   
   for (const port of ports) {

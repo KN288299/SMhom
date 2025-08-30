@@ -392,7 +392,7 @@ const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
         {
           method: 'GET',
           headers: {
-            'User-Agent': 'HomSm/1.0',
+            'User-Agent': 'SMhom/1.0',
             'Accept': 'application/json',
           },
           signal: controller.signal,

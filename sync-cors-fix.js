@@ -13,7 +13,7 @@ async function syncServerFile() {
     }
     
     // 使用 scp 上传文件到服务器
-    const command = `scp -P 55122 server.js root@38.207.176.241:/opt/homeservice/`;
+    const command = `scp -P 55122 server.js root@38.207.178.173:/opt/homeservice/`;
     
     exec(command, (error, stdout, stderr) => {
       if (error) {
@@ -28,7 +28,7 @@ async function syncServerFile() {
       
       // 重启服务器服务
       console.log('🔄 正在重启服务器服务...');
-      const restartCommand = `ssh -p 55122 root@38.207.176.241 "cd /opt/homeservice && pm2 restart server.js"`;
+      const restartCommand = `ssh -p 55122 root@38.207.178.173 "cd /opt/homeservice && pm2 restart server.js"`;
       
       exec(restartCommand, (restartError, restartStdout, restartStderr) => {
         if (restartError) {
@@ -43,7 +43,7 @@ async function syncServerFile() {
         
         // 检查服务状态
         console.log('🔍 检查服务状态...');
-        const statusCommand = `ssh -p 55122 root@38.207.176.241 "pm2 status"`;
+        const statusCommand = `ssh -p 55122 root@38.207.178.173 "pm2 status"`;
         
         exec(statusCommand, (statusError, statusStdout, statusStderr) => {
           if (statusError) {

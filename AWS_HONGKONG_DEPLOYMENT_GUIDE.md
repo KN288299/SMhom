@@ -292,7 +292,7 @@ export const API_CONFIG = {
 ```
 
 ### iOS网络配置
-在 `ios/HomSm/Info.plist` 中确保:
+在 `ios/SMhom/Info.plist` 中确保:
 ```xml
 <key>NSAppTransportSecurity</key>
 <dict>

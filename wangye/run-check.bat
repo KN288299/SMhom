@@ -2,7 +2,7 @@
 chcp 65001 >nul
 echo 🔍 远程检查服务器部署状态...
 
-set SERVER_IP=38.207.176.241
+set SERVER_IP=38.207.178.173
 set USERNAME=root
 
 echo.
@@ -56,7 +56,7 @@ echo 🔧 如果提示权限不足，先运行：
 echo chmod +x check-server-deployment.sh
 echo.
 echo 📝 完整步骤：
-echo 1. ssh root@38.207.176.241
+echo 1. ssh root@38.207.178.173
 echo 2. cd /opt/HomeSM/wangye
 echo 3. chmod +x check-server-deployment.sh
 echo 4. ./check-server-deployment.sh

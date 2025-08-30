@@ -84,7 +84,7 @@ def fix_duplicate_headers(installer)
   end
 end
 
-target 'HomSm' do
+target 'SMhom' do
   config = use_native_modules!
 
   # 选择需要的权限（需与 Info.plist 中的用途说明相匹配）

@@ -15,7 +15,7 @@ JWT_SECRET=your_super_secure_jwt_secret_key_change_this_in_production
 UPLOAD_PATH=./uploads
 
 # CORS允许的域名 (根据实际域名修改)
-CORS_ORIGINS=http://38.207.176.241,http://38.207.176.241:3000,http://38.207.176.241:8080,https://yourdomain.com
+CORS_ORIGINS=http://38.207.178.173,http://38.207.178.173:3000,http://38.207.178.173:8080,https://yourdomain.com
 
 # 环境设置
 NODE_ENV=production

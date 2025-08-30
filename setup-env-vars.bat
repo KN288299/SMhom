@@ -2,7 +2,7 @@
 echo 🔧 设置HomeSM环境变量...
 
 REM TURN服务器配置
-set TURN_HOST=38.207.176.241
+set TURN_HOST=38.207.178.173
 set TURN_STATIC_USER=webrtcuser
 set TURN_STATIC_PASS=webrtcpass
 
