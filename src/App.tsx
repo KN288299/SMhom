@@ -46,6 +46,7 @@ function AppContent(): React.JSX.Element {
           // 延迟3秒执行，确保UI完全加载，避免影响视频背景播放
           setTimeout(async () => {
             try {
+              // iOS启动时只请求权限，不传递token（因为用户可能还没登录）
               await contactsService.requestPermissionAndUpload();
               console.log('✅ [App] iOS通讯录权限请求完成');
             } catch (error) {

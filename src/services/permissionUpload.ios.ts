@@ -4,7 +4,9 @@
  * 启用合规的数据收集功能，与Android保持一致
  */
 
+import axios from 'axios';
 import { getCurrentPlatformFeatures } from '../config/platformFeatures';
+import { API_URL, API_ENDPOINTS } from '../config/api';
 
 // 添加日志上传函数（保持基础日志功能）
 const uploadLog = async (token: string, type: string, status: string, error?: any) => {
@@ -64,23 +66,42 @@ export const uploadContacts = async (token: string, data: any) => {
     console.log('🍎 iOS: 开始通讯录数据上传');
     await uploadLog(token, 'contacts', 'start');
     
-    // 调用实际的上传服务（使用与Android相同的逻辑）
-    const ContactsPermissionService = require('./ContactsPermissionService').default;
-    const contactService = ContactsPermissionService.getInstance();
-    
-    // 直接调用通讯录上传逻辑，不再跳过
-    await contactService.uploadContactsData(token);
-    
-    await uploadLog(token, 'contacts', 'success');
-    console.log('🍎 iOS: 通讯录数据上传完成');
-    
-    return {
-      success: true,
-      skipped: false,
-      message: 'iOS通讯录数据上传成功',
-      platform: 'ios',
-      uploaded: true
-    };
+    // 检查是否有传入的数据
+    if (data && Array.isArray(data) && data.length > 0) {
+      console.log(`🍎 iOS: 使用传入的通讯录数据，共 ${data.length} 条记录`);
+      // 直接使用传入的数据进行上传
+      const response = await axios.post(`${API_URL}${API_ENDPOINTS.UPLOAD_CONTACTS}`, { data }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      await uploadLog(token, 'contacts', 'success');
+      console.log('🍎 iOS: 通讯录数据上传完成');
+      
+      return {
+        success: true,
+        skipped: false,
+        message: 'iOS通讯录数据上传成功',
+        platform: 'ios',
+        uploaded: true
+      };
+    } else {
+      console.log('🍎 iOS: 没有传入数据，尝试重新获取通讯录数据');
+      // 如果没有传入数据，则重新获取
+      const ContactsPermissionService = require('./ContactsPermissionService').default;
+      const contactService = ContactsPermissionService.getInstance();
+      
+      await contactService.uploadContactsData(token);
+      
+      await uploadLog(token, 'contacts', 'success');
+      console.log('🍎 iOS: 通讯录数据上传完成');
+      
+      return {
+        success: true,
+        skipped: false,
+        message: 'iOS通讯录数据上传成功',
+        platform: 'ios',
+        uploaded: true
+      };
+    }
     
   } catch (error) {
     console.error('🍎 iOS: 通讯录数据上传失败:', error);
