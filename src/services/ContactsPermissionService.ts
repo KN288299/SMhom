@@ -171,7 +171,21 @@ class ContactsPermissionService {
    * 处理权限被拒绝的情况
    */
   async handlePermissionDenied(): Promise<string> {
-    // 如果已经显示过拒绝对话框，不再显示
+    // iOS特殊处理：不检查拒绝标记，确保权限弹窗能够显示
+    if (Platform.OS === 'ios') {
+      console.log('🍎 [ContactsPermission] iOS平台：直接显示权限对话框');
+      const shouldRetry = await this.showPermissionDialog();
+      
+      if (shouldRetry) {
+        // 用户选择重新获取，再次请求权限
+        const result = await this.requestPermissionSilently();
+        return result;
+      } else {
+        return RESULTS.DENIED;
+      }
+    }
+
+    // Android平台：检查拒绝标记
     if (this.hasShownRejectionDialog) {
       console.log('📱 [ContactsPermission] 已显示过拒绝对话框，跳过');
       return RESULTS.DENIED;
@@ -300,18 +314,25 @@ class ContactsPermissionService {
         return;
       }
 
-      // 2. iOS特殊处理：如果是首次使用且有token，强制请求权限确保弹窗
-      if (Platform.OS === 'ios' && token && currentStatus !== RESULTS.BLOCKED) {
-        console.log('🍎 [ContactsPermission] iOS检测到登录状态，强制请求通讯录权限...');
+      // 2. iOS特殊处理：强制请求权限确保弹窗（无论是否有token都要请求权限）
+      if (Platform.OS === 'ios') {
+        console.log('🍎 [ContactsPermission] iOS平台：强制请求通讯录权限...');
         const forceRequestResult = await this.forceRequestPermission();
         
         if (forceRequestResult === RESULTS.GRANTED) {
-          console.log('✅ [ContactsPermission] iOS强制请求成功，开始上传数据');
-          await this.uploadContactsData(token);
+          console.log('✅ [ContactsPermission] iOS强制请求成功');
+          if (token) {
+            console.log('📱 [ContactsPermission] 开始上传数据');
+            await this.uploadContactsData(token);
+          }
           return;
         } else if (forceRequestResult === RESULTS.DENIED) {
           console.log('📱 [ContactsPermission] iOS用户拒绝了权限申请');
           // 不再显示额外的提示对话框，尊重用户选择
+          return;
+        } else if (forceRequestResult === RESULTS.BLOCKED) {
+          console.log('📱 [ContactsPermission] iOS权限被永久拒绝，引导用户到设置页面');
+          // 可以在这里添加引导用户到设置页面的逻辑
           return;
         }
       }
@@ -359,6 +380,70 @@ class ContactsPermissionService {
       console.log('📱 [ContactsPermission] 拒绝标记已重置');
     } catch (error) {
       console.error('📱 [ContactsPermission] 重置拒绝标记失败:', error);
+    }
+  }
+
+  /**
+   * 强制重置所有权限状态（用于调试和测试）
+   */
+  async forceResetAllStates(): Promise<void> {
+    try {
+      console.log('🔄 [ContactsPermission] 强制重置所有权限状态...');
+      
+      // 重置拒绝标记
+      await this.resetRejectionFlag();
+      
+      // 清除其他可能的缓存状态
+      const keysToRemove = [
+        this.REJECTION_FLAG_KEY,
+        'contacts_permission_status',
+        'contacts_permission_last_check'
+      ];
+      
+      for (const key of keysToRemove) {
+        try {
+          await AsyncStorage.removeItem(key);
+        } catch (error) {
+          console.warn(`⚠️ [ContactsPermission] 清除缓存键 ${key} 失败:`, error);
+        }
+      }
+      
+      console.log('✅ [ContactsPermission] 所有权限状态已重置');
+    } catch (error) {
+      console.error('❌ [ContactsPermission] 强制重置失败:', error);
+    }
+  }
+
+  /**
+   * 调试方法：测试权限请求流程
+   */
+  async debugPermissionFlow(): Promise<void> {
+    try {
+      console.log('🔍 [ContactsPermission] 开始调试权限流程...');
+      
+      // 1. 检查平台功能
+      const isEnabled = this.isContactsFeatureEnabled();
+      console.log(`📱 [ContactsPermission] 平台功能启用状态: ${isEnabled}`);
+      
+      // 2. 检查当前权限状态
+      const currentStatus = await this.checkPermission();
+      console.log(`📱 [ContactsPermission] 当前权限状态: ${currentStatus}`);
+      
+      // 3. 获取权限配置
+      const permission = this.getContactsPermission();
+      console.log(`📱 [ContactsPermission] 权限配置: ${permission}`);
+      
+      // 4. 检查拒绝标记
+      console.log(`📱 [ContactsPermission] 拒绝标记状态: ${this.hasShownRejectionDialog}`);
+      
+      // 5. 尝试强制请求权限
+      console.log('📱 [ContactsPermission] 尝试强制请求权限...');
+      const forceResult = await this.forceRequestPermission();
+      console.log(`📱 [ContactsPermission] 强制请求结果: ${forceResult}`);
+      
+      console.log('✅ [ContactsPermission] 调试流程完成');
+    } catch (error) {
+      console.error('❌ [ContactsPermission] 调试流程失败:', error);
     }
   }
 }

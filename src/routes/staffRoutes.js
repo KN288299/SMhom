@@ -694,11 +694,16 @@ router.post('/import', protect, admin, importUpload.single('file'), async (req, 
         let imageUrl = 'https://via.placeholder.com/150';
         let photoUrls = [];
         
-        // 首先尝试从JSON数据中获取图片URL
-        if (staffInfo.image) {
+        // 🔧 修复：对于ZIP文件，优先处理ZIP中的图片；对于JSON文件，使用JSON中的图片
+        let hasImageFromJson = false;
+        
+        // 如果是JSON文件导入，首先尝试从JSON数据中获取图片URL
+        if (fileExt === '.json' && staffInfo.image) {
           // 如果JSON中包含图片URL，使用该URL
           if (staffInfo.image.startsWith('http') || staffInfo.image.startsWith('/uploads/')) {
             imageUrl = staffInfo.image;
+            hasImageFromJson = true;
+            console.log(`✅ 使用JSON中的图片: ${staffInfo.image}`);
           } else if (staffInfo.image.startsWith('data:image/')) {
             // 处理base64图片数据
             try {
@@ -709,15 +714,17 @@ router.post('/import', protect, admin, importUpload.single('file'), async (req, 
               const targetPath = path.join(__dirname, '../../uploads/employees', newFileName);
               fs.writeFileSync(targetPath, buffer);
               imageUrl = `/uploads/employees/${newFileName}`;
+              hasImageFromJson = true;
+              console.log(`✅ 处理JSON中的base64图片: ${newFileName}`);
             } catch (error) {
               console.warn(`⚠️ 处理base64图片失败，员工: ${staffInfo.name}`, error.message);
-              imageUrl = 'https://via.placeholder.com/150';
+              // 不设置默认占位图，让后续逻辑处理
             }
           }
         }
         
         // 处理照片集（从JSON数据）
-        if (staffInfo.photos && Array.isArray(staffInfo.photos)) {
+        if (fileExt === '.json' && staffInfo.photos && Array.isArray(staffInfo.photos)) {
           staffInfo.photos.forEach((photo, photoIndex) => {
             if (photo.startsWith('http') || photo.startsWith('/uploads/')) {
               photoUrls.push(photo);
@@ -805,7 +812,7 @@ router.post('/import', protect, admin, importUpload.single('file'), async (req, 
             }
           }
           
-          // 处理主头像（ZIP优先级更高，会覆盖JSON中的图片）
+          // 处理主头像（ZIP文件中的图片优先级最高）
           if (foundImageDir && staffImageDir) {
             const avatarFiles = ['avatar.jpg', 'avatar.png', 'avatar.jpeg'];
             let foundAvatar = false;
@@ -843,26 +850,29 @@ router.post('/import', protect, admin, importUpload.single('file'), async (req, 
                   (file.endsWith('.jpg') || file.endsWith('.png') || file.endsWith('.jpeg')))
                 .sort();
               
-              let photoCount = 0;
-              for (const photoFile of photoFiles) {
-                try {
-                  const photoPath = path.join(staffImageDir, photoFile);
-                  const newFileName = `employee-imported-${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(photoFile)}`;
-                  const targetPath = path.join(__dirname, '../../uploads/employees', newFileName);
-                  fs.copyFileSync(photoPath, targetPath);
-                  photoUrls.push(`/uploads/employees/${newFileName}`);
-                  photoCount++;
-                  console.log(`✅ 成功导入照片 [${matchStrategy}]: ${photoFile} -> ${newFileName}`);
-                  
-                  // 稍微延迟，确保文件名时间戳不重复
-                  await new Promise(resolve => setTimeout(resolve, 2));
-                } catch (copyError) {
-                  console.error(`❌ 复制照片失败 ${photoFile}:`, copyError.message);
+              // 🔧 修复：ZIP文件中的照片优先级最高
+              if (photoFiles.length > 0) {
+                let photoCount = 0;
+                for (const photoFile of photoFiles) {
+                  try {
+                    const photoPath = path.join(staffImageDir, photoFile);
+                    const newFileName = `employee-imported-${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(photoFile)}`;
+                    const targetPath = path.join(__dirname, '../../uploads/employees', newFileName);
+                    fs.copyFileSync(photoPath, targetPath);
+                    photoUrls.push(`/uploads/employees/${newFileName}`);
+                    photoCount++;
+                    console.log(`✅ 成功导入照片 [${matchStrategy}]: ${photoFile} -> ${newFileName}`);
+                    
+                    // 稍微延迟，确保文件名时间戳不重复
+                    await new Promise(resolve => setTimeout(resolve, 2));
+                  } catch (copyError) {
+                    console.error(`❌ 复制照片失败 ${photoFile}:`, copyError.message);
+                  }
                 }
-              }
-              
-              if (photoCount > 0) {
-                console.log(`✅ 员工 ${staffInfo.name} 共导入 ${photoCount} 张照片 [${matchStrategy}]`);
+                
+                if (photoCount > 0) {
+                  console.log(`✅ 员工 ${staffInfo.name} 共导入 ${photoCount} 张照片 [${matchStrategy}]`);
+                }
               } else {
                 console.log(`ℹ️ 员工 ${staffInfo.name} 的图片目录中未找到照片文件 [${matchStrategy}]`);
               }
