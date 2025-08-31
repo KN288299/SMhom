@@ -3,26 +3,22 @@
     {
       "idiom" : "iphone",
       "scale" : "2x",
-      "size" : "20x20",
-      "filename" : "20x20@2x.png"
+      "size" : "20x20"
     },
     {
       "idiom" : "iphone",
       "scale" : "3x",
-      "size" : "20x20",
-      "filename" : "20x20@3x.png"
+      "size" : "20x20"
     },
     {
       "idiom" : "iphone",
       "scale" : "2x",
-      "size" : "29x29",
-      "filename" : "29x29@2x.png"
+      "size" : "29x29"
     },
     {
       "idiom" : "iphone",
       "scale" : "3x",
-      "size" : "29x29",
-      "filename" : "29x29@3x.png"
+      "size" : "29x29"
     },
     {
       "idiom" : "iphone",
