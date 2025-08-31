@@ -307,7 +307,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.yourcompany.homsm";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.smhom";
 				PRODUCT_NAME = SMhom;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -334,7 +334,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.yourcompany.homsm";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.smhom";
 				PRODUCT_NAME = SMhom;
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
