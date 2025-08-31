@@ -126,11 +126,29 @@ const triggerAutoMessages = asyncHandler(async (req, res) => {
       for (let i = 0; i < rule.messages.length; i++) {
         const m = rule.messages[i];
         // 发送者为客服
+        let content = '';
+        if (m.contentType === 'text') {
+          content = m.content || '';
+        } else if (m.contentType === 'image') {
+          content = '[图片]';
+        } else if (m.contentType === 'voice') {
+          content = '[语音]';
+        } else if (m.contentType === 'video') {
+          content = '[视频]';
+        } else {
+          content = `[${m.contentType}]`;
+        }
+        
+        // 确保content不为空
+        if (!content || content.trim() === '') {
+          content = `[${m.contentType || '消息'}]`;
+        }
+        
         const messageData = {
           conversationId: conversation._id,
           senderId: rule.customerServiceId,
           senderRole: 'customer_service',
-          content: m.contentType === 'text' ? (m.content || '') : (m.content || ''),
+          content: content,
           contentType: m.contentType,
           messageType: m.contentType,
         };
@@ -152,7 +170,7 @@ const triggerAutoMessages = asyncHandler(async (req, res) => {
         }
 
         const created = await Message.create(messageData);
-        conversation.lastMessage = messageData.content || m.contentType;
+        conversation.lastMessage = content;
         conversation.lastMessageTime = Date.now();
         // 未读计数：增加用户未读
         conversation.unreadCountUser += 1;
@@ -168,7 +186,7 @@ const triggerAutoMessages = asyncHandler(async (req, res) => {
               senderAvatar,
               senderName,
               senderPhoneNumber,
-              content: messageData.content,
+              content: content,
               conversationId: String(conversation._id),
               timestamp: new Date(),
               messageType: messageData.messageType || messageData.contentType || 'text',
